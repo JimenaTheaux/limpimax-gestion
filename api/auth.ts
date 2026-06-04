@@ -22,7 +22,7 @@ const isProd = process.env.NODE_ENV === 'production'
 export const auth = betterAuth({
   database: pool,
 
-  secret: process.env.BETTER_AUTH_SECRET!,
+  secret: process.env.BETTER_AUTH_SECRET ?? 'change-me-in-vercel-env-vars',
 
   baseURL: process.env.BETTER_AUTH_URL ?? 'http://localhost:5173',
 
