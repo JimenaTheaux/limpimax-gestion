@@ -1,0 +1,361 @@
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { Plus, Edit2, Settings, Mail } from 'lucide-react'
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle,
+} from '@/components/ui/sheet'
+import { Skeleton }         from '@/components/ui/skeleton'
+import { FloatInput }            from '@/components/common/FloatInput'
+import { ButtonGroup }           from '@/components/common/ButtonGroup'
+import { BadgeRol, BadgeActivo } from '@/components/common/BadgeEstado'
+import { EmptyState }       from '@/components/common/EmptyState'
+import { ToastContainer }   from '@/components/common/ToastContainer'
+import { useToast }         from '@/hooks/useToast'
+import { useAuth }          from '@/hooks/useAuth'
+import {
+  useUsuarios, useCrearUsuario, useEditarUsuario,
+  type UsuarioConEmail,
+} from '@/services/usuarios'
+
+// ─── Constantes ───────────────────────────────────────────────────────────────
+
+const ROL_OPTIONS = [
+  { value: 'admin',      label: 'Admin',      color: '#1B9ED6' },
+  { value: 'produccion', label: 'Producción', color: '#F57C00' },
+  { value: 'repartidor', label: 'Repartidor', color: '#2E9E5C' },
+]
+
+// ─── Schemas ──────────────────────────────────────────────────────────────────
+
+const crearSchema = z.object({
+  nombre:   z.string().min(1, 'El nombre es obligatorio'),
+  email:    z.string().email('Email inválido'),
+  password: z.string().min(6, 'Mínimo 6 caracteres'),
+  rol:      z.enum(['admin', 'produccion', 'repartidor']),
+})
+
+const editarSchema = z.object({
+  nombre:   z.string().min(1, 'El nombre es obligatorio'),
+  rol:      z.enum(['admin', 'produccion', 'repartidor']),
+})
+
+type CrearForm  = z.infer<typeof crearSchema>
+type EditarForm = z.infer<typeof editarSchema>
+
+// ─── Drawer crear ─────────────────────────────────────────────────────────────
+
+interface CrearDrawerProps {
+  open:    boolean
+  onClose: () => void
+  onSaved: (msg: string) => void
+}
+
+function CrearUsuarioDrawer({ open, onClose, onSaved }: CrearDrawerProps) {
+  const crear  = useCrearUsuario()
+  const saving = crear.isPending
+
+  const { register, handleSubmit, reset, watch, setValue: setVal, formState: { errors } } = useForm<CrearForm>({
+    resolver: zodResolver(crearSchema),
+    defaultValues: { nombre: '', email: '', password: '', rol: 'admin' },
+  })
+
+  const rolVal = watch('rol')
+
+  const onSubmit = async (data: CrearForm) => {
+    try {
+      await crear.mutateAsync(data)
+      onSaved('Usuario creado correctamente')
+      reset()
+      onClose()
+    } catch (e) {
+      onSaved((e instanceof Error ? e.message : 'Error al crear usuario') + '|error')
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={v => { if (!v) onClose() }}>
+      <SheetContent side="right">
+        <SheetHeader>
+          <SheetTitle>Nuevo usuario</SheetTitle>
+        </SheetHeader>
+
+        <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 24 }}>
+          <FloatInput label="Nombre completo *" error={errors.nombre?.message}   {...register('nombre')} />
+          <FloatInput label="Email *"           error={errors.email?.message}    {...register('email')}    type="email" autoComplete="off" />
+          <FloatInput label="Contraseña inicial *" error={errors.password?.message} {...register('password')} type="password" autoComplete="new-password" />
+
+          <ButtonGroup
+            label="Rol *"
+            value={rolVal}
+            onChange={v => setVal('rol', v as CrearForm['rol'], { shouldValidate: true })}
+            error={errors.rol?.message}
+            options={ROL_OPTIONS}
+          />
+
+          <p style={{ fontSize: 12, color: '#4A5568', background: '#F4F6F8', borderRadius: 8, padding: '8px 10px', margin: 0 }}>
+            El usuario recibirá sus credenciales. Pedile que cambie la contraseña al ingresar.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+            <button type="submit" disabled={saving} style={{
+              background: saving ? 'rgba(13,92,138,0.5)' : '#0D5C8A', color: '#fff',
+              border: 'none', borderRadius: 10, padding: '13px 20px', minHeight: 44,
+              fontSize: 15, fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer',
+            }}>
+              {saving ? 'Creando…' : 'Crear usuario'}
+            </button>
+            <button type="button" onClick={onClose} style={{
+              background: 'transparent', color: '#0D5C8A', border: '1.5px solid #0D5C8A',
+              borderRadius: 10, padding: '12px 20px', minHeight: 44,
+              fontSize: 15, fontWeight: 600, cursor: 'pointer',
+            }}>
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+// ─── Drawer editar ────────────────────────────────────────────────────────────
+
+interface EditarDrawerProps {
+  open:    boolean
+  onClose: () => void
+  usuario: UsuarioConEmail | null
+  onSaved: (msg: string) => void
+  selfId:  string
+}
+
+function EditarUsuarioDrawer({ open, onClose, usuario, onSaved, selfId }: EditarDrawerProps) {
+  const editar = useEditarUsuario()
+  const saving = editar.isPending
+  const isSelf = usuario?.userId === selfId
+
+  const { register, handleSubmit, watch, setValue: setVal, formState: { errors } } = useForm<EditarForm>({
+    resolver: zodResolver(editarSchema),
+    values: { nombre: usuario?.nombre ?? '', rol: (usuario?.rol ?? 'admin') as EditarForm['rol'] },
+  })
+
+  const rolVal = watch('rol')
+
+  const onSubmit = async (data: EditarForm) => {
+    if (!usuario) return
+    try {
+      await editar.mutateAsync({ id: usuario.id, ...data })
+      onSaved('Usuario actualizado')
+      onClose()
+    } catch (e) {
+      onSaved((e instanceof Error ? e.message : 'Error al guardar') + '|error')
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={v => { if (!v) onClose() }}>
+      <SheetContent side="right">
+        <SheetHeader>
+          <SheetTitle>Editar usuario</SheetTitle>
+        </SheetHeader>
+
+        {usuario && (
+          <>
+            <p style={{ fontSize: 13, color: '#4A5568', marginTop: 16, marginBottom: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Mail size={14} /> {usuario.email}
+            </p>
+
+            <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 20 }}>
+              <FloatInput label="Nombre *" error={errors.nombre?.message} {...register('nombre')} />
+
+              <ButtonGroup
+                label="Rol *"
+                value={rolVal}
+                onChange={v => setVal('rol', v as EditarForm['rol'], { shouldValidate: true })}
+                error={errors.rol?.message}
+                disabled={isSelf}
+                options={ROL_OPTIONS}
+              />
+
+              {isSelf && (
+                <p style={{ fontSize: 12, color: '#F57C00', background: '#FFF3E0', borderRadius: 8, padding: '8px 10px', margin: 0 }}>
+                  No podés cambiar tu propio rol.
+                </p>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+                <button type="submit" disabled={saving} style={{
+                  background: saving ? 'rgba(13,92,138,0.5)' : '#0D5C8A', color: '#fff',
+                  border: 'none', borderRadius: 10, padding: '13px 20px', minHeight: 44,
+                  fontSize: 15, fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer',
+                }}>
+                  {saving ? 'Guardando…' : 'Guardar cambios'}
+                </button>
+                <button type="button" onClick={onClose} style={{
+                  background: 'transparent', color: '#0D5C8A', border: '1.5px solid #0D5C8A',
+                  borderRadius: 10, padding: '12px 20px', minHeight: 44,
+                  fontSize: 15, fontWeight: 600, cursor: 'pointer',
+                }}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+
+            {/* Activar / desactivar */}
+            {!isSelf && (
+              <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid #D1D5DB' }}>
+                <button
+                  onClick={async () => {
+                    await editar.mutateAsync({ id: usuario.id, activo: !usuario.activo })
+                    onSaved(`Usuario ${!usuario.activo ? 'activado' : 'desactivado'}`)
+                    onClose()
+                  }}
+                  style={{
+                    width: '100%',
+                    background: usuario.activo ? '#FDECEA' : '#E8F8F0',
+                    color: usuario.activo ? '#D32F2F' : '#2E9E5C',
+                    border: `1.5px solid ${usuario.activo ? '#D32F2F' : '#2E9E5C'}`,
+                    borderRadius: 10, padding: '12px 20px', minHeight: 44,
+                    fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  {usuario.activo ? 'Desactivar usuario' : 'Activar usuario'}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+// ─── Card usuario ─────────────────────────────────────────────────────────────
+
+function UsuarioCard({
+  usuario, onEdit, isSelf,
+}: { usuario: UsuarioConEmail; onEdit: () => void; isSelf: boolean }) {
+  function getIniciales(nombre: string) {
+    return nombre.split(' ').slice(0,2).map(p => p[0]?.toUpperCase() ?? '').join('')
+  }
+
+  return (
+    <div style={{
+      background: '#fff', borderRadius: 20, padding: '16px 20px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+      display: 'flex', alignItems: 'center', gap: 14,
+    }}>
+      {/* Avatar */}
+      <div style={{
+        width: 44, height: 44, borderRadius: '50%', background: '#0D5C8A',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: '#fff', fontSize: 14, fontWeight: 700, flexShrink: 0,
+      }}>
+        {getIniciales(usuario.nombre)}
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+          <span style={{ fontWeight: 600, fontSize: 14, color: '#1A2B3C' }}>
+            {usuario.nombre}
+            {isSelf && <span style={{ fontSize: 11, color: '#4A5568', fontWeight: 400 }}> (vos)</span>}
+          </span>
+          <BadgeRol rol={usuario.rol} />
+          <BadgeActivo activo={usuario.activo ?? true} />
+        </div>
+        <p style={{ fontSize: 12, color: '#4A5568', margin: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <Mail size={12} /> {usuario.email}
+        </p>
+      </div>
+
+      <button onClick={onEdit} style={{
+        background: 'transparent', border: 'none', cursor: 'pointer',
+        color: '#4A5568', padding: 6, borderRadius: 8,
+        display: 'flex', alignItems: 'center', flexShrink: 0,
+      }} title="Editar">
+        <Edit2 size={16} />
+      </button>
+    </div>
+  )
+}
+
+// ─── Página ───────────────────────────────────────────────────────────────────
+
+export default function UsuariosPage() {
+  const [crearOpen, setCrear]   = useState(false)
+  const [editarOpen, setEditar] = useState(false)
+  const [selected, setSelected] = useState<UsuarioConEmail | null>(null)
+  const { toasts, show, dismiss } = useToast()
+  const { usuario: self } = useAuth()
+
+  const { data: usuarios, isLoading } = useUsuarios()
+
+  const handleEdit  = (u: UsuarioConEmail) => { setSelected(u); setEditar(true) }
+  const handleSaved = (msg: string) => {
+    if (msg.endsWith('|error')) show(msg.replace('|error', ''), 'error')
+    else                        show(msg, 'success')
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <h1 className="section-title">Usuarios</h1>
+        <button onClick={() => setCrear(true)} style={{
+          background: '#0D5C8A', color: '#fff', border: 'none',
+          borderRadius: 10, padding: '10px 16px', minHeight: 40,
+          fontSize: 14, fontWeight: 600, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <Plus size={16} /> Nuevo usuario
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {[1,2,3].map(i => <Skeleton key={i} style={{ height: 76, borderRadius: 20 }} />)}
+        </div>
+      ) : !usuarios?.length ? (
+        <EmptyState
+          icon={Settings}
+          title="No hay usuarios"
+          message="Creá el primer usuario del sistema."
+          action={
+            <button onClick={() => setCrear(true)} style={{
+              background: '#0D5C8A', color: '#fff', border: 'none',
+              borderRadius: 10, padding: '10px 20px', fontSize: 14,
+              fontWeight: 600, cursor: 'pointer', minHeight: 44,
+            }}>
+              + Nuevo usuario
+            </button>
+          }
+        />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {usuarios.map(u => (
+            <UsuarioCard
+              key={u.id}
+              usuario={u}
+              onEdit={() => handleEdit(u)}
+              isSelf={u.user_id === self?.id}
+            />
+          ))}
+          <p style={{ fontSize: 12, color: '#4A5568', textAlign: 'center', marginTop: 4 }}>
+            {usuarios.length} {usuarios.length === 1 ? 'usuario' : 'usuarios'}
+          </p>
+        </div>
+      )}
+
+      <CrearUsuarioDrawer open={crearOpen} onClose={() => setCrear(false)} onSaved={handleSaved} />
+      <EditarUsuarioDrawer
+        open={editarOpen}
+        onClose={() => { setEditar(false); setSelected(null) }}
+        usuario={selected}
+        onSaved={handleSaved}
+        selfId={self?.id ?? ''}
+      />
+
+      <ToastContainer toasts={toasts} dismiss={dismiss} />
+    </div>
+  )
+}
