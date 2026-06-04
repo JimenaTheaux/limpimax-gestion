@@ -380,7 +380,7 @@ function CardRepartidor({ pedido, onEntregar, onFalla, onEmergencia }: {
 export default function RepartidorPage() {
   const HOY = new Date().toISOString().split('T')[0]
   const { toasts, show, dismiss }             = useToast()
-  const { isOnline, addAction, refreshCount } = useOffline()
+  const { isOnline, addAction } = useOffline()
   const cambiar                               = useCambiarEstado()
 
   const [entregando, setEntregando] = useState<PedidoListItem | null>(null)
@@ -401,7 +401,6 @@ export default function RepartidorPage() {
       for (const p of listos) {
         await addAction({ type: 'cambiarEstado', pedidoId: p.id, estadoNuevo: 'en_reparto' })
       }
-      await refreshCount()
       show(`${listos.length} pedido${listos.length !== 1 ? 's' : ''} encolados offline`, 'info')
       return
     }
