@@ -1,10 +1,8 @@
 import { betterAuth } from 'better-auth'
-import { Pool } from 'pg'
+import { Pool } from '@neondatabase/serverless'
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-  max: 1,
+  connectionString: process.env.DATABASE_URL ?? 'postgresql://not-configured/limpimax',
 })
 
 // En dev el puerto de Vite varía (5173, 5174, 5175…). Aceptamos cualquier localhost.
