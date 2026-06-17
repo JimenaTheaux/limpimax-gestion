@@ -20,7 +20,10 @@ const isProd = process.env.NODE_ENV === 'production'
 
 app.use('*', cors({
   origin: isProd
-    ? [process.env.BETTER_AUTH_URL ?? '']
+    ? [
+        process.env.BETTER_AUTH_URL ?? '',
+        process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
+      ].filter(Boolean)
     : [
         'http://localhost:5173',
         'http://localhost:5174',

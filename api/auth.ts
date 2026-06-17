@@ -1,7 +1,9 @@
 import { betterAuth } from 'better-auth'
-import { Pool } from '@neondatabase/serverless'
+import pg from 'pg'
 
-const pool = new Pool({
+// @neondatabase/serverless Pool necesita WebSockets (paquete 'ws') en Node.js.
+// Como el runtime es 'nodejs', usamos pg.Pool que conecta vía TCP sin dependencias extra.
+const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL ?? 'postgresql://not-configured/limpimax',
 })
 
