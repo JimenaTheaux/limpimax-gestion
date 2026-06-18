@@ -16,6 +16,8 @@ const app = new Hono().basePath('/api')
 
 app.use('*', logger())
 
+app.get('/health', (c) => c.json({ ok: true, ts: Date.now() }))
+
 const isProd = process.env.NODE_ENV === 'production'
 
 app.use('*', cors({
