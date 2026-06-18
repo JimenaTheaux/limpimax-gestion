@@ -1,15 +1,17 @@
 import { betterAuth } from 'better-auth'
-import { neonConfig, Pool } from '@neondatabase/serverless'
+import { neon } from '@neondatabase/serverless'
 
-// poolQueryViaFetch routes Pool.query() calls through HTTP fetch instead of WebSocket.
-// This avoids the need for the 'ws' package and works in any serverless environment.
-// (experimental but stable for simple queries — no transactions needed for auth)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-;(neonConfig as any).poolQueryViaFetch = true
+// Use the HTTP-based neon() driver instead of Pool.
+// Pool (WebSocket) has reliability issues in Vercel serverless; neon() uses HTTP
+// fetch (port 443) which is guaranteed to work in any serverless environment.
+// Verified: neon().query(text, params, { fullResults: true }) returns the same
+// { rows, rowCount, fields } format that better-auth expects from a pg Pool.
+const sql = neon(process.env.DATABASE_URL ?? 'postgresql://not-configured/limpimax')
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL ?? 'postgresql://not-configured/limpimax',
-})
+const db = {
+  query: (queryText: string, values?: unknown[]) =>
+    sql.query(queryText, (values ?? []) as never[], { fullResults: true } as never),
+}
 
 // En dev el puerto de Vite varía (5173, 5174, 5175…). Aceptamos cualquier localhost.
 const DEV_ORIGINS = [
@@ -24,7 +26,7 @@ const DEV_ORIGINS = [
 const isProd = process.env.NODE_ENV === 'production'
 
 export const auth = betterAuth({
-  database: pool,
+  database: db,
 
   secret: process.env.BETTER_AUTH_SECRET ?? 'change-me-in-vercel-env-vars',
 
