@@ -1,11 +1,11 @@
 import { betterAuth } from 'better-auth'
 import { neonConfig, Pool } from '@neondatabase/serverless'
-import ws from 'ws'
 
-// In Node.js there is no native WebSocket. @neondatabase/serverless Pool connects to
-// Neon over WebSocket (port 443) — far more reliable in serverless than pg TCP (port 5432).
+// poolQueryViaFetch routes Pool.query() calls through HTTP fetch instead of WebSocket.
+// This avoids the need for the 'ws' package and works in any serverless environment.
+// (experimental but stable for simple queries — no transactions needed for auth)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-;(neonConfig as any).webSocketConstructor = ws
+;(neonConfig as any).poolQueryViaFetch = true
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL ?? 'postgresql://not-configured/limpimax',
