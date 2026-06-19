@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Producto, CategoriaProducto } from '@/types'
 
@@ -35,7 +35,9 @@ const CAT_KEY = ['categorias']
 
 export const useProductos = (q?: string, categoriaId?: string) =>
   useQuery({
-    queryKey: [...KEY, q, categoriaId],
+    queryKey:        [...KEY, q, categoriaId],
+    placeholderData: keepPreviousData,
+    staleTime:       1000 * 60 * 5,      // 5 min — catálogo estable
     queryFn: async () => {
       let query = supabase
         .from('productos')
@@ -54,7 +56,8 @@ export const useProductos = (q?: string, categoriaId?: string) =>
 
 export const useCategorias = () =>
   useQuery({
-    queryKey: CAT_KEY,
+    queryKey:  CAT_KEY,
+    staleTime: 1000 * 60 * 30,   // 30 min — categorías raramente cambian
     queryFn: async () => {
       const { data, error } = await supabase
         .from('categorias_producto')

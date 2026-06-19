@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Cliente } from '@/types'
 
@@ -28,7 +28,9 @@ const KEY = ['clientes']
 
 export const useClientes = (q?: string) =>
   useQuery({
-    queryKey: [...KEY, q],
+    queryKey:        [...KEY, q],
+    placeholderData: keepPreviousData,    // sin flash al cambiar búsqueda
+    staleTime:       1000 * 60 * 2,      // 2 min — clientes no cambian seguido
     queryFn: async () => {
       let query = supabase
         .from('clientes')

@@ -214,87 +214,92 @@ export const useResumenProduccion = (fecha?: string) => {
   })
 }
 
-export const useDashboard = () =>
-  useQuery({
-    queryKey: ['dashboard'],
+export const useDashboard = () => {
+  const hoy = new Date().toISOString().split('T')[0]
+
+  return useQuery({
+    queryKey: ['dashboard', hoy],
     queryFn: async () => {
-      const hoy   = new Date().toISOString().split('T')[0]
-      const desde = `${hoy}T00:00:00`
-      const hasta = `${hoy}T23:59:59`
+      // Usa la RPC get_dashboard_stats: 1 HTTP request en vez de 2
+      const { data, error } = await supabase.rpc('get_dashboard_stats', {
+        p_fecha: hoy,
+      })
 
-      // Pedidos de hoy (por fecha de creación)
-      const { data: pedidosHoyRaw, error: e1 } = await supabase
-        .from('pedidos')
-        .select('id, numero, estado, total_calculado, total_manual, forma_cobro, monto_cobrado, fecha_produccion, cliente_id')
-        .gte('created_at', desde)
-        .lte('created_at', hasta)
-
-      if (e1) throw new Error(e1.message)
-
-      // Pedidos activos (estados no terminales)
-      const { data: pedidosActivosRaw, error: e2 } = await supabase
-        .from('pedidos')
-        .select('id, estado')
-        .not('estado', 'in', `(${ESTADOS_TERMINALES.join(',')})`)
-
-      if (e2) throw new Error(e2.message)
-
-      // ── Agregar "hoy" ──────────────────────────────────────────────────────
-
-      const pedidosHoy = pedidosHoyRaw ?? []
-
-      const porEstadoHoy: Record<string, number> = {}
-      let totalEfectivo      = 0
-      let totalTransferencia = 0
-      let totalCobrado       = 0
-      let cobrandoPendientes = 0
-
-      for (const p of pedidosHoy) {
-        porEstadoHoy[p.estado] = (porEstadoHoy[p.estado] ?? 0) + 1
-
-        if (p.estado === 'entregado' || p.estado === 'cerrado') {
-          const monto = parseFloat(p.monto_cobrado ?? '0') || 0
-          totalCobrado += monto
-
-          if (p.forma_cobro === 'efectivo')       totalEfectivo      += monto
-          if (p.forma_cobro === 'transferencia')  totalTransferencia += monto
-          if (p.forma_cobro === 'pendiente' || !p.forma_cobro) cobrandoPendientes++
-        }
+      if (error) {
+        // Fallback si la RPC aún no existe: 2 queries directas
+        console.warn('RPC get_dashboard_stats no disponible, usando fallback:', error.message)
+        return fallbackDashboard(hoy)
       }
 
-      // ── Agregar "activos" ──────────────────────────────────────────────────
-
-      const activos = pedidosActivosRaw ?? []
-      const porEstadoActivos: Record<string, number> = {}
-      for (const p of activos) {
-        porEstadoActivos[p.estado] = (porEstadoActivos[p.estado] ?? 0) + 1
-      }
-
-      return {
-        hoy: {
-          total:              pedidosHoy.length,
-          porEstado:          porEstadoHoy,
-          totalEfectivo,
-          totalTransferencia,
-          totalCobrado,
-          cobrandoPendientes,
-        },
-        activos: {
-          total:     activos.length,
-          porEstado: porEstadoActivos,
-        },
-        pedidosHoy: pedidosHoy.map(p => ({
-          id:              p.id,
-          numero:          p.numero,
-          estado:          p.estado as EstadoPedido,
-          totalCalculado:  String(p.total_calculado ?? '0'),
-          totalManual:     p.total_manual != null ? String(p.total_manual) : null,
-          formaCobro:      p.forma_cobro,
-          montoCobrado:    p.monto_cobrado != null ? String(p.monto_cobrado) : null,
-          fechaProduccion: p.fecha_produccion,
-          clienteId:       p.cliente_id,
-        })),
-      } as DashboardData
+      // La RPC devuelve JSON — los keys ya están en camelCase (definidos en el SQL)
+      return data as DashboardData
     },
     refetchInterval: 60_000,
   })
+}
+
+// Fallback usado si la RPC aún no está deployada en Supabase
+async function fallbackDashboard(hoy: string): Promise<DashboardData> {
+  const desde = `${hoy}T00:00:00`
+  const hasta = `${hoy}T23:59:59`
+
+  const [{ data: pedidosHoyRaw, error: e1 }, { data: pedidosActivosRaw, error: e2 }] =
+    await Promise.all([
+      supabase
+        .from('pedidos')
+        .select('id, numero, estado, total_calculado, total_manual, forma_cobro, monto_cobrado, fecha_produccion, cliente_id')
+        .gte('created_at', desde)
+        .lte('created_at', hasta),
+      supabase
+        .from('pedidos')
+        .select('id, estado')
+        .not('estado', 'in', `(${ESTADOS_TERMINALES.join(',')})`),
+    ])
+
+  if (e1) throw new Error(e1.message)
+  if (e2) throw new Error(e2.message)
+
+  const pedidosHoy = pedidosHoyRaw ?? []
+  const porEstadoHoy: Record<string, number> = {}
+  let totalEfectivo = 0, totalTransferencia = 0, totalCobrado = 0, cobrandoPendientes = 0
+
+  for (const p of pedidosHoy) {
+    porEstadoHoy[p.estado] = (porEstadoHoy[p.estado] ?? 0) + 1
+    if (p.estado === 'entregado' || p.estado === 'cerrado') {
+      const monto = parseFloat(p.monto_cobrado ?? '0') || 0
+      totalCobrado += monto
+      if (p.forma_cobro === 'efectivo')      totalEfectivo      += monto
+      if (p.forma_cobro === 'transferencia') totalTransferencia += monto
+      if (p.forma_cobro === 'pendiente' || !p.forma_cobro) cobrandoPendientes++
+    }
+  }
+
+  const activos = pedidosActivosRaw ?? []
+  const porEstadoActivos: Record<string, number> = {}
+  for (const p of activos) {
+    porEstadoActivos[p.estado] = (porEstadoActivos[p.estado] ?? 0) + 1
+  }
+
+  return {
+    hoy: {
+      total: pedidosHoy.length,
+      porEstado: porEstadoHoy,
+      totalEfectivo,
+      totalTransferencia,
+      totalCobrado,
+      cobrandoPendientes,
+    },
+    activos: { total: activos.length, porEstado: porEstadoActivos },
+    pedidosHoy: pedidosHoy.map(p => ({
+      id:              p.id,
+      numero:          p.numero,
+      estado:          p.estado as EstadoPedido,
+      totalCalculado:  String(p.total_calculado ?? '0'),
+      totalManual:     p.total_manual != null ? String(p.total_manual) : null,
+      formaCobro:      p.forma_cobro,
+      montoCobrado:    p.monto_cobrado != null ? String(p.monto_cobrado) : null,
+      fechaProduccion: p.fecha_produccion,
+      clienteId:       p.cliente_id,
+    })),
+  }
+}
