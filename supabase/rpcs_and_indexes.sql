@@ -20,9 +20,8 @@ CREATE INDEX IF NOT EXISTS idx_pedidos_fecha_estado
   ON pedidos(fecha_produccion, estado)
   WHERE estado IN ('en_produccion', 'listo_reparto', 'en_reparto');
 
--- Índice compuesto para el dashboard (created_at::date + estado)
-CREATE INDEX IF NOT EXISTS idx_pedidos_created_date
-  ON pedidos(DATE(created_at), estado);
+-- Nota: no se puede indexar DATE(created_at) porque DATE() es STABLE (timezone-dependent).
+-- El índice idx_pedidos_created_at (created_at DESC) ya cubre las queries de rango del dashboard.
 
 CREATE INDEX IF NOT EXISTS idx_pedido_historial_pedido_id
   ON pedido_historial(pedido_id, created_at);
