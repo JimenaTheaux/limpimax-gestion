@@ -2,6 +2,10 @@ import type { MiddlewareHandler } from 'hono'
 import { auth } from '../auth.js'
 
 export const requireAuth: MiddlewareHandler = async (c, next) => {
+  if (c.req.path.startsWith('/api/auth')) {
+    return next()
+  }
+
   const session = await auth.api.getSession({ headers: c.req.raw.headers })
 
   if (!session) {
