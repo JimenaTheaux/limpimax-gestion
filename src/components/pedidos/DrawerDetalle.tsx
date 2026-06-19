@@ -142,7 +142,8 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
   const handleEstado = async (nuevoEstado: EstadoPedido) => {
     if (!pedido) return
     try {
-      await cambiarEstado.mutateAsync({ id: pedido.id, estado: nuevoEstado })
+      // Pasa estadoActual para evitar la query de lectura extra
+      await cambiarEstado.mutateAsync({ id: pedido.id, estadoActual: pedido.estado, estado: nuevoEstado })
       onSaved(`Estado actualizado a: ${ESTADO_CONFIG[nuevoEstado].label}`)
       setConfirmando(null)
     } catch (e) {
@@ -153,7 +154,7 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
   const handleAnular = async (motivo: string) => {
     if (!pedido) return
     try {
-      await anular.mutateAsync({ id: pedido.id, motivo })
+      await anular.mutateAsync({ id: pedido.id, motivo, estadoActual: pedido.estado })
       onSaved('Pedido anulado')
       setAnulando(false)
       onClose()

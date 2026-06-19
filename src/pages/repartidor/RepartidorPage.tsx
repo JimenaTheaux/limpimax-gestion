@@ -8,11 +8,12 @@ import { Skeleton }       from '@/components/ui/skeleton'
 import { ToastContainer } from '@/components/common/ToastContainer'
 import { useToast }       from '@/hooks/useToast'
 import { useOffline }     from '@/hooks/useOffline'
-import { usePedidos, useCambiarEstado, useEditarCobro, totalPedido, type PedidoListItem } from '@/services/pedidos'
+import { usePedidos, useCambiarEstado, useRegistrarEntrega, totalPedido, type PedidoListItem } from '@/services/pedidos'
 import { ESTADO_CONFIG }  from '@/types'
 import type { AddActionInput } from '@/hooks/useOffline'
 
 // ─── Drawer Registrar Entrega ─────────────────────────────────────────────────
+// OPT: usa useRegistrarEntrega → combina estado + cobro en 2 queries (era 4)
 
 function DrawerEntrega({ pedido, isOnline, addAction, onClose, onSaved }: {
   pedido:     PedidoListItem | null
@@ -21,18 +22,16 @@ function DrawerEntrega({ pedido, isOnline, addAction, onClose, onSaved }: {
   onClose:    () => void
   onSaved:    (msg: string) => void
 }) {
-  const cambiar      = useCambiarEstado()
-  const editarCobro  = useEditarCobro()
+  const registrar   = useRegistrarEntrega()
   const [forma,  setForma]  = useState<'efectivo' | 'transferencia' | 'pendiente'>('efectivo')
   const [monto,  setMonto]  = useState(pedido ? String(Math.round(Number(totalPedido(pedido)))) : '')
   const [notas,  setNotas]  = useState('')
-  const saving = cambiar.isPending || editarCobro.isPending
+  const saving = registrar.isPending
 
   if (!pedido) return null
 
   const handleConfirmar = async () => {
     if (!isOnline) {
-      // Encolar ambas acciones para cuando vuelva la conexión
       await addAction({ type: 'cambiarEstado', pedidoId: pedido.id, estadoNuevo: 'entregado', notas: notas.trim() || undefined })
       await addAction({ type: 'editarCobro',   pedidoId: pedido.id, formaCobro: forma, montoCobrado: monto || undefined })
       onSaved('Entrega guardada offline — se enviará al reconectar')
@@ -41,15 +40,12 @@ function DrawerEntrega({ pedido, isOnline, addAction, onClose, onSaved }: {
     }
 
     try {
-      await cambiar.mutateAsync({
-        id:     pedido.id,
-        estado: 'entregado',
-        notas:  notas.trim() || undefined,
-      })
-      await editarCobro.mutateAsync({
+      await registrar.mutateAsync({
         id:           pedido.id,
+        estadoActual: pedido.estado,
         formaCobro:   forma,
         montoCobrado: monto || undefined,
+        notas:        notas.trim() || undefined,
       })
       onSaved('Entrega registrada correctamente')
       onClose()
@@ -168,7 +164,7 @@ function DrawerFalla({ pedido, isOnline, addAction, onClose, onSaved }: {
     }
 
     try {
-      await cambiar.mutateAsync({ id: pedido.id, estado: 'entrega_fallida', notas: motivo.trim() })
+      await cambiar.mutateAsync({ id: pedido.id, estadoActual: pedido.estado, estado: 'entrega_fallida', notas: motivo.trim() })
       onSaved('Entrega fallida registrada')
       onClose()
     } catch (e) {
@@ -386,11 +382,11 @@ export default function RepartidorPage() {
   const [entregando, setEntregando] = useState<PedidoListItem | null>(null)
   const [falla,      setFalla]      = useState<PedidoListItem | null>(null)
 
-  const { data: pedidos, isLoading, refetch } = usePedidos({ fechaProduccion: HOY })
-
-  const pedidosFiltrados = pedidos?.filter(p =>
-    ['en_produccion', 'listo_reparto', 'en_reparto'].includes(p.estado)
-  ) ?? []
+  // Filtro server-side: solo estados relevantes del día (no trae entregados/cerrados)
+  const { data: pedidosFiltrados = [], isLoading, refetch } = usePedidos({
+    fechaProduccion: HOY,
+    estados: ['en_produccion', 'listo_reparto', 'en_reparto'],
+  })
 
   const listos    = pedidosFiltrados.filter(p => p.estado === 'listo_reparto')
   const enReparto = pedidosFiltrados.filter(p => p.estado === 'en_reparto')
@@ -406,7 +402,7 @@ export default function RepartidorPage() {
     }
     try {
       await Promise.all(listos.map(p =>
-        cambiar.mutateAsync({ id: p.id, estado: 'en_reparto' })
+        cambiar.mutateAsync({ id: p.id, estadoActual: 'listo_reparto', estado: 'en_reparto' })
       ))
       show(`${listos.length} pedido${listos.length !== 1 ? 's' : ''} en camino`, 'success')
       refetch()
@@ -422,7 +418,7 @@ export default function RepartidorPage() {
       return
     }
     try {
-      await cambiar.mutateAsync({ id, estado: 'en_reparto', notas: 'Avance de emergencia — repartidor' })
+      await cambiar.mutateAsync({ id, estadoActual: 'en_produccion', estado: 'en_reparto', notas: 'Avance de emergencia — repartidor' })
       show('Avance de emergencia registrado', 'info')
       refetch()
     } catch (e) {

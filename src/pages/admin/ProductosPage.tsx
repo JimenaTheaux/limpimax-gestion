@@ -18,6 +18,7 @@ import {
   useProductos, useCategorias,
   useCrearProducto, useEditarProducto, useCrearCategoria,
 } from '@/services/productos'
+import { useDebounce } from '@/hooks/useDebounce'
 import type { Producto } from '@/types'
 
 
@@ -269,7 +270,8 @@ export default function ProductosPage() {
   const [selected, setSelected] = useState<ProductoConCat | null>(null)
   const { toasts, show, dismiss } = useToast()
 
-  const { data: productos, isLoading } = useProductos(q || undefined, catFiltro || undefined)
+  const qDebounced = useDebounce(q, 300)
+  const { data: productos, isLoading } = useProductos(qDebounced || undefined, catFiltro || undefined)
   const { data: categorias }           = useCategorias()
 
   const handleEdit  = (p: ProductoConCat) => { setSelected(p); setDrawer(true) }

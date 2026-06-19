@@ -9,6 +9,7 @@ import { ButtonGroup } from '@/components/common/ButtonGroup'
 import { useClientes } from '@/services/clientes'
 import { useProductos } from '@/services/productos'
 import { useCrearPedido, useEditarPedido, type PedidoDetalle, type ItemForm } from '@/services/pedidos'
+import { useDebounce } from '@/hooks/useDebounce'
 import type { Producto } from '@/types'
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
@@ -53,7 +54,8 @@ function SelectorCliente({
 }: { value: string; onChange: (id: string, tipo: 'minorista' | 'mayorista', dir: string) => void; error?: string }) {
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
-  const { data: clientes } = useClientes(q || undefined)
+  const qDebounced = useDebounce(q, 300)
+  const { data: clientes } = useClientes(qDebounced || undefined)
 
   const selected = clientes?.find(c => c.id === value)
 

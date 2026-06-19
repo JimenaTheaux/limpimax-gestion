@@ -16,6 +16,7 @@ import { useToast }         from '@/hooks/useToast'
 import {
   useClientes, useCrearCliente, useEditarCliente,
 } from '@/services/clientes'
+import { useDebounce } from '@/hooks/useDebounce'
 import type { Cliente } from '@/types'
 
 // ─── Formato CUIT ─────────────────────────────────────────────────────────────
@@ -250,7 +251,8 @@ export default function ClientesPage() {
   const [selected, setSelected] = useState<Cliente | null>(null)
   const { toasts, show, dismiss } = useToast()
 
-  const { data: clientes, isLoading } = useClientes(q || undefined)
+  const qDebounced = useDebounce(q, 300)
+  const { data: clientes, isLoading } = useClientes(qDebounced || undefined)
 
   const handleEdit = (c: Cliente) => { setSelected(c); setDrawer(true) }
   const handleNew  = ()           => { setSelected(null); setDrawer(true) }

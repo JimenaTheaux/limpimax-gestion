@@ -289,7 +289,8 @@ export default function ProduccionPage() {
 
   const handleMarcarListo = async (id: string) => {
     try {
-      await cambiarEstado.mutateAsync({ id, estado: 'listo_reparto' })
+      // estadoActual siempre es 'en_produccion' en esta vista — evita la lectura previa
+      await cambiarEstado.mutateAsync({ id, estadoActual: 'en_produccion', estado: 'listo_reparto' })
       show('Pedido marcado como listo para reparto', 'success')
       refetch()
     } catch (e) {
