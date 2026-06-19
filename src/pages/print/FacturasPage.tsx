@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Printer, X } from 'lucide-react'
-import { api } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
 import type { PedidoDetalle } from '@/services/pedidos'
 import { totalPedido } from '@/services/pedidos'
 
@@ -168,7 +168,58 @@ export default function FacturasPage() {
   useEffect(() => {
     if (!ids.length) { setLoading(false); return }
 
-    Promise.allSettled(ids.map(id => api.get<PedidoDetalle>(`/api/pedidos/${id}`)))
+    Promise.allSettled(ids.map(async (id) => {
+      const { data: p, error: pErr } = await supabase
+        .from('pedidos')
+        .select('*, clientes(nombre)')
+        .eq('id', id)
+        .maybeSingle()
+      if (pErr || !p) throw new Error(pErr?.message ?? 'No encontrado')
+
+      const { data: items } = await supabase
+        .from('pedido_items')
+        .select('*, productos(nombre, fragancia, presentacion, precio_minorista, precio_mayorista)')
+        .eq('pedido_id', id)
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mapped: PedidoDetalle = {
+        id:               p.id,
+        numero:           p.numero,
+        estado:           p.estado,
+        tipoPrecio:       p.tipo_precio,
+        direccionEntrega: p.direccion_entrega,
+        fechaProduccion:  p.fecha_produccion,
+        totalCalculado:   String(p.total_calculado ?? '0'),
+        totalManual:      p.total_manual != null ? String(p.total_manual) : null,
+        costoEnvio:       String(p.costo_envio ?? '0'),
+        formaCobro:       p.forma_cobro,
+        montoCobrado:     p.monto_cobrado != null ? String(p.monto_cobrado) : null,
+        notasProduccion:  p.notas_produccion,
+        notasInternas:    p.notas_internas,
+        createdAt:        p.created_at,
+        updatedAt:        p.updated_at,
+        clienteId:        p.cliente_id,
+        clienteNombre:    (p as any).clientes?.nombre ?? null,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        items: (items ?? []).map((item: any) => ({
+          id:                    item.id,
+          pedidoId:              item.pedido_id,
+          productoId:            item.producto_id,
+          productoNombre:        item.productos?.nombre ?? '',
+          productoFragancia:     item.productos?.fragancia ?? null,
+          productoPresentacion:  item.productos?.presentacion != null ? String(item.productos.presentacion) : null,
+          precioMinoristaActual: item.productos?.precio_minorista != null ? String(item.productos.precio_minorista) : null,
+          precioMayoristaActual: item.productos?.precio_mayorista != null ? String(item.productos.precio_mayorista) : null,
+          presentacion:          item.productos?.presentacion != null ? String(item.productos.presentacion) : '',
+          cantidad:              String(item.cantidad),
+          precioUnitario:        String(item.precio_unitario),
+          precioReferencia:      String(item.precio_referencia),
+          bidonNuevo:            item.bidon_nuevo ?? false,
+        })),
+        historial: [],
+      }
+      return mapped
+    }))
       .then(results => {
         const ok:  PedidoDetalle[] = []
         const err: string[]        = []

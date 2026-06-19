@@ -3,7 +3,7 @@ import {
   addToQueue, getQueue, removeFromQueue, getQueueCount,
   type OfflineAction,
 } from '@/lib/offlineQueue'
-import { api } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
 import type { EstadoPedido } from '@/types'
 
 // ─── Tipos públicos ───────────────────────────────────────────────────────────
@@ -42,15 +42,20 @@ export function useOffline() {
       for (const action of queue) {
         try {
           if (action.type === 'cambiarEstado') {
-            await api.patch(`/api/pedidos/${action.pedidoId}/estado`, {
-              estado: action.estadoNuevo,
-              notas:  action.notas,
-            })
+            const { error } = await supabase
+              .from('pedidos')
+              .update({ estado: action.estadoNuevo })
+              .eq('id', action.pedidoId)
+            if (error) throw new Error(error.message)
           } else if (action.type === 'editarCobro') {
-            await api.patch(`/api/pedidos/${action.pedidoId}/cobro`, {
-              formaCobro:   action.formaCobro,
-              montoCobrado: action.montoCobrado,
-            })
+            const { error } = await supabase
+              .from('pedidos')
+              .update({
+                forma_cobro:   action.formaCobro,
+                monto_cobrado: action.montoCobrado ? parseFloat(action.montoCobrado) : null,
+              })
+              .eq('id', action.pedidoId)
+            if (error) throw new Error(error.message)
           }
           await removeFromQueue(action.id)
         } catch (e) {

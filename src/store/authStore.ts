@@ -11,30 +11,20 @@ interface UsuarioActual {
 
 interface AuthState {
   usuario: UsuarioActual | null
-  token:   string | null
-  setUser:  (usuario: UsuarioActual) => void
-  setToken: (token: string) => void
-  logout:   () => void
+  setUser: (usuario: UsuarioActual) => void
+  logout:  () => void
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       usuario: null,
-      token:   null,
-
       setUser: (usuario) => set({ usuario }),
-
-      setToken: (token) => set({ token }),
-
-      logout: () => set({ usuario: null, token: null }),
+      logout:  () => set({ usuario: null }),
     }),
     {
-      name: 'limpimax-auth',
-      partialize: (state) => ({
-        usuario: state.usuario,
-        token:   state.token,
-      }),
+      name:        'limpimax-auth',
+      partialize:  (state) => ({ usuario: state.usuario }),
     }
   )
 )

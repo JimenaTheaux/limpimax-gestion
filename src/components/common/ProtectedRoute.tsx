@@ -39,15 +39,14 @@ export function ProtectedRoute({ children, roles }: Props) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  if (roles && usuario && !roles.includes(usuario.rol)) {
-    // Redirige al home del rol del usuario
+  if (roles && usuario && !roles.includes(usuario.rol as Rol)) {
     const homeRol: Record<Rol, string> = {
       admin:      '/admin',
       superadmin: '/admin',
       produccion: '/produccion',
       repartidor: '/repartidor',
     }
-    return <Navigate to={homeRol[usuario.rol]} replace />
+    return <Navigate to={homeRol[usuario.rol as Rol]} replace />
   }
 
   return <>{children}</>

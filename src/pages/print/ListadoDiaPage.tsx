@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { api } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
 
 interface ItemDia {
   pedidoId:      string
@@ -42,8 +42,49 @@ export default function ListadoDiaPage() {
     setLoading(true)
     setError(null)
     try {
-      const data = await api.get<PedidoDia[]>(`/api/pedidos/dia/${f}`)
-      setPedidos(data.filter(p => ESTADOS_REPARTO.has(p.estado)))
+      const { data, error } = await supabase
+        .from('pedidos')
+        .select(`
+          id, numero, estado, total_calculado, total_manual,
+          forma_cobro, monto_cobrado, notas_produccion,
+          cliente_id, direccion_entrega,
+          clientes(nombre, telefono),
+          pedido_items(
+            cantidad,
+            productos(nombre, fragancia, presentacion, precio_minorista)
+          )
+        `)
+        .eq('fecha_produccion', f)
+        .order('numero', { ascending: true })
+
+      if (error) throw new Error(error.message)
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mapped: PedidoDia[] = (data ?? []).map((p: any) => ({
+        id:               p.id,
+        numero:           p.numero,
+        estado:           p.estado,
+        totalCalculado:   String(p.total_calculado ?? '0'),
+        totalManual:      p.total_manual != null ? String(p.total_manual) : null,
+        formaCobro:       p.forma_cobro,
+        montoCobrado:     p.monto_cobrado != null ? String(p.monto_cobrado) : null,
+        notasProduccion:  p.notas_produccion,
+        clienteId:        p.cliente_id,
+        clienteNombre:    p.clientes?.nombre ?? null,
+        clienteTelefono:  p.clientes?.telefono ?? null,
+        direccionEntrega: p.direccion_entrega,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        items: (p.pedido_items ?? []).map((item: any) => ({
+          pedidoId:      p.id,
+          cantidad:      String(item.cantidad),
+          nombre:        item.productos?.nombre        ?? null,
+          fragancia:     item.productos?.fragancia     ?? null,
+          presentacion:  item.productos?.presentacion != null ? String(item.productos.presentacion) : null,
+          precioUnitario: String(item.productos?.precio_minorista ?? '0'),
+        })),
+      }))
+
+      setPedidos(mapped.filter(p => ESTADOS_REPARTO.has(p.estado)))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al cargar')
     } finally {

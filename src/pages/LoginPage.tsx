@@ -1,13 +1,8 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
-import { signIn } from '@/lib/auth-client'
-import { useAuthStore } from '@/store/authStore'
+import { useAuth } from '@/hooks/useAuth'
 import type { Rol } from '@/types'
-
-// Login completamente aislado: no llama useSession ni useAuth.
-// Llama signIn.email directamente y navega según el rol devuelto.
-// Esto evita la cascada de re-renders de useSession que reseteaba los inputs.
 
 const RUTA_POR_ROL: Record<Rol, string> = {
   admin:      '/admin',
@@ -17,16 +12,22 @@ const RUTA_POR_ROL: Record<Rol, string> = {
 }
 
 export default function LoginPage() {
-  const navigate   = useNavigate()
-  const setUser    = useAuthStore(s => s.setUser)
+  const navigate              = useNavigate()
+  const { login, usuario, cargando } = useAuth()
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
 
-  // Ref para no perder foco durante loading
   const emailRef    = useRef<HTMLInputElement>(null)
   const passwordRef = useRef<HTMLInputElement>(null)
+
+  // Redirigir si ya está autenticado
+  useEffect(() => {
+    if (!cargando && usuario) {
+      navigate(RUTA_POR_ROL[usuario.rol as Rol] ?? '/admin', { replace: true })
+    }
+  }, [cargando, usuario, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,40 +37,17 @@ export default function LoginPage() {
     setError('')
 
     try {
-      const result = await signIn.email({
-        email:      email.trim().toLowerCase(),
-        password,
-        rememberMe: true,
-      })
-
-      if (result.error) {
-        setError('Credenciales incorrectas. Intentá de nuevo.')
-        setLoading(false)
-        return
-      }
-
-      const user = result.data?.user
-      if (!user) {
-        setError('No se pudo iniciar sesión. Intentá de nuevo.')
-        setLoading(false)
-        return
-      }
-
-      const rol = ((user as { role?: string }).role ?? 'admin') as Rol
-
-      // Sincronizar store antes de navegar
-      setUser({ id: user.id, nombre: user.name, email: user.email, rol })
-
-      navigate(RUTA_POR_ROL[rol] ?? '/admin', { replace: true })
+      await login(email.trim().toLowerCase(), password)
+      // La navegación la dispara el useEffect cuando `usuario` se actualiza
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Credenciales incorrectas. Intentá de nuevo.')
+      const msg = err instanceof Error ? err.message : String(err)
+      setError(msg)
       setLoading(false)
+      emailRef.current?.focus()
     }
   }
 
-  const emailValid    = email.trim().length > 0
-  const passwordValid = password.length > 0
-  const canSubmit     = emailValid && passwordValid && !loading
+  const canSubmit = email.trim().length > 0 && password.length > 0 && !loading
 
   return (
     <div
@@ -103,8 +81,6 @@ export default function LoginPage() {
           </h2>
 
           <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-            {/* Email */}
             <label className="form-label">
               <input
                 ref={emailRef}
@@ -119,7 +95,6 @@ export default function LoginPage() {
               <span>Email</span>
             </label>
 
-            {/* Contraseña */}
             <label className="form-label">
               <input
                 ref={passwordRef}
@@ -134,7 +109,6 @@ export default function LoginPage() {
               <span>Contraseña</span>
             </label>
 
-            {/* Error */}
             {error && (
               <div style={{
                 background: '#FDECEA', border: '1px solid #D32F2F',
@@ -145,19 +119,18 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Submit */}
             <button
               type="submit"
               disabled={!canSubmit}
               style={{
-                background:     !canSubmit ? 'rgba(13,92,138,0.5)' : '#0D5C8A',
-                color:          '#fff', border: 'none', borderRadius: 10,
-                padding:        '13px 20px', minHeight: 44,
-                fontSize:       15, fontWeight: 600,
-                cursor:         !canSubmit ? 'not-allowed' : 'pointer',
-                transition:     'background 0.2s ease',
-                display:        'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                marginTop:      4,
+                background:  !canSubmit ? 'rgba(13,92,138,0.5)' : '#0D5C8A',
+                color:       '#fff', border: 'none', borderRadius: 10,
+                padding:     '13px 20px', minHeight: 44,
+                fontSize:    15, fontWeight: 600,
+                cursor:      !canSubmit ? 'not-allowed' : 'pointer',
+                transition:  'background 0.2s ease',
+                display:     'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                marginTop:   4,
               }}
             >
               {loading ? (
