@@ -32,6 +32,18 @@ const TRANSICIONES_ADMIN: Partial<Record<EstadoPedido, EstadoPedido[]>> = {
   entrega_fallida: ['listo_reparto', 'en_reparto', 'entregado', 'cerrado'],
 }
 
+// Etiqueta de acción para la transición primaria
+const ACCION_LABEL: Partial<Record<EstadoPedido, string>> = {
+  borrador:        'Confirmar pedido',
+  confirmado:      'Enviar a producción',
+  en_produccion:   'Marcar listo para reparto',
+  listo_reparto:   'Iniciar reparto',
+  en_reparto:      'Registrar entrega',
+  entregado:       'Cerrar venta',
+  entrega_fallida: 'Reagendar entrega',
+  cerrado:         'Cerrado',
+}
+
 // ─── Modales ─────────────────────────────────────────────────────────────────
 
 function ConfirmModal({ mensaje, onConfirm, onCancel }: {
@@ -309,27 +321,64 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
               {/* Acciones */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <button type="button" onClick={() => window.open(`/print/${p.id}`, '_blank')}
-                  style={{ background: '#F4F6F8', color: '#4A5568', border: '1.5px solid #D1D5DB', borderRadius: 10, padding: '12px', minHeight: 44, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  aria-label={`Generar documento del pedido P-${String(p.numero).padStart(5, '0')}`}
+                  style={{ background: '#F4F6F8', color: '#4A5568', border: '1.5px solid #D1D5DB', borderRadius: 10, padding: '12px', minHeight: 44, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, outlineOffset: 2 }}>
                   <Printer size={14} /> Generar documento
                 </button>
 
-                {transiciones.map((next: EstadoPedido) => (
+                {/* Botón primario — primera transición lógica */}
+                {transiciones.length > 0 && (() => {
+                  const primary = transiciones[0]
+                  const cfg     = ESTADO_CONFIG[primary]
+                  const label   = ACCION_LABEL[primary] ?? `Pasar a ${cfg.label}`
+                  const isPending = cambiarEstado.isPending
+                  return (
+                    <button
+                      key={primary}
+                      type="button"
+                      onClick={() => setConfirmando(primary)}
+                      disabled={isPending}
+                      aria-disabled={isPending}
+                      aria-label={`${label} — pedido P-${String(p.numero).padStart(5, '0')}`}
+                      style={{
+                        background: isPending ? `${cfg.color}80` : cfg.color,
+                        color: '#fff', border: 'none', borderRadius: 10,
+                        padding: '14px', minHeight: 48, fontSize: 15, fontWeight: 700,
+                        cursor: isPending ? 'not-allowed' : 'pointer', outlineOffset: 2,
+                      }}
+                    >
+                      {isPending ? 'Procesando…' : label}
+                    </button>
+                  )
+                })()}
+
+                {/* Transiciones secundarias (override admin) */}
+                {transiciones.slice(1).map((next: EstadoPedido) => (
                   <button key={next} type="button" onClick={() => setConfirmando(next)}
-                    style={{ background: ESTADO_CONFIG[next].bg, color: ESTADO_CONFIG[next].color, border: `1.5px solid ${ESTADO_CONFIG[next].color}`, borderRadius: 10, padding: '12px', minHeight: 44, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                    disabled={cambiarEstado.isPending}
+                    aria-label={`Pasar a ${ESTADO_CONFIG[next].label} — pedido P-${String(p.numero).padStart(5, '0')}`}
+                    style={{
+                      background: ESTADO_CONFIG[next].bg, color: ESTADO_CONFIG[next].color,
+                      border: `1.5px solid ${ESTADO_CONFIG[next].color}`,
+                      borderRadius: 10, padding: '11px', minHeight: 44, fontSize: 13,
+                      fontWeight: 600, cursor: 'pointer', outlineOffset: 2,
+                    }}>
                     Pasar a: {ESTADO_CONFIG[next].label}
                   </button>
                 ))}
 
                 {['borrador', 'confirmado', 'en_produccion'].includes(p.estado) && (
                   <button type="button" onClick={() => pedido && onEditar(pedido)}
-                    style={{ background: 'transparent', color: '#0D5C8A', border: '1.5px solid #0D5C8A', borderRadius: 10, padding: '12px', minHeight: 44, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    aria-label={`Editar pedido P-${String(p.numero).padStart(5, '0')}`}
+                    style={{ background: 'transparent', color: '#0D5C8A', border: '1.5px solid #0D5C8A', borderRadius: 10, padding: '12px', minHeight: 44, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, outlineOffset: 2 }}>
                     <Edit2 size={14} /> Editar pedido
                   </button>
                 )}
 
                 {p.estado !== 'cerrado' && p.estado !== 'anulado' && (
                   <button type="button" onClick={() => setAnulando(true)}
-                    style={{ background: '#FDECEA', color: '#D32F2F', border: '1.5px solid #D32F2F', borderRadius: 10, padding: '12px', minHeight: 44, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    aria-label={`Anular pedido P-${String(p.numero).padStart(5, '0')}`}
+                    style={{ background: '#FDECEA', color: '#D32F2F', border: '1.5px solid #D32F2F', borderRadius: 10, padding: '12px', minHeight: 44, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, outlineOffset: 2 }}>
                     <XCircle size={14} /> Anular pedido
                   </button>
                 )}

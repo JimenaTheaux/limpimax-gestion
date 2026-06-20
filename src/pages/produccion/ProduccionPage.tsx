@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { ChevronDown, ChevronUp, Check, Package, RefreshCw } from 'lucide-react'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { ChevronDown, ChevronUp, Package, RefreshCw } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ToastContainer } from '@/components/common/ToastContainer'
 import { useToast }        from '@/hooks/useToast'
@@ -92,98 +92,160 @@ function PanelResumen({ fecha }: { fecha?: string }) {
 
 // ─── Card de pedido para producción ──────────────────────────────────────────
 
-function CardProduccion({ pedido, onMarcarListo }: { pedido: PedidoProduccion; onMarcarListo: () => void }) {
+function CardProduccion({ pedido, onMarcarListo }: {
+  pedido: PedidoProduccion
+  onMarcarListo: () => Promise<void>
+}) {
   const [confirmando, setConfirmando] = useState(false)
+  const [loading,     setLoading]     = useState(false)
+  const [error,       setError]       = useState<string | null>(null)
+  const [saliendo,    setSaliendo]    = useState(false)
+  const confirmBtnRef = useRef<HTMLButtonElement>(null)
+
+  // Foco al botón confirmar cuando aparece
+  useEffect(() => {
+    if (confirmando) confirmBtnRef.current?.focus()
+  }, [confirmando])
+
+  const handleConfirmar = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      await onMarcarListo()
+      setSaliendo(true)
+      setConfirmando(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo marcar como listo')
+      setTimeout(() => setError(null), 3000)
+      setConfirmando(false)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div style={{
-      background: '#fff', borderRadius: 20, padding: '14px 16px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-      borderLeft: '4px solid #F57C00',
+      opacity:    saliendo ? 0 : 1,
+      maxHeight:  saliendo ? 0 : 800,
+      overflow:   'hidden',
+      transition: 'opacity 0.3s ease, max-height 0.3s ease',
     }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div>
-          <span style={{ fontWeight: 700, fontSize: 13, color: '#1A2B3C' }}>
-            P-{String(pedido.numero).padStart(5, '0')}
-          </span>
-          <span style={{ marginLeft: 8, fontWeight: 600, fontSize: 14, color: '#1A2B3C' }}>
-            {pedido.clientes?.nombre}
-          </span>
-        </div>
-        <span style={{ fontSize: 11, color: '#4A5568' }}>
-          {new Date(pedido.updated_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
-        </span>
-      </div>
-
-      {/* Ítems */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
-        {pedido.pedido_items.map((item, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-            <span style={{
-              width: 28, height: 28, borderRadius: 8, background: '#F4F6F8',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontWeight: 700, fontSize: 12, color: '#0D5C8A', flexShrink: 0,
-            }}>
-              {item.cantidad}
+      <div style={{
+        background: '#fff', borderRadius: 20, padding: '14px 16px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+        borderLeft: '4px solid #F57C00',
+      }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div>
+            <span style={{ fontWeight: 700, fontSize: 13, color: '#1A2B3C' }}>
+              P-{String(pedido.numero).padStart(5, '0')}
             </span>
-            <span style={{ fontWeight: 500 }}>
-              {item.nombre}{item.fragancia ? ` (${item.fragancia})` : ''}
-              <span style={{ color: '#4A5568', fontWeight: 400 }}> · {item.presentacion}L</span>
+            <span style={{ marginLeft: 8, fontWeight: 600, fontSize: 14, color: '#1A2B3C' }}>
+              {pedido.clientes?.nombre}
             </span>
-            {item.bidon_nuevo && (
-              <span style={{ fontSize: 9, fontWeight: 700, background: '#FFF3E0', color: '#F57C00', padding: '2px 6px', borderRadius: 99 }}>
-                BIDÓN NUEVO
-              </span>
-            )}
           </div>
-        ))}
-      </div>
-
-      {/* Notas producción */}
-      {pedido.notas_produccion && (
-        <p style={{ fontSize: 12, color: '#4A5568', background: '#F4F6F8', borderRadius: 8, padding: '6px 10px', margin: '0 0 12px' }}>
-          {pedido.notas_produccion}
-        </p>
-      )}
-
-      {/* Botón marcar listo */}
-      {!confirmando ? (
-        <button
-          onClick={() => setConfirmando(true)}
-          style={{
-            width: '100%', background: '#E8F8F0', color: '#2E9E5C',
-            border: '1.5px solid #2E9E5C', borderRadius: 10,
-            padding: '13px', minHeight: 48, fontSize: 15, fontWeight: 700,
-            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          }}
-        >
-          <Check size={18} /> Marcar listo para reparto
-        </button>
-      ) : (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => { onMarcarListo(); setConfirmando(false) }}
-            style={{
-              flex: 1, background: '#2E9E5C', color: '#fff', border: 'none',
-              borderRadius: 10, padding: '13px', minHeight: 48, fontSize: 15,
-              fontWeight: 700, cursor: 'pointer',
-            }}
-          >
-            ✓ Confirmar
-          </button>
-          <button
-            onClick={() => setConfirmando(false)}
-            style={{
-              flex: 1, background: 'transparent', color: '#4A5568',
-              border: '1.5px solid #D1D5DB', borderRadius: 10,
-              padding: '13px', minHeight: 48, fontSize: 15, cursor: 'pointer',
-            }}
-          >
-            Cancelar
-          </button>
+          <span style={{ fontSize: 11, color: '#4A5568' }}>
+            {new Date(pedido.updated_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+          </span>
         </div>
-      )}
+
+        {/* Ítems */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
+          {pedido.pedido_items.map((item, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+              <span style={{
+                width: 28, height: 28, borderRadius: 8, background: '#F4F6F8',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 700, fontSize: 12, color: '#0D5C8A', flexShrink: 0,
+              }}>
+                {item.cantidad}
+              </span>
+              <span style={{ fontWeight: 500 }}>
+                {item.nombre}{item.fragancia ? ` (${item.fragancia})` : ''}
+                <span style={{ color: '#4A5568', fontWeight: 400 }}> · {item.presentacion}L</span>
+              </span>
+              {item.bidon_nuevo && (
+                <span style={{ fontSize: 9, fontWeight: 700, background: '#FFF3E0', color: '#F57C00', padding: '2px 6px', borderRadius: 99 }}>
+                  BIDÓN NUEVO
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Notas producción */}
+        {pedido.notas_produccion && (
+          <p style={{ fontSize: 12, color: '#4A5568', background: '#F4F6F8', borderRadius: 8, padding: '6px 10px', margin: '0 0 12px' }}>
+            {pedido.notas_produccion}
+          </p>
+        )}
+
+        {/* Botón / confirmación inline */}
+        {!confirmando ? (
+          <button
+            onClick={() => setConfirmando(true)}
+            disabled={loading}
+            aria-label={`Marcar pedido P-${String(pedido.numero).padStart(5, '0')} como listo para reparto`}
+            aria-disabled={loading}
+            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+            style={{
+              width: '100%', background: loading ? 'rgba(249,168,37,0.5)' : '#F9A825',
+              color: '#fff', border: 'none', borderRadius: 10,
+              padding: '13px', minHeight: 48, fontSize: 15, fontWeight: 700,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              outlineOffset: 2,
+            }}
+          >
+            {loading ? 'Procesando…' : 'Marcar listo para reparto'}
+          </button>
+        ) : (
+          <div>
+            <p style={{ margin: '0 0 10px', fontSize: 13, color: '#1A2B3C', fontWeight: 600 }}>
+              ¿Confirmás que está listo?
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                ref={confirmBtnRef}
+                onClick={handleConfirmar}
+                disabled={loading}
+                aria-disabled={loading}
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                style={{
+                  flex: 1, background: loading ? 'rgba(249,168,37,0.5)' : '#F9A825',
+                  color: '#fff', border: 'none',
+                  borderRadius: 10, padding: '13px', minHeight: 48, fontSize: 15,
+                  fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
+                  outlineOffset: 2,
+                }}
+              >
+                {loading ? 'Guardando…' : 'Sí, marcar listo'}
+              </button>
+              <button
+                onClick={() => setConfirmando(false)}
+                disabled={loading}
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                style={{
+                  flex: 1, background: 'transparent', color: '#4A5568',
+                  border: '1.5px solid #D1D5DB', borderRadius: 10,
+                  padding: '13px', minHeight: 48, fontSize: 15, cursor: 'pointer',
+                  outlineOffset: 2,
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Error inline */}
+        {error && (
+          <p style={{ color: '#D32F2F', fontSize: 12, marginTop: 8, margin: '8px 0 0' }} role="alert">
+            {error}
+          </p>
+        )}
+      </div>
     </div>
   )
 }
@@ -192,7 +254,7 @@ function CardProduccion({ pedido, onMarcarListo }: { pedido: PedidoProduccion; o
 
 function KanbanDesktop({ grupos, onMarcarListo }: {
   grupos: Map<string, PedidoProduccion[]>
-  onMarcarListo: (id: string) => void
+  onMarcarListo: (id: string) => Promise<void>
 }) {
   return (
     <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 16, minHeight: 400 }}>
@@ -229,7 +291,7 @@ function KanbanDesktop({ grupos, onMarcarListo }: {
 
 function ListaMobile({ grupos, onMarcarListo }: {
   grupos: Map<string, PedidoProduccion[]>
-  onMarcarListo: (id: string) => void
+  onMarcarListo: (id: string) => Promise<void>
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -240,10 +302,7 @@ function ListaMobile({ grupos, onMarcarListo }: {
 
         return (
           <div key={fecha}>
-            {/* Encabezado de día */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12,
-            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
               <div style={{ flex: 1, height: 1, background: esHoy ? '#1B9ED6' : '#D1D5DB' }} />
               <div style={{
                 background: esHoy ? '#1B9ED6' : '#F4F6F8',
@@ -277,7 +336,6 @@ export default function ProduccionPage() {
 
   const { data: pedidosProd, isLoading, refetch } = usePedidosProduccion(fechaFiltro)
 
-  // Agrupar por fecha de producción, ordenado cronológicamente
   const grupos = useMemo(() => {
     const map = new Map<string, PedidoProduccion[]>()
     pedidosProd?.forEach(p => {
@@ -288,15 +346,11 @@ export default function ProduccionPage() {
     return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)))
   }, [pedidosProd])
 
+  // No try/catch: errors propagate to CardProduccion for inline display
   const handleMarcarListo = async (id: string) => {
-    try {
-      // estadoActual siempre es 'en_produccion' en esta vista — evita la lectura previa
-      await cambiarEstado.mutateAsync({ id, estadoActual: 'en_produccion', estado: 'listo_reparto' })
-      show('Pedido marcado como listo para reparto', 'success')
-      refetch()
-    } catch (e) {
-      show(e instanceof Error ? e.message : 'Error', 'error')
-    }
+    await cambiarEstado.mutateAsync({ id, estadoActual: 'en_produccion', estado: 'listo_reparto' })
+    show('Pedido marcado como listo para reparto', 'success')
+    refetch()
   }
 
   const totalPedidos = pedidosProd?.length ?? 0
@@ -352,11 +406,9 @@ export default function ProduccionPage() {
         </div>
       ) : (
         <>
-          {/* Desktop: kanban */}
           <div className="hidden md:block">
             <KanbanDesktop grupos={grupos} onMarcarListo={handleMarcarListo} />
           </div>
-          {/* Mobile: lista agrupada */}
           <div className="block md:hidden">
             <ListaMobile grupos={grupos} onMarcarListo={handleMarcarListo} />
           </div>
