@@ -129,15 +129,13 @@ export const usePedidosProduccion = (fecha?: string) =>
   })
 
 export const usePedidosListosHoy = () => {
-  const hoy = new Date().toISOString().split('T')[0]
   return useQuery({
-    queryKey: ['produccion', 'listos', hoy],
+    queryKey: ['produccion', 'listos'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pedidos')
         .select('id, numero, estado, fecha_produccion, notas_produccion, updated_at, clientes(nombre)')
         .eq('estado', 'listo_reparto')
-        .eq('fecha_produccion', hoy)
         .order('updated_at', { ascending: false })
 
       if (error) throw new Error(error.message)

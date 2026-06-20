@@ -8,7 +8,8 @@ import { useCambiarEstado } from '@/services/pedidos'
 
 // ─── Helpers de fecha ─────────────────────────────────────────────────────────
 
-const HOY = new Date().toISOString().split('T')[0]
+const d = new Date()
+const HOY = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 function labelFecha(fecha: string | null): string {
   if (!fecha) return 'Sin fecha'
