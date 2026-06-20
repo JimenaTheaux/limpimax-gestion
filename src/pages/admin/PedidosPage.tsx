@@ -75,8 +75,8 @@ function CardPedido({ pedido, onClick, onSaved, seleccionado, modoSeleccion }: {
   const handleAccion = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!action) return
-    // en_reparto → entregado requiere form de cobro: abrir drawer detalle
-    if (pedido.estado === 'en_reparto') { onClick(); return }
+    // estas transiciones requieren form de cobro: abrir drawer detalle
+    if (pedido.estado === 'en_reparto' || pedido.estado === 'entregado') { onClick(); return }
     setLoading(true)
     try {
       await cambiarEstado.mutateAsync({ id: pedido.id, estadoActual: pedido.estado, estado: action.next })

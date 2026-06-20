@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Clock, Edit2, XCircle, ChevronRight, Printer } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { BadgeEstado } from '@/components/common/BadgeEstado'
@@ -108,6 +108,31 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
   const [cobroForma,    setCobroForma]    = useState('')
   const [cobroMonto,    setCobroMonto]    = useState('')
 
+  // Flujo "Cerrar venta" con form de cobro inline
+  const [cerrando,      setCerrando]      = useState(false)
+  const [cerrarForma,   setCerrarForma]   = useState<'efectivo' | 'transferencia' | 'pendiente'>('efectivo')
+  const [cerrarMonto,   setCerrarMonto]   = useState('')
+  const [cerrarError,   setCerrarError]   = useState<string | null>(null)
+  const cerrarBtnRef = useRef<HTMLButtonElement>(null)
+
+  // Pre-llenar cobro al abrir el form de cierre
+  useEffect(() => {
+    if (cerrando && p) {
+      setCerrarForma((p.forma_cobro ?? 'efectivo') as typeof cerrarForma)
+      setCerrarMonto(
+        p.monto_cobrado != null
+          ? String(p.monto_cobrado)
+          : String(Math.round(Number(totalPedido(p))))
+      )
+      setCerrarError(null)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cerrando])
+
+  useEffect(() => {
+    if (cerrando) cerrarBtnRef.current?.focus()
+  }, [cerrando])
+
   const handleEstado = async (nuevoEstado: EstadoPedido) => {
     if (!pedido) return
     try {
@@ -142,6 +167,29 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
     }
   }
 
+  const handleCerrarVenta = async () => {
+    if (!pedido) return
+    if (cerrarForma !== 'pendiente' && !cerrarMonto.trim()) {
+      setCerrarError('El monto cobrado es obligatorio')
+      return
+    }
+    setCerrarError(null)
+    try {
+      // Guardar cobro siempre (aunque no haya cambiado, asegura que quede registrado)
+      await editarCobro.mutateAsync({
+        id:            pedido.id,
+        forma_cobro:   cerrarForma,
+        monto_cobrado: cerrarMonto.trim() || undefined,
+      })
+      // Cambiar estado a cerrado
+      await cambiarEstado.mutateAsync({ id: pedido.id, estadoActual: 'entregado', estado: 'cerrado' })
+      onSaved('Venta cerrada correctamente')
+      setCerrando(false)
+    } catch (e) {
+      setCerrarError(e instanceof Error ? e.message : 'No se pudo cerrar la venta')
+    }
+  }
+
   const p = pedido
   const transiciones: EstadoPedido[] = p
     ? (isAdmin ? TRANSICIONES_ADMIN[p.estado] : TRANSICIONES[p.estado]) ?? []
@@ -155,8 +203,8 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
         <SheetContent
           side="right"
           style={{ width: '100%', maxWidth: 500, overflowY: 'auto' }}
-          onPointerDownOutside={e => { if (confirmando || anulando) e.preventDefault() }}
-          onInteractOutside={e => { if (confirmando || anulando) e.preventDefault() }}
+          onPointerDownOutside={e => { if (confirmando || anulando || cerrando) e.preventDefault() }}
+          onInteractOutside={e => { if (confirmando || anulando || cerrando) e.preventDefault() }}
         >
           <SheetHeader>
             <SheetTitle>{p ? `P-${String(p.numero).padStart(5, '0')}` : 'Detalle de pedido'}</SheetTitle>
@@ -328,10 +376,140 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
 
                 {/* Botón primario — primera transición lógica */}
                 {transiciones.length > 0 && (() => {
-                  const primary = transiciones[0]
-                  const cfg     = ESTADO_CONFIG[primary]
-                  const label   = ACCION_LABEL[primary] ?? `Pasar a ${cfg.label}`
-                  const isPending = cambiarEstado.isPending
+                  const primary   = transiciones[0]
+                  const cfg       = ESTADO_CONFIG[primary]
+                  const label     = ACCION_LABEL[primary] ?? `Pasar a ${cfg.label}`
+                  const isPending = cambiarEstado.isPending || editarCobro.isPending
+
+                  // ── Cerrar venta: flujo especial con form de cobro ──────
+                  if (primary === 'cerrado') {
+                    return cerrando ? (
+                      <div key="cerrar-form" style={{
+                        background: '#F4F6F8', borderRadius: 14, padding: 16,
+                        display: 'flex', flexDirection: 'column', gap: 12,
+                        border: '1.5px solid #145A32',
+                      }}>
+                        <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#145A32' }}>
+                          Confirmar cobro y cerrar venta
+                        </p>
+
+                        {/* Total de referencia */}
+                        <div style={{
+                          background: '#D4EDDA', borderRadius: 10, padding: '10px 14px',
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        }}>
+                          <span style={{ fontSize: 12, color: '#145A32', fontWeight: 600 }}>Total pedido</span>
+                          <span style={{ fontSize: 20, fontWeight: 900, color: '#145A32', letterSpacing: -0.5 }}>
+                            ${Number(totalPedido(p)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+
+                        {/* Forma de cobro */}
+                        <div>
+                          <label style={{ fontSize: 11, color: '#4A5568', fontWeight: 600, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                            Forma de cobro
+                          </label>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            {(['efectivo', 'transferencia', 'pendiente'] as const).map(f => (
+                              <button
+                                key={f}
+                                type="button"
+                                onClick={() => setCerrarForma(f)}
+                                style={{
+                                  flex: 1, padding: '9px 6px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                                  border: `1.5px solid ${cerrarForma === f ? '#145A32' : '#D1D5DB'}`,
+                                  background: cerrarForma === f ? '#D4EDDA' : '#fff',
+                                  color: cerrarForma === f ? '#145A32' : '#4A5568',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                {f === 'efectivo' ? 'Efectivo' : f === 'transferencia' ? 'Transf.' : 'Pendiente'}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Monto cobrado */}
+                        <div>
+                          <label style={{ fontSize: 11, color: '#4A5568', fontWeight: 600, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                            Monto cobrado {cerrarForma !== 'pendiente' ? '*' : '(opcional)'}
+                          </label>
+                          <input
+                            type="number"
+                            value={cerrarMonto}
+                            onChange={e => setCerrarMonto(e.target.value)}
+                            placeholder="0.00"
+                            inputMode="decimal"
+                            style={{
+                              width: '100%', padding: '10px 12px',
+                              border: `1.5px solid ${cerrarError ? '#D32F2F' : '#D1D5DB'}`,
+                              borderRadius: 10, fontSize: 14, fontFamily: 'Inter, sans-serif',
+                              outline: 0, boxSizing: 'border-box',
+                            }}
+                            onFocus={e => (e.target.style.borderColor = '#145A32')}
+                            onBlur={e  => (e.target.style.borderColor = cerrarError ? '#D32F2F' : '#D1D5DB')}
+                          />
+                        </div>
+
+                        {cerrarError && (
+                          <p style={{ color: '#D32F2F', fontSize: 12, margin: 0 }} role="alert">
+                            {cerrarError}
+                          </p>
+                        )}
+
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            ref={cerrarBtnRef}
+                            type="button"
+                            onClick={handleCerrarVenta}
+                            disabled={isPending}
+                            aria-disabled={isPending}
+                            aria-label={`Confirmar cierre de venta — pedido P-${String(p.numero).padStart(5, '0')}`}
+                            style={{
+                              flex: 1,
+                              background: isPending ? 'rgba(20,90,50,0.5)' : '#145A32',
+                              color: '#fff', border: 'none', borderRadius: 10,
+                              padding: '13px', minHeight: 48, fontSize: 15, fontWeight: 700,
+                              cursor: isPending ? 'not-allowed' : 'pointer', outlineOffset: 2,
+                            }}
+                          >
+                            {isPending ? 'Cerrando…' : '✓ Confirmar cierre'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCerrando(false)}
+                            disabled={isPending}
+                            style={{
+                              flex: 1, background: 'transparent', color: '#4A5568',
+                              border: '1.5px solid #D1D5DB', borderRadius: 10,
+                              padding: '12px', fontSize: 14, cursor: 'pointer', minHeight: 48,
+                            }}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        key="cerrar-btn"
+                        type="button"
+                        onClick={() => setCerrando(true)}
+                        disabled={isPending}
+                        aria-disabled={isPending}
+                        aria-label={`Cerrar venta — pedido P-${String(p.numero).padStart(5, '0')}`}
+                        style={{
+                          background: isPending ? `${cfg.color}80` : cfg.color,
+                          color: '#fff', border: 'none', borderRadius: 10,
+                          padding: '14px', minHeight: 48, fontSize: 15, fontWeight: 700,
+                          cursor: isPending ? 'not-allowed' : 'pointer', outlineOffset: 2,
+                        }}
+                      >
+                        {label}
+                      </button>
+                    )
+                  }
+
+                  // ── Transición genérica ─────────────────────────────────
                   return (
                     <button
                       key={primary}
