@@ -49,6 +49,8 @@ CREATE OR REPLACE FUNCTION public.cambiar_estado_pedido(
 )
 RETURNS void
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
 AS $$
 BEGIN
   UPDATE pedidos
@@ -95,6 +97,8 @@ CREATE OR REPLACE FUNCTION public.registrar_entrega(
 )
 RETURNS void
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
 AS $$
 BEGIN
   UPDATE pedidos
@@ -138,6 +142,8 @@ CREATE OR REPLACE FUNCTION public.anular_pedido(
 )
 RETURNS void
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
 AS $$
 BEGIN
   IF p_estado_anterior = 'cerrado' THEN
@@ -184,6 +190,8 @@ CREATE OR REPLACE FUNCTION public.get_dashboard_stats(p_fecha date DEFAULT CURRE
 RETURNS json
 LANGUAGE sql
 STABLE
+SECURITY DEFINER
+SET search_path = public
 AS $$
   WITH
   pedidos_hoy AS (
