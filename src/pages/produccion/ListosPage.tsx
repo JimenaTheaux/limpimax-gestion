@@ -30,14 +30,14 @@ export default function ListosPage() {
               <CheckCircle size={20} color="#2E9E5C" />
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, color: '#1A2B3C' }}>
-                  P-{String(p.numero).padStart(5, '0')} — {p.clienteNombre}
+                  P-{String(p.numero).padStart(5, '0')} — {p.clientes?.nombre}
                 </div>
-                {p.notasProduccion && (
-                  <div style={{ fontSize: 12, color: '#4A5568', marginTop: 2 }}>{p.notasProduccion}</div>
+                {p.notas_produccion && (
+                  <div style={{ fontSize: 12, color: '#4A5568', marginTop: 2 }}>{p.notas_produccion}</div>
                 )}
               </div>
               <span style={{ fontSize: 11, color: '#4A5568' }}>
-                {new Date(p.updatedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                {new Date(p.updated_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
           ))}

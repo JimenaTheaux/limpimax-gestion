@@ -66,17 +66,17 @@ function PanelResumen({ fecha }: { fecha?: string }) {
                 {data.map((r, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid #F4F6F8' }}>
                     <td style={{ padding: '8px 4px', fontWeight: 500 }}>
-                      {r.nombreProducto}
-                      {r.presentacion && <span style={{ color: '#4A5568', fontWeight: 400 }}> — {r.presentacion}{r.unidadMedida === 'litros' ? 'L' : ''}</span>}
+                      {r.nombre_producto}
+                      {r.presentacion && <span style={{ color: '#4A5568', fontWeight: 400 }}> — {r.presentacion}{r.unidad_medida === 'litros' ? 'L' : ''}</span>}
                     </td>
                     <td style={{ padding: '8px 4px', textAlign: 'right', fontWeight: 700, color: '#0D5C8A' }}>
-                      {r.totalCantidad}
+                      {r.total_cantidad}
                     </td>
-                    <td style={{ padding: '8px 4px', textAlign: 'right', color: r.totalBidonNuevo > 0 ? '#F57C00' : '#9A9A9A' }}>
-                      {r.totalBidonNuevo > 0 ? r.totalBidonNuevo : '—'}
+                    <td style={{ padding: '8px 4px', textAlign: 'right', color: r.total_bidon_nuevo > 0 ? '#F57C00' : '#9A9A9A' }}>
+                      {r.total_bidon_nuevo > 0 ? r.total_bidon_nuevo : '—'}
                     </td>
                     <td style={{ padding: '8px 4px', color: '#4A5568' }}>
-                      {labelFecha(r.fechaProduccion)}
+                      {labelFecha(r.fecha_produccion)}
                     </td>
                   </tr>
                 ))}
@@ -107,17 +107,17 @@ function CardProduccion({ pedido, onMarcarListo }: { pedido: PedidoProduccion; o
             P-{String(pedido.numero).padStart(5, '0')}
           </span>
           <span style={{ marginLeft: 8, fontWeight: 600, fontSize: 14, color: '#1A2B3C' }}>
-            {pedido.clienteNombre}
+            {pedido.clientes?.nombre}
           </span>
         </div>
         <span style={{ fontSize: 11, color: '#4A5568' }}>
-          {new Date(pedido.updatedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+          {new Date(pedido.updated_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>
 
       {/* Ítems */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
-        {pedido.items.map((item, i) => (
+        {pedido.pedido_items.map((item, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
             <span style={{
               width: 28, height: 28, borderRadius: 8, background: '#F4F6F8',
@@ -130,7 +130,7 @@ function CardProduccion({ pedido, onMarcarListo }: { pedido: PedidoProduccion; o
               {item.nombre}{item.fragancia ? ` (${item.fragancia})` : ''}
               <span style={{ color: '#4A5568', fontWeight: 400 }}> · {item.presentacion}L</span>
             </span>
-            {item.bidonNuevo && (
+            {item.bidon_nuevo && (
               <span style={{ fontSize: 9, fontWeight: 700, background: '#FFF3E0', color: '#F57C00', padding: '2px 6px', borderRadius: 99 }}>
                 BIDÓN NUEVO
               </span>
@@ -140,9 +140,9 @@ function CardProduccion({ pedido, onMarcarListo }: { pedido: PedidoProduccion; o
       </div>
 
       {/* Notas producción */}
-      {pedido.notasProduccion && (
+      {pedido.notas_produccion && (
         <p style={{ fontSize: 12, color: '#4A5568', background: '#F4F6F8', borderRadius: 8, padding: '6px 10px', margin: '0 0 12px' }}>
-          {pedido.notasProduccion}
+          {pedido.notas_produccion}
         </p>
       )}
 
@@ -280,7 +280,7 @@ export default function ProduccionPage() {
   const grupos = useMemo(() => {
     const map = new Map<string, PedidoProduccion[]>()
     pedidosProd?.forEach(p => {
-      const key = p.fechaProduccion ?? 'sin-fecha'
+      const key = p.fecha_produccion ?? 'sin-fecha'
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(p)
     })

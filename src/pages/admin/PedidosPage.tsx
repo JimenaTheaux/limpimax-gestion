@@ -83,26 +83,26 @@ function CardPedido({ pedido, onClick, seleccionado, modoSeleccion }: {
             P-{String(pedido.numero).padStart(5, '0')}
           </span>
           <BadgeEstado estado={pedido.estado} />
-          {pedido.fechaProduccion && (
+          {pedido.fecha_produccion && (
             <span style={{ fontSize: 11, color: '#4A5568', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-              Prod: {new Date(pedido.fechaProduccion + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })}
+              Prod: {new Date(pedido.fecha_produccion + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })}
             </span>
           )}
         </div>
 
         <p style={{ margin: '0 0 4px', fontWeight: 600, fontSize: 14, color: '#1A2B3C', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {pedido.clienteNombre ?? '—'}
+          {pedido.clientes?.nombre ?? '—'}
         </p>
 
         <p style={{ margin: 0, fontSize: 12, color: '#4A5568' }}>
           <span style={{
-            background: pedido.tipoPrecio === 'mayorista' ? '#E8F4FF' : '#F0F0F0',
-            color:      pedido.tipoPrecio === 'mayorista' ? '#1B9ED6' : '#9A9A9A',
+            background: pedido.tipo_precio === 'mayorista' ? '#E8F4FF' : '#F0F0F0',
+            color:      pedido.tipo_precio === 'mayorista' ? '#1B9ED6' : '#9A9A9A',
             fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 99, marginRight: 6,
           }}>
-            {pedido.tipoPrecio.toUpperCase()}
+            {pedido.tipo_precio.toUpperCase()}
           </span>
-          {pedido.direccionEntrega ?? ''}
+          {pedido.direccion_entrega ?? ''}
         </p>
       </div>
 
@@ -110,7 +110,7 @@ function CardPedido({ pedido, onClick, seleccionado, modoSeleccion }: {
         <p style={{ margin: 0, fontWeight: 900, fontSize: 16, color: '#0D5C8A', letterSpacing: -0.5 }}>
           ${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
         </p>
-        {pedido.totalManual && (
+        {pedido.total_manual && (
           <p style={{ margin: 0, fontSize: 9, color: '#F57C00', fontWeight: 600 }}>MANUAL</p>
         )}
       </div>

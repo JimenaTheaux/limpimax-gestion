@@ -2,10 +2,36 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Printer, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import type { PedidoDetalle } from '@/services/pedidos'
-import { totalPedido } from '@/services/pedidos'
+import type { EstadoPedido } from '@/types'
 
-// Reutilizamos el tipo PedidoDetalle del servicio
+// ─── Tipos locales (la página fetchea directamente y mapea a camelCase) ─────────
+
+interface FacturaItem {
+  id:                   string
+  productoNombre:       string
+  productoPresentacion: string | null
+  cantidad:             string
+  precioUnitario:       string
+  bidonNuevo:           boolean
+}
+
+interface FacturaPedido {
+  id:               string
+  numero:           number
+  estado:           EstadoPedido
+  tipoPrecio:       string
+  direccionEntrega: string | null
+  fechaProduccion:  string | null
+  totalCalculado:   string
+  totalManual:      string | null
+  costoEnvio:       string
+  formaCobro:       string | null
+  montoCobrado:     string | null
+  notasProduccion:  string | null
+  createdAt:        string
+  clienteNombre:    string | null
+  items:            FacturaItem[]
+}
 
 function formatPeso(n: number | string | null | undefined) {
   if (!n) return '0,00'
@@ -19,8 +45,8 @@ function formatFecha(s: string | null | undefined) {
 
 // ─── Factura individual (1/4 de A4) ──────────────────────────────────────────
 
-function Factura({ pedido, posicion }: { pedido: PedidoDetalle; posicion: 0|1|2|3 }) {
-  const total = Number(totalPedido(pedido))
+function Factura({ pedido, posicion }: { pedido: FacturaPedido; posicion: 0|1|2|3 }) {
+  const total = Number(pedido.totalManual ?? pedido.totalCalculado)
 
   // Bordes de corte: solo los bordes internos (entre facturas)
   const borderRight  = posicion === 0 || posicion === 2 ? '1px dashed #bbb' : 'none'
@@ -132,7 +158,7 @@ function Factura({ pedido, posicion }: { pedido: PedidoDetalle; posicion: 0|1|2|
 
 // ─── Hoja A4 con 4 facturas ───────────────────────────────────────────────────
 
-function HojaA4({ pedidos, indice }: { pedidos: (PedidoDetalle | null)[]; indice: number }) {
+function HojaA4({ pedidos, indice }: { pedidos: (FacturaPedido | null)[]; indice: number }) {
   const grupo = [...pedidos]
   while (grupo.length < 4) grupo.push(null)
 
@@ -161,7 +187,7 @@ export default function FacturasPage() {
   const idsStr = searchParams.get('ids') ?? ''
   const ids    = idsStr.split(',').map(s => s.trim()).filter(Boolean)
 
-  const [pedidos,  setPedidos]  = useState<PedidoDetalle[]>([])
+  const [pedidos,  setPedidos]  = useState<FacturaPedido[]>([])
   const [loading,  setLoading]  = useState(true)
   const [errores,  setErrores]  = useState<string[]>([])
 
@@ -182,7 +208,7 @@ export default function FacturasPage() {
         .eq('pedido_id', id)
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mapped: PedidoDetalle = {
+      const mapped: FacturaPedido = {
         id:               p.id,
         numero:           p.numero,
         estado:           p.estado,
@@ -195,33 +221,22 @@ export default function FacturasPage() {
         formaCobro:       p.forma_cobro,
         montoCobrado:     p.monto_cobrado != null ? String(p.monto_cobrado) : null,
         notasProduccion:  p.notas_produccion,
-        notasInternas:    p.notas_internas,
         createdAt:        p.created_at,
-        updatedAt:        p.updated_at,
-        clienteId:        p.cliente_id,
         clienteNombre:    (p as any).clientes?.nombre ?? null,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        items: (items ?? []).map((item: any) => ({
-          id:                    item.id,
-          pedidoId:              item.pedido_id,
-          productoId:            item.producto_id,
-          productoNombre:        item.productos?.nombre ?? '',
-          productoFragancia:     item.productos?.fragancia ?? null,
-          productoPresentacion:  item.productos?.presentacion != null ? String(item.productos.presentacion) : null,
-          precioMinoristaActual: item.productos?.precio_minorista != null ? String(item.productos.precio_minorista) : null,
-          precioMayoristaActual: item.productos?.precio_mayorista != null ? String(item.productos.precio_mayorista) : null,
-          presentacion:          item.productos?.presentacion != null ? String(item.productos.presentacion) : '',
-          cantidad:              String(item.cantidad),
-          precioUnitario:        String(item.precio_unitario),
-          precioReferencia:      String(item.precio_referencia),
-          bidonNuevo:            item.bidon_nuevo ?? false,
+        items: (items ?? []).map((item: any): FacturaItem => ({
+          id:                   item.id,
+          productoNombre:       item.productos?.nombre ?? '',
+          productoPresentacion: item.productos?.presentacion != null ? String(item.productos.presentacion) : null,
+          cantidad:             String(item.cantidad),
+          precioUnitario:       String(item.precio_unitario),
+          bidonNuevo:           item.bidon_nuevo ?? false,
         })),
-        historial: [],
       }
       return mapped
     }))
       .then(results => {
-        const ok:  PedidoDetalle[] = []
+        const ok:  FacturaPedido[] = []
         const err: string[]        = []
         results.forEach((r, i) => {
           if (r.status === 'fulfilled') ok.push(r.value)
@@ -242,7 +257,7 @@ export default function FacturasPage() {
   }, [loading, pedidos.length])
 
   // Agrupar en páginas de 4
-  const hojas: PedidoDetalle[][] = []
+  const hojas: FacturaPedido[][] = []
   for (let i = 0; i < pedidos.length; i += 4) hojas.push(pedidos.slice(i, i + 4))
   if (!hojas.length && !loading) hojas.push([]) // página vacía para el mensaje
 

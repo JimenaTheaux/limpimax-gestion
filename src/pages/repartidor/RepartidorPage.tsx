@@ -65,8 +65,8 @@ function DrawerEntrega({ pedido, isOnline, addAction, onClose, onSaved }: {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 24 }}>
           <p style={{ margin: 0, fontSize: 14, color: '#4A5568' }}>
-            <strong>{pedido.clienteNombre}</strong>
-            {pedido.direccionEntrega && <> · {pedido.direccionEntrega}</>}
+            <strong>{pedido.clientes?.nombre}</strong>
+            {pedido.direccion_entrega && <> · {pedido.direccion_entrega}</>}
           </p>
 
           {/* Total a cobrar */}
@@ -181,7 +181,7 @@ function DrawerFalla({ pedido, isOnline, addAction, onClose, onSaved }: {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 24 }}>
           <p style={{ margin: 0, fontSize: 14, color: '#4A5568' }}>
-            <strong>{pedido.clienteNombre}</strong> · {pedido.direccionEntrega ?? ''}
+            <strong>{pedido.clientes?.nombre}</strong> · {pedido.direccion_entrega ?? ''}
           </p>
 
           <div>
@@ -275,10 +275,10 @@ function CardRepartidor({ pedido, onEntregar, onFalla, onEmergencia }: {
             <BadgeEstado estado={pedido.estado} />
           </div>
           <p style={{ margin: '0 0 2px', fontWeight: 600, fontSize: 15, color: '#1A2B3C' }}>
-            {pedido.clienteNombre}
+            {pedido.clientes?.nombre}
           </p>
-          {pedido.direccionEntrega && (
-            <p style={{ margin: 0, fontSize: 13, color: '#4A5568' }}>{pedido.direccionEntrega}</p>
+          {pedido.direccion_entrega && (
+            <p style={{ margin: 0, fontSize: 13, color: '#4A5568' }}>{pedido.direccion_entrega}</p>
           )}
         </div>
 
@@ -293,9 +293,9 @@ function CardRepartidor({ pedido, onEntregar, onFalla, onEmergencia }: {
       {/* Detalle expandible */}
       {expanded && (
         <div style={{ padding: '0 16px 14px', borderTop: '1px solid #F4F6F8' }}>
-          {pedido.notasProduccion && (
+          {pedido.notas_produccion && (
             <p style={{ fontSize: 12, color: '#4A5568', background: '#F4F6F8', borderRadius: 8, padding: '6px 10px', marginTop: 8 }}>
-              {pedido.notasProduccion}
+              {pedido.notas_produccion}
             </p>
           )}
         </div>

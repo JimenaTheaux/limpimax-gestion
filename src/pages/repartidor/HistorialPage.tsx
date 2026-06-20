@@ -12,8 +12,8 @@ export default function HistorialPage() {
   ) ?? []
 
   const totalCobrado = historial
-    .filter(p => p.formaCobro && p.formaCobro !== 'pendiente' && p.montoCobrado)
-    .reduce((acc, p) => acc + Number(p.montoCobrado ?? 0), 0)
+    .filter(p => p.forma_cobro && p.forma_cobro !== 'pendiente' && p.monto_cobrado)
+    .reduce((acc, p) => acc + Number(p.monto_cobrado ?? 0), 0)
 
   return (
     <div>
@@ -58,11 +58,11 @@ export default function HistorialPage() {
                   <span style={{ fontWeight: 700, fontSize: 13 }}>P-{String(p.numero).padStart(5, '0')}</span>
                   <BadgeEstado estado={p.estado} />
                 </div>
-                <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>{p.clienteNombre}</p>
-                {p.formaCobro && (
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>{p.clientes?.nombre}</p>
+                {p.forma_cobro && (
                   <p style={{ margin: '2px 0 0', fontSize: 12, color: '#4A5568' }}>
-                    {p.formaCobro === 'efectivo' ? '💵' : p.formaCobro === 'transferencia' ? '🏦' : '⏳'} {p.formaCobro}
-                    {p.montoCobrado ? ` — $${Number(p.montoCobrado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}` : ''}
+                    {p.forma_cobro === 'efectivo' ? '💵' : p.forma_cobro === 'transferencia' ? '🏦' : '⏳'} {p.forma_cobro}
+                    {p.monto_cobrado ? ` — $${Number(p.monto_cobrado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}` : ''}
                   </p>
                 )}
               </div>

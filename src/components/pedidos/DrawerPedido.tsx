@@ -8,7 +8,7 @@ import { FloatInput }  from '@/components/common/FloatInput'
 import { ButtonGroup } from '@/components/common/ButtonGroup'
 import { useClientes } from '@/services/clientes'
 import { useProductos } from '@/services/productos'
-import { useCrearPedido, useEditarPedido, type PedidoDetalle, type ItemForm } from '@/services/pedidos'
+import { useCrearPedido, useEditarPedido, type PedidoDetalle, type ItemForm, type CrearPedidoInput } from '@/services/pedidos'
 import { useDebounce } from '@/hooks/useDebounce'
 import type { Producto } from '@/types'
 
@@ -74,7 +74,7 @@ function SelectorCliente({
           <div>
             <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: '#1A2B3C' }}>{selected.nombre}</p>
             <p style={{ margin: 0, fontSize: 12, color: '#4A5568' }}>
-              {selected.tipocliente} {selected.direccion ? `· ${selected.direccion}` : ''}
+              {selected.tipo_cliente} {selected.direccion ? `· ${selected.direccion}` : ''}
             </p>
           </div>
           <button type="button" onClick={() => { onChange('', 'minorista', ''); setQ('') }}
@@ -106,7 +106,7 @@ function SelectorCliente({
                 <button
                   key={c.id} type="button"
                   onClick={() => {
-                    onChange(c.id, c.tipocliente as 'minorista' | 'mayorista', c.direccion ?? '')
+                    onChange(c.id, c.tipo_cliente, c.direccion ?? '')
                     setQ(c.nombre)
                     setOpen(false)
                   }}
@@ -117,7 +117,7 @@ function SelectorCliente({
                   }}
                 >
                   <span style={{ fontWeight: 500, fontSize: 14 }}>{c.nombre}</span>
-                  <span style={{ color: '#4A5568', fontSize: 12, marginLeft: 8 }}>{c.tipocliente}</span>
+                  <span style={{ color: '#4A5568', fontSize: 12, marginLeft: 8 }}>{c.tipo_cliente}</span>
                 </button>
               ))}
             </div>
@@ -153,18 +153,18 @@ function FilaItem({
   // Al cambiar producto: pre-cargar precio y datos
   useEffect(() => {
     if (!producto) return
-    const precio = tipoPrecio === 'mayorista' ? producto.precioMayorista : producto.precioMinorista
-    setValue(`items.${index}.precioUnitario`,   precio)
-    setValue(`items.${index}.precioReferencia`, precio)
+    const precio = tipoPrecio === 'mayorista' ? producto.precio_mayorista : producto.precio_minorista
+    setValue(`items.${index}.precioUnitario`,   String(precio))
+    setValue(`items.${index}.precioReferencia`, String(precio))
     setValue(`items.${index}.productoNombre`,   producto.nombre)
-    setValue(`items.${index}.presentacion`,     producto.presentacion)
+    setValue(`items.${index}.presentacion`,     String(producto.presentacion))
   }, [productoId, tipoPrecio])
 
   const subtotal = (Number(cantidad) || 0) * (Number(precioUnitario) || 0)
 
   // Alerta de precio desactualizado
   const precioReferencia = watch(`items.${index}.precioReferencia`)
-  const precioActual     = tipoPrecio === 'mayorista' ? producto?.precioMayorista : producto?.precioMinorista
+  const precioActual     = tipoPrecio === 'mayorista' ? producto?.precio_mayorista : producto?.precio_minorista
   const precioDesact     = producto && precioActual && precioReferencia &&
     Number(precioActual) !== Number(precioReferencia)
 
@@ -240,7 +240,7 @@ function FilaItem({
             <AlertTriangle size={11} />
             Precio cambió a ${Number(precioActual).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
             <button type="button"
-              onClick={() => setValue(`items.${index}.precioUnitario`, precioActual ?? '')}
+              onClick={() => setValue(`items.${index}.precioUnitario`, String(precioActual ?? 0))}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#F57C00', fontWeight: 700, fontSize: 11, textDecoration: 'underline' }}>
               Actualizar
             </button>
@@ -260,28 +260,28 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
 
   const { data: productos } = useProductos()
 
-  const defaultItems: ItemForm[] = pedido?.items?.map(i => ({
-    productoId:       i.productoId,
-    productoNombre:   i.productoNombre ?? '',
-    presentacion:     i.productoPresentacion ?? '',
-    cantidad:         i.cantidad,
-    precioUnitario:   i.precioUnitario,
-    precioReferencia: i.precioReferencia,
-    bidonNuevo:       i.bidonNuevo,
+  const defaultItems = pedido?.pedido_items?.map(i => ({
+    productoId:       i.producto_id,
+    productoNombre:   i.productos?.nombre ?? '',
+    presentacion:     String(i.productos?.presentacion ?? ''),
+    cantidad:         String(i.cantidad),
+    precioUnitario:   String(i.precio_unitario),
+    precioReferencia: String(i.precio_referencia),
+    bidonNuevo:       i.bidon_nuevo,
   })) ?? []
 
   const { register, control, handleSubmit, watch, setValue, reset, formState: { errors } } =
     useForm<FormData>({
       resolver: zodResolver(schema),
       defaultValues: {
-        clienteId:        pedido?.clienteId        ?? '',
-        tipoPrecio:       pedido?.tipoPrecio        ?? 'minorista',
-        fechaProduccion:  pedido?.fechaProduccion   ?? '',
-        direccionEntrega: pedido?.direccionEntrega  ?? '',
-        notasProduccion:  pedido?.notasProduccion   ?? '',
-        notasInternas:    pedido?.notasInternas     ?? '',
-        costoEnvio:       pedido?.costoEnvio        ?? '0',
-        totalManual:      pedido?.totalManual       ?? '',
+        clienteId:        pedido?.cliente_id         ?? '',
+        tipoPrecio:       pedido?.tipo_precio         ?? 'minorista',
+        fechaProduccion:  pedido?.fecha_produccion    ?? '',
+        direccionEntrega: pedido?.direccion_entrega   ?? '',
+        notasProduccion:  pedido?.notas_produccion    ?? '',
+        notasInternas:    pedido?.notas_internas      ?? '',
+        costoEnvio:       String(pedido?.costo_envio  ?? 0),
+        totalManual:      pedido?.total_manual != null ? String(pedido.total_manual) : '',
         items:            defaultItems,
       },
     })
@@ -302,12 +302,32 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
   const handleClose = () => { reset(); onClose() }
 
   const submit = async (data: FormData, accion: 'borrador' | 'confirmar') => {
+    const mapped: CrearPedidoInput = {
+      cliente_id:        data.clienteId,
+      tipo_precio:       data.tipoPrecio,
+      fecha_produccion:  data.fechaProduccion ?? '',
+      direccion_entrega: data.direccionEntrega ?? '',
+      notas_produccion:  data.notasProduccion ?? '',
+      notas_internas:    data.notasInternas ?? '',
+      costo_envio:       data.costoEnvio ?? '0',
+      total_manual:      data.totalManual ?? '',
+      items: data.items.map((item): ItemForm => ({
+        producto_id:       item.productoId,
+        producto_nombre:   item.productoNombre,
+        presentacion:      item.presentacion,
+        cantidad:          item.cantidad,
+        precio_unitario:   item.precioUnitario,
+        precio_referencia: item.precioReferencia,
+        bidon_nuevo:       item.bidonNuevo,
+      })),
+      accion,
+    }
     try {
       if (pedido) {
-        await editar.mutateAsync({ id: pedido.id, ...data, accion })
+        await editar.mutateAsync({ id: pedido.id, ...mapped })
         onSaved('Pedido actualizado')
       } else {
-        await crear.mutateAsync({ ...data, accion } as Parameters<typeof crear.mutateAsync>[0])
+        await crear.mutateAsync(mapped)
         onSaved(accion === 'confirmar' ? 'Pedido confirmado y enviado a producción' : 'Borrador guardado')
         reset()
       }

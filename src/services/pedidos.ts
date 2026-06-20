@@ -1,115 +1,101 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/authStore'
-import type { EstadoPedido } from '@/types'
+import { totalPedido } from '@/types'
+import type { Pedido, PedidoItem, PedidoHistorial, Cliente, Producto, EstadoPedido } from '@/types'
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
+export { totalPedido }
 
-export interface PedidoListItem {
-  id:               string
-  numero:           number
-  estado:           EstadoPedido
-  tipoPrecio:       'minorista' | 'mayorista'
-  direccionEntrega: string | null
-  fechaProduccion:  string | null
-  totalCalculado:   string
-  totalManual:      string | null
-  costoEnvio:       string
-  formaCobro:       'efectivo' | 'transferencia' | 'pendiente' | null
-  montoCobrado:     string | null
-  notasProduccion:  string | null
-  notasInternas:    string | null
-  createdAt:        string
-  updatedAt:        string
-  clienteId:        string
-  clienteNombre:    string | null
+// ─── Tipos extendidos (con joins de Supabase) ────────────────────────────────
+
+export type PedidoConCliente = Pedido & {
+  clientes: Pick<Cliente, 'nombre' | 'direccion' | 'tipo_cliente' | 'telefono'>
 }
+
+export type ItemDetalle = PedidoItem & {
+  productos: Pick<Producto, 'nombre' | 'fragancia' | 'presentacion' | 'precio_minorista' | 'precio_mayorista'>
+}
+
+export type HistorialDetalle = PedidoHistorial & {
+  perfiles: { nombre: string } | null
+}
+
+export type PedidoDetalle = PedidoConCliente & {
+  pedido_items:     ItemDetalle[]
+  pedido_historial: HistorialDetalle[]
+}
+
+export type PedidoListItem = PedidoConCliente
+
+// ─── Tipo para ítems del formulario (strings para inputs numéricos) ───────────
 
 export interface ItemForm {
-  productoId:       string
-  productoNombre:   string
-  presentacion:     string
-  cantidad:         string
-  precioUnitario:   string
-  precioReferencia: string
-  bidonNuevo:       boolean
+  producto_id:       string
+  producto_nombre:   string
+  presentacion:      string
+  cantidad:          string
+  precio_unitario:   string
+  precio_referencia: string
+  bidon_nuevo:       boolean
 }
 
-export interface ItemDetalle extends ItemForm {
-  id:                    string
-  pedidoId:              string
-  productoFragancia:     string | null
-  productoPresentacion:  string | null
-  precioMinoristaActual: string | null
-  precioMayoristaActual: string | null
-}
-
-export interface HistorialItem {
-  id:             string
-  estadoAnterior: EstadoPedido | null
-  estadoNuevo:    EstadoPedido
-  notas:          string | null
-  createdAt:      string
-  usuarioNombre:  string | null
-}
-
-export interface PedidoDetalle extends PedidoListItem {
-  items:     ItemDetalle[]
-  historial: HistorialItem[]
-}
+// ─── Tipo de entrada para crear/editar pedido ─────────────────────────────────
 
 export interface CrearPedidoInput {
-  clienteId:        string
-  tipoPrecio:       'minorista' | 'mayorista'
-  direccionEntrega: string
-  fechaProduccion:  string
-  notasInternas:    string
-  notasProduccion:  string
-  costoEnvio:       string
-  totalManual:      string
-  items:            ItemForm[]
-  accion:           'borrador' | 'confirmar'
+  cliente_id:        string
+  tipo_precio:       'minorista' | 'mayorista'
+  direccion_entrega: string
+  fecha_produccion:  string
+  notas_internas:    string
+  notas_produccion:  string
+  costo_envio:       string
+  total_manual:      string
+  items:             ItemForm[]
+  accion:            'borrador' | 'confirmar'
 }
 
-// ─── Columnas explícitas para la lista ────────────────────────────────────────
+// ─── Parseo de numéricos ──────────────────────────────────────────────────────
+// Supabase retorna NUMERIC/DECIMAL como string — convertimos a number
 
-const PEDIDO_LIST_SELECT = `
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parsePedido(row: any): PedidoConCliente {
+  return {
+    ...row,
+    costo_envio:     Number(row.costo_envio     ?? 0),
+    total_calculado: Number(row.total_calculado ?? 0),
+    total_manual:    row.total_manual  != null ? Number(row.total_manual)  : null,
+    monto_cobrado:   row.monto_cobrado != null ? Number(row.monto_cobrado) : null,
+  } as PedidoConCliente
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseItemDetalle(item: any): ItemDetalle {
+  return {
+    ...item,
+    cantidad:          Number(item.cantidad),
+    precio_unitario:   Number(item.precio_unitario),
+    precio_referencia: Number(item.precio_referencia),
+    bidon_nuevo:       item.bidon_nuevo ?? false,
+    productos: item.productos
+      ? {
+          nombre:           item.productos.nombre,
+          fragancia:        item.productos.fragancia   ?? null,
+          presentacion:     Number(item.productos.presentacion),
+          precio_minorista: Number(item.productos.precio_minorista),
+          precio_mayorista: Number(item.productos.precio_mayorista),
+        }
+      : null,
+  } as ItemDetalle
+}
+
+// ─── Select para listas ───────────────────────────────────────────────────────
+
+const LIST_SELECT = `
   id, numero, estado, tipo_precio, direccion_entrega, fecha_produccion,
   total_calculado, total_manual, costo_envio, forma_cobro, monto_cobrado,
   notas_produccion, notas_internas, created_at, updated_at, cliente_id,
-  clientes!inner(nombre)
+  clientes!inner(nombre, direccion, tipo_cliente, telefono)
 ` as const
-
-// ─── Transformación snake_case → camelCase ────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function toPedidoListItem(row: any): PedidoListItem {
-  const clienteNombre =
-    row.clientes?.nombre ??
-    (Array.isArray(row.clientes) ? row.clientes[0]?.nombre : null) ??
-    null
-  return {
-    id:               row.id,
-    numero:           row.numero,
-    estado:           row.estado,
-    tipoPrecio:       row.tipo_precio,
-    direccionEntrega: row.direccion_entrega,
-    fechaProduccion:  row.fecha_produccion,
-    totalCalculado:   String(row.total_calculado ?? '0'),
-    totalManual:      row.total_manual != null ? String(row.total_manual) : null,
-    costoEnvio:       String(row.costo_envio ?? '0'),
-    formaCobro:       row.forma_cobro,
-    montoCobrado:     row.monto_cobrado != null ? String(row.monto_cobrado) : null,
-    notasProduccion:  row.notas_produccion,
-    notasInternas:    row.notas_internas,
-    createdAt:        row.created_at,
-    updatedAt:        row.updated_at,
-    clienteId:        row.cliente_id,
-    clienteNombre,
-  }
-}
-
-// ─── Query key ────────────────────────────────────────────────────────────────
 
 const KEY = ['pedidos']
 
@@ -124,11 +110,11 @@ export const usePedidos = (filtros?: {
 }) =>
   useQuery({
     queryKey:        [...KEY, filtros],
-    placeholderData: keepPreviousData,   // no flash vacío al cambiar filtros
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       let q = supabase
         .from('pedidos')
-        .select(PEDIDO_LIST_SELECT)
+        .select(LIST_SELECT)
         .order('created_at', { ascending: false })
 
       if (filtros?.estado)          q = q.eq('estado', filtros.estado)
@@ -139,16 +125,16 @@ export const usePedidos = (filtros?: {
       const { data, error } = await q
       if (error) throw new Error(error.message)
 
-      let items = (data ?? []).map(toPedidoListItem)
+      let pedidos = (data ?? []).map(parsePedido)
 
       if (filtros?.q) {
         const lower = filtros.q.toLowerCase()
-        items = items.filter(p =>
+        pedidos = pedidos.filter(p =>
           String(p.numero).includes(filtros.q!) ||
-          (p.clienteNombre ?? '').toLowerCase().includes(lower)
+          (p.clientes?.nombre ?? '').toLowerCase().includes(lower)
         )
       }
-      return items
+      return pedidos
     },
     refetchInterval: 30_000,
   })
@@ -160,11 +146,10 @@ export const usePedidoDetalle = (id: string | null) =>
     queryKey: [...KEY, id],
     enabled:  !!id,
     queryFn: async () => {
-      // Fetch pedido + items + historial en paralelo
       const [
-        { data: pedido,      error: pedidoErr  },
-        { data: itemsRaw,    error: itemsErr   },
-        { data: historialRaw, error: histErr   },
+        { data: pedido,       error: e1 },
+        { data: itemsRaw,     error: e2 },
+        { data: historialRaw, error: e3 },
       ] = await Promise.all([
         supabase
           .from('pedidos')
@@ -173,7 +158,7 @@ export const usePedidoDetalle = (id: string | null) =>
             total_calculado, total_manual, costo_envio, forma_cobro, monto_cobrado,
             notas_produccion, notas_internas, notas_entrega, motivo_falla,
             motivo_anulacion, created_at, updated_at, cliente_id,
-            clientes!inner(nombre)
+            clientes!inner(nombre, direccion, tipo_cliente, telefono)
           `)
           .eq('id', id!)
           .maybeSingle(),
@@ -188,43 +173,16 @@ export const usePedidoDetalle = (id: string | null) =>
           .order('created_at', { ascending: true }),
       ])
 
-      if (pedidoErr) throw new Error(pedidoErr.message)
-      if (itemsErr)  throw new Error(itemsErr.message)
-      if (histErr)   throw new Error(histErr.message)
-      if (!pedido)   throw new Error('Pedido no encontrado')
+      if (e1) throw new Error(e1.message)
+      if (e2) throw new Error(e2.message)
+      if (e3) throw new Error(e3.message)
+      if (!pedido) throw new Error('Pedido no encontrado')
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const items: ItemDetalle[] = (itemsRaw ?? []).map((item: any) => ({
-        id:                    item.id,
-        pedidoId:              item.pedido_id,
-        productoId:            item.producto_id,
-        productoNombre:        item.productos?.nombre ?? '',
-        productoFragancia:     item.productos?.fragancia ?? null,
-        productoPresentacion:  item.productos?.presentacion != null
-          ? String(item.productos.presentacion) : null,
-        precioMinoristaActual: item.productos?.precio_minorista != null
-          ? String(item.productos.precio_minorista) : null,
-        precioMayoristaActual: item.productos?.precio_mayorista != null
-          ? String(item.productos.precio_mayorista) : null,
-        presentacion:          item.productos?.presentacion != null
-          ? String(item.productos.presentacion) : '',
-        cantidad:              String(item.cantidad),
-        precioUnitario:        String(item.precio_unitario),
-        precioReferencia:      String(item.precio_referencia),
-        bidonNuevo:            item.bidon_nuevo ?? false,
-      }))
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const historial: HistorialItem[] = (historialRaw ?? []).map((h: any) => ({
-        id:             h.id,
-        estadoAnterior: h.estado_anterior,
-        estadoNuevo:    h.estado_nuevo,
-        notas:          h.notas,
-        createdAt:      h.created_at,
-        usuarioNombre:  h.perfiles?.nombre ?? null,
-      }))
-
-      return { ...toPedidoListItem(pedido), items, historial } as PedidoDetalle
+      return {
+        ...parsePedido(pedido),
+        pedido_items:     (itemsRaw    ?? []).map(parseItemDetalle),
+        pedido_historial: (historialRaw ?? []) as HistorialDetalle[],
+      } as PedidoDetalle
     },
   })
 
@@ -238,49 +196,42 @@ export const useCrearPedido = () => {
     mutationFn: async (data: CrearPedidoInput) => {
       const estadoInicial: EstadoPedido =
         data.accion === 'confirmar' ? 'en_produccion' : 'borrador'
-      const costoEnvio     = parseFloat(data.costoEnvio) || 0
-      const subtotal       = data.items.reduce(
-        (acc, item) => acc + parseFloat(item.cantidad) * parseFloat(item.precioUnitario),
+      const costoEnvio    = parseFloat(data.costo_envio) || 0
+      const subtotal      = data.items.reduce(
+        (acc, item) => acc + parseFloat(item.cantidad) * parseFloat(item.precio_unitario),
         0
       )
       const totalCalculado = subtotal + costoEnvio
 
-      const { data: pedido, error: pedidoErr } = await supabase
+      const { data: pedido, error: e1 } = await supabase
         .from('pedidos')
         .insert({
-          cliente_id:        data.clienteId,
-          tipo_precio:       data.tipoPrecio,
-          direccion_entrega: data.direccionEntrega || null,
-          fecha_produccion:  data.fechaProduccion  || null,
-          notas_internas:    data.notasInternas    || null,
-          notas_produccion:  data.notasProduccion  || null,
+          cliente_id:        data.cliente_id,
+          tipo_precio:       data.tipo_precio,
+          direccion_entrega: data.direccion_entrega || null,
+          fecha_produccion:  data.fecha_produccion  || null,
+          notas_internas:    data.notas_internas    || null,
+          notas_produccion:  data.notas_produccion  || null,
           costo_envio:       costoEnvio,
           total_calculado:   totalCalculado,
-          total_manual:      data.totalManual ? parseFloat(data.totalManual) : null,
+          total_manual:      data.total_manual ? parseFloat(data.total_manual) : null,
           estado:            estadoInicial,
           creado_por:        usuario?.id ?? null,
         })
-        .select(`
-          id, numero, estado, tipo_precio, direccion_entrega, fecha_produccion,
-          total_calculado, total_manual, costo_envio, forma_cobro, monto_cobrado,
-          notas_produccion, notas_internas, created_at, updated_at, cliente_id,
-          clientes!inner(nombre)
-        `)
-        .maybeSingle()
+        .select(LIST_SELECT)
+        .single()
 
-      if (pedidoErr) throw new Error(pedidoErr.message)
-      if (!pedido)   throw new Error('Error al crear pedido')
+      if (e1) throw new Error(e1.message)
 
-      // Items + historial en paralelo (no dependen entre sí)
       await Promise.all([
         supabase.from('pedido_items').insert(
           data.items.map(item => ({
             pedido_id:         pedido.id,
-            producto_id:       item.productoId,
+            producto_id:       item.producto_id,
             cantidad:          parseFloat(item.cantidad),
-            precio_unitario:   parseFloat(item.precioUnitario),
-            precio_referencia: parseFloat(item.precioReferencia),
-            bidon_nuevo:       item.bidonNuevo,
+            precio_unitario:   parseFloat(item.precio_unitario),
+            precio_referencia: parseFloat(item.precio_referencia),
+            bidon_nuevo:       item.bidon_nuevo,
           }))
         ),
         supabase.from('pedido_historial').insert({
@@ -292,7 +243,7 @@ export const useCrearPedido = () => {
         }),
       ])
 
-      return toPedidoListItem(pedido)
+      return parsePedido(pedido)
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   })
@@ -305,25 +256,25 @@ export const useEditarPedido = () => {
 
   return useMutation({
     mutationFn: async ({ id, items, ...data }: Partial<CrearPedidoInput> & { id: string }) => {
-      const costoEnvio = data.costoEnvio != null ? parseFloat(data.costoEnvio) || 0 : undefined
+      const costoEnvio = data.costo_envio != null ? parseFloat(data.costo_envio) || 0 : undefined
 
       let totalCalculado: number | undefined
       if (items && items.length > 0 && costoEnvio !== undefined) {
         const subtotal = items.reduce(
-          (acc, item) => acc + parseFloat(item.cantidad) * parseFloat(item.precioUnitario),
+          (acc, item) => acc + parseFloat(item.cantidad) * parseFloat(item.precio_unitario),
           0
         )
         totalCalculado = subtotal + costoEnvio
       }
 
       const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
-      if (data.direccionEntrega !== undefined) patch.direccion_entrega = data.direccionEntrega || null
-      if (data.fechaProduccion  !== undefined) patch.fecha_produccion  = data.fechaProduccion  || null
-      if (data.notasInternas    !== undefined) patch.notas_internas    = data.notasInternas    || null
-      if (data.notasProduccion  !== undefined) patch.notas_produccion  = data.notasProduccion  || null
-      if (costoEnvio            !== undefined) patch.costo_envio       = costoEnvio
-      if (data.totalManual      !== undefined) patch.total_manual      = data.totalManual ? parseFloat(data.totalManual) : null
-      if (totalCalculado        !== undefined) patch.total_calculado   = totalCalculado
+      if (data.direccion_entrega !== undefined) patch.direccion_entrega = data.direccion_entrega || null
+      if (data.fecha_produccion  !== undefined) patch.fecha_produccion  = data.fecha_produccion  || null
+      if (data.notas_internas    !== undefined) patch.notas_internas    = data.notas_internas    || null
+      if (data.notas_produccion  !== undefined) patch.notas_produccion  = data.notas_produccion  || null
+      if (costoEnvio             !== undefined) patch.costo_envio       = costoEnvio
+      if (data.total_manual      !== undefined) patch.total_manual      = data.total_manual ? parseFloat(data.total_manual) : null
+      if (totalCalculado         !== undefined) patch.total_calculado   = totalCalculado
 
       const { error: updateErr } = await supabase.from('pedidos').update(patch).eq('id', id)
       if (updateErr) throw new Error(updateErr.message)
@@ -335,25 +286,21 @@ export const useEditarPedido = () => {
         const { error: insErr } = await supabase.from('pedido_items').insert(
           items.map(item => ({
             pedido_id:         id,
-            producto_id:       item.productoId,
+            producto_id:       item.producto_id,
             cantidad:          parseFloat(item.cantidad),
-            precio_unitario:   parseFloat(item.precioUnitario),
-            precio_referencia: parseFloat(item.precioReferencia),
-            bidon_nuevo:       item.bidonNuevo,
+            precio_unitario:   parseFloat(item.precio_unitario),
+            precio_referencia: parseFloat(item.precio_referencia),
+            bidon_nuevo:       item.bidon_nuevo,
           }))
         )
         if (insErr) throw new Error(insErr.message)
       }
 
       const { data: updated, error } = await supabase
-        .from('pedidos')
-        .select(PEDIDO_LIST_SELECT)
-        .eq('id', id)
-        .maybeSingle()
+        .from('pedidos').select(LIST_SELECT).eq('id', id).single()
 
-      if (error)   throw new Error(error.message)
-      if (!updated) throw new Error('Pedido no encontrado')
-      return toPedidoListItem(updated)
+      if (error) throw new Error(error.message)
+      return parsePedido(updated)
     },
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEY })
@@ -363,8 +310,6 @@ export const useEditarPedido = () => {
 }
 
 // ─── useCambiarEstado ─────────────────────────────────────────────────────────
-// Usa RPC atómica: update + historial en 1 transacción, 1 HTTP request.
-// Optimistic update: el estado cambia en la UI antes de confirmar con el servidor.
 
 export const useCambiarEstado = () => {
   const qc      = useQueryClient()
@@ -383,8 +328,7 @@ export const useCambiarEstado = () => {
         const { data, error } = await supabase
           .from('pedidos').select('estado').eq('id', id).maybeSingle()
         if (error) throw new Error(error.message)
-        if (!data) throw new Error('Pedido no encontrado')
-        estadoAnterior = data.estado as EstadoPedido
+        estadoAnterior = data?.estado as EstadoPedido
       }
 
       const { error } = await supabase.rpc('cambiar_estado_pedido', {
@@ -394,14 +338,13 @@ export const useCambiarEstado = () => {
         p_usuario_id:      usuario?.id ?? null,
         p_notas:           notas ?? null,
       })
-
       if (error) throw new Error(error.message)
     },
 
     onMutate: async ({ id, estado }) => {
       await qc.cancelQueries({ queryKey: KEY })
-      const snapshots = qc.getQueriesData<PedidoListItem[]>({ queryKey: KEY })
-      qc.setQueriesData<PedidoListItem[]>({ queryKey: KEY }, (old) => {
+      const snapshots = qc.getQueriesData<PedidoConCliente[]>({ queryKey: KEY })
+      qc.setQueriesData<PedidoConCliente[]>({ queryKey: KEY }, (old) => {
         if (!Array.isArray(old)) return old
         return old.map(p => p.id === id ? { ...p, estado } : p)
       })
@@ -440,14 +383,13 @@ export const useAnularPedido = () => {
         p_motivo:          motivo,
         p_usuario_id:      usuario?.id ?? null,
       })
-
       if (error) throw new Error(error.message)
     },
 
     onMutate: async ({ id }) => {
       await qc.cancelQueries({ queryKey: KEY })
-      const snapshots = qc.getQueriesData<PedidoListItem[]>({ queryKey: KEY })
-      qc.setQueriesData<PedidoListItem[]>({ queryKey: KEY }, (old) => {
+      const snapshots = qc.getQueriesData<PedidoConCliente[]>({ queryKey: KEY })
+      qc.setQueriesData<PedidoConCliente[]>({ queryKey: KEY }, (old) => {
         if (!Array.isArray(old)) return old
         return old.map(p => p.id === id ? { ...p, estado: 'anulado' } : p)
       })
@@ -461,37 +403,34 @@ export const useAnularPedido = () => {
 }
 
 // ─── useRegistrarEntrega ──────────────────────────────────────────────────────
-// RPC atómica: estado + cobro + historial en 1 transacción, 1 HTTP request.
-// Optimistic update: el pedido desaparece de la lista del repartidor de inmediato.
 
 export const useRegistrarEntrega = () => {
   const qc      = useQueryClient()
   const usuario = useAuthStore(s => s.usuario)
 
   return useMutation({
-    mutationFn: async ({ id, estadoActual, formaCobro, montoCobrado, notas }: {
-      id:            string
-      estadoActual:  EstadoPedido
-      formaCobro:    string
-      montoCobrado?: string
-      notas?:        string
+    mutationFn: async ({ id, estadoActual, forma_cobro, monto_cobrado, notas }: {
+      id:             string
+      estadoActual:   EstadoPedido
+      forma_cobro:    string
+      monto_cobrado?: string
+      notas?:         string
     }) => {
       const { error } = await supabase.rpc('registrar_entrega', {
         p_pedido_id:       id,
         p_estado_anterior: estadoActual,
-        p_forma_cobro:     formaCobro,
-        p_monto_cobrado:   montoCobrado ? parseFloat(montoCobrado) : null,
+        p_forma_cobro:     forma_cobro,
+        p_monto_cobrado:   monto_cobrado ? parseFloat(monto_cobrado) : null,
         p_notas_entrega:   notas ?? null,
         p_usuario_id:      usuario?.id ?? null,
       })
-
       if (error) throw new Error(error.message)
     },
 
     onMutate: async ({ id }) => {
       await qc.cancelQueries({ queryKey: KEY })
-      const snapshots = qc.getQueriesData<PedidoListItem[]>({ queryKey: KEY })
-      qc.setQueriesData<PedidoListItem[]>({ queryKey: KEY }, (old) => {
+      const snapshots = qc.getQueriesData<PedidoConCliente[]>({ queryKey: KEY })
+      qc.setQueriesData<PedidoConCliente[]>({ queryKey: KEY }, (old) => {
         if (!Array.isArray(old)) return old
         return old.map(p => p.id === id ? { ...p, estado: 'entregado' } : p)
       })
@@ -509,14 +448,16 @@ export const useRegistrarEntrega = () => {
 export const useEditarCobro = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, formaCobro, montoCobrado }: {
-      id: string; formaCobro: string; montoCobrado?: string
+    mutationFn: async ({ id, forma_cobro, monto_cobrado }: {
+      id:             string
+      forma_cobro:    string
+      monto_cobrado?: string
     }) => {
       const { error } = await supabase
         .from('pedidos')
         .update({
-          forma_cobro:   formaCobro,
-          monto_cobrado: montoCobrado ? parseFloat(montoCobrado) : null,
+          forma_cobro,
+          monto_cobrado: monto_cobrado ? parseFloat(monto_cobrado) : null,
           updated_at:    new Date().toISOString(),
         })
         .eq('id', id)
@@ -526,8 +467,3 @@ export const useEditarCobro = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   })
 }
-
-// ─── Helper ───────────────────────────────────────────────────────────────────
-
-export const totalPedido = (p: Pick<PedidoListItem, 'totalManual' | 'totalCalculado'>) =>
-  p.totalManual ?? p.totalCalculado

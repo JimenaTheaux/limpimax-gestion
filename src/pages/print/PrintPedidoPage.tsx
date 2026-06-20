@@ -27,8 +27,8 @@ export default function PrintPedidoPage() {
   if (!pedido) return <p>Pedido no encontrado.</p>
 
   const total = Number(totalPedido(pedido))
-  const fecha = pedido.createdAt
-    ? new Date(pedido.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
+  const fecha = pedido.created_at
+    ? new Date(pedido.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
     : '—'
 
   return (
@@ -112,26 +112,26 @@ export default function PrintPedidoPage() {
               {ESTADO_CONFIG[pedido.estado].label}
             </span>
           </div>
-          {pedido.fechaProduccion && (
+          {pedido.fecha_produccion && (
             <div>
               <p style={{ margin: 0, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#4A5568', marginBottom: 4 }}>Fecha producción</p>
               <p style={{ margin: 0, fontSize: 14 }}>
-                {new Date(pedido.fechaProduccion + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: '2-digit', month: 'long' })}
+                {new Date(pedido.fecha_produccion + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: '2-digit', month: 'long' })}
               </p>
             </div>
           )}
           <div>
             <p style={{ margin: 0, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#4A5568', marginBottom: 4 }}>Tipo precio</p>
-            <p style={{ margin: 0, fontSize: 14, textTransform: 'capitalize' }}>{pedido.tipoPrecio}</p>
+            <p style={{ margin: 0, fontSize: 14, textTransform: 'capitalize' }}>{pedido.tipo_precio}</p>
           </div>
         </div>
 
         {/* Datos del cliente */}
         <div style={{ background: '#F4F6F8', borderRadius: 10, padding: '16px 20px', marginBottom: 24 }}>
           <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#4A5568' }}>Cliente</p>
-          <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700 }}>{pedido.clienteNombre ?? '—'}</p>
-          {pedido.direccionEntrega && (
-            <p style={{ margin: 0, fontSize: 13, color: '#4A5568' }}>📍 {pedido.direccionEntrega}</p>
+          <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700 }}>{pedido.clientes?.nombre ?? '—'}</p>
+          {pedido.direccion_entrega && (
+            <p style={{ margin: 0, fontSize: 13, color: '#4A5568' }}>📍 {pedido.direccion_entrega}</p>
           )}
         </div>
 
@@ -146,15 +146,15 @@ export default function PrintPedidoPage() {
             </tr>
           </thead>
           <tbody>
-            {pedido.items?.map((item, i) => {
-              const subtotal = Number(item.cantidad) * Number(item.precioUnitario)
+            {pedido.pedido_items?.map((item, i) => {
+              const subtotal = Number(item.cantidad) * Number(item.precio_unitario)
               return (
                 <tr key={i} style={{ borderBottom: '1px solid #F4F6F8' }}>
                   <td style={{ padding: '10px 4px', fontSize: 13 }}>
-                    {item.productoNombre}
-                    {item.productoFragancia ? ` (${item.productoFragancia})` : ''}
-                    {item.productoPresentacion ? ` — ${item.productoPresentacion}L` : ''}
-                    {item.bidonNuevo && (
+                    {item.productos?.nombre}
+                    {item.productos?.fragancia ? ` (${item.productos.fragancia})` : ''}
+                    {item.productos?.presentacion ? ` — ${item.productos.presentacion}L` : ''}
+                    {item.bidon_nuevo && (
                       <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, background: '#FFF3E0', color: '#F57C00', padding: '1px 5px', borderRadius: 99 }}>
                         BIDÓN NUEVO
                       </span>
@@ -162,7 +162,7 @@ export default function PrintPedidoPage() {
                   </td>
                   <td style={{ padding: '10px 4px', textAlign: 'center', fontSize: 13 }}>{item.cantidad}</td>
                   <td style={{ padding: '10px 4px', textAlign: 'right', fontSize: 13 }}>
-                    ${Number(item.precioUnitario).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    ${Number(item.precio_unitario).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                   </td>
                   <td style={{ padding: '10px 4px', textAlign: 'right', fontSize: 13, fontWeight: 600 }}>
                     ${subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
@@ -175,43 +175,43 @@ export default function PrintPedidoPage() {
 
         {/* Totales */}
         <div style={{ marginLeft: 'auto', maxWidth: 260 }}>
-          {Number(pedido.costoEnvio) > 0 && (
+          {Number(pedido.costo_envio) > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 13 }}>
               <span style={{ color: '#4A5568' }}>Subtotal productos</span>
-              <span>${(total - Number(pedido.costoEnvio)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+              <span>${(total - Number(pedido.costo_envio)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
             </div>
           )}
-          {Number(pedido.costoEnvio) > 0 && (
+          {Number(pedido.costo_envio) > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 13, borderBottom: '1px solid #D1D5DB' }}>
               <span style={{ color: '#4A5568' }}>Envío</span>
-              <span>${Number(pedido.costoEnvio).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+              <span>${Number(pedido.costo_envio).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
             </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0 0', fontSize: 18, fontWeight: 900, color: '#0D5C8A' }}>
             <span>TOTAL</span>
             <span>${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
           </div>
-          {pedido.totalManual && (
+          {pedido.total_manual && (
             <p style={{ margin: '2px 0 0', fontSize: 10, color: '#F57C00', textAlign: 'right' }}>Total editado manualmente</p>
           )}
         </div>
 
         {/* Cobro */}
-        {(pedido.formaCobro || pedido.montoCobrado) && (
+        {(pedido.forma_cobro || pedido.monto_cobrado) && (
           <div style={{ marginTop: 24, padding: '14px 16px', background: '#E8F8F0', borderRadius: 10 }}>
             <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#2E9E5C' }}>
               COBRO REGISTRADO
-              {pedido.formaCobro && ` — ${pedido.formaCobro.toUpperCase()}`}
-              {pedido.montoCobrado && `: $${Number(pedido.montoCobrado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`}
+              {pedido.forma_cobro && ` — ${pedido.forma_cobro.toUpperCase()}`}
+              {pedido.monto_cobrado && `: $${Number(pedido.monto_cobrado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`}
             </p>
           </div>
         )}
 
         {/* Notas */}
-        {pedido.notasProduccion && (
+        {pedido.notas_produccion && (
           <div style={{ marginTop: 16, padding: '10px 14px', background: '#F4F6F8', borderRadius: 8 }}>
             <p style={{ margin: 0, fontSize: 12, color: '#4A5568' }}>
-              <strong>Notas:</strong> {pedido.notasProduccion}
+              <strong>Notas:</strong> {pedido.notas_produccion}
             </p>
           </div>
         )}
