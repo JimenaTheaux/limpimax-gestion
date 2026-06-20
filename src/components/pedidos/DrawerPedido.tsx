@@ -6,11 +6,11 @@ import { Plus, Trash2, AlertTriangle, Package } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { FloatInput }  from '@/components/common/FloatInput'
 import { ButtonGroup } from '@/components/common/ButtonGroup'
-import { useClientes } from '@/services/clientes'
+import { useClientes, useCrearCliente } from '@/services/clientes'
 import { useProductos } from '@/services/productos'
 import { useCrearPedido, useEditarPedido, type PedidoDetalle, type ItemForm, type CrearPedidoInput } from '@/services/pedidos'
 import { useDebounce } from '@/hooks/useDebounce'
-import type { Producto } from '@/types'
+import type { Producto, Cliente } from '@/types'
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -52,12 +52,55 @@ interface Props {
 function SelectorCliente({
   value, onChange, error,
 }: { value: string; onChange: (id: string, tipo: 'minorista' | 'mayorista', dir: string) => void; error?: string }) {
-  const [q, setQ] = useState('')
+  const [q, setQ]       = useState('')
   const [open, setOpen] = useState(false)
-  const qDebounced = useDebounce(q, 300)
+  const qDebounced      = useDebounce(q, 300)
   const { data: clientes } = useClientes(qDebounced || undefined)
+  const crearCliente       = useCrearCliente()
 
-  const selected = clientes?.find(c => c.id === value)
+  // mini-form
+  const [miniOpen,     setMiniOpen]     = useState(false)
+  const [miniNombre,   setMiniNombre]   = useState('')
+  const [miniTel,      setMiniTel]      = useState('')
+  const [miniDir,      setMiniDir]      = useState('')
+  const [miniTipo,     setMiniTipo]     = useState<'minorista' | 'mayorista'>('minorista')
+  const [miniErr,      setMiniErr]      = useState('')
+  const [recienCreado, setRecienCreado] = useState<Cliente | null>(null)
+
+  // Cuando el cliente se deselecciona externamente (reset del form), limpiar estado local
+  useEffect(() => {
+    if (!value) { setQ(''); setOpen(false); setMiniOpen(false); setRecienCreado(null) }
+  }, [value])
+
+  const selected: Cliente | undefined =
+    clientes?.find(c => c.id === value) ??
+    (recienCreado !== null && recienCreado.id === value ? recienCreado : undefined)
+
+  const guardarCliente = async () => {
+    if (!miniNombre.trim()) { setMiniErr('El nombre es obligatorio'); return }
+    setMiniErr('')
+    try {
+      const nuevo = await crearCliente.mutateAsync({
+        nombre:       miniNombre.trim(),
+        telefono:     miniTel.trim()  || null,
+        direccion:    miniDir.trim()  || null,
+        tipo_cliente: miniTipo,
+        notas:        null,
+        activo:       true,
+      })
+      setRecienCreado(nuevo)
+      onChange(nuevo.id, nuevo.tipo_cliente, nuevo.direccion ?? '')
+      setMiniOpen(false)
+      setMiniNombre(''); setMiniTel(''); setMiniDir(''); setMiniTipo('minorista')
+    } catch {
+      setMiniErr('No se pudo crear el cliente')
+    }
+  }
+
+  const cancelarMini = () => {
+    setMiniOpen(false)
+    setMiniNombre(''); setMiniTel(''); setMiniDir(''); setMiniTipo('minorista'); setMiniErr('')
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -77,53 +120,109 @@ function SelectorCliente({
               {selected.tipo_cliente} {selected.direccion ? `· ${selected.direccion}` : ''}
             </p>
           </div>
-          <button type="button" onClick={() => { onChange('', 'minorista', ''); setQ('') }}
+          <button type="button" onClick={() => { onChange('', 'minorista', ''); setQ(''); setRecienCreado(null) }}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1B9ED6', fontSize: 12, fontWeight: 600 }}>
             Cambiar
           </button>
         </div>
       ) : (
-        <div style={{ position: 'relative' }}>
-          <input
-            value={q}
-            onChange={e => { setQ(e.target.value); setOpen(true) }}
-            onFocus={() => setOpen(true)}
-            placeholder="Buscar cliente…"
-            style={{
-              width: '100%', padding: '10px 14px',
-              border: `1.5px solid ${error ? '#D32F2F' : '#D1D5DB'}`,
-              borderRadius: 10, fontSize: 14, outline: 0, background: '#fff',
-            }}
-          />
-          {open && clientes && clientes.length > 0 && (
+        <>
+          <div style={{ position: 'relative' }}>
+            <input
+              value={q}
+              onChange={e => { setQ(e.target.value); setOpen(true) }}
+              onFocus={() => setOpen(true)}
+              onBlur={() => setTimeout(() => setOpen(false), 150)}
+              placeholder="Buscar cliente…"
+              style={{
+                width: '100%', padding: '10px 14px',
+                border: `1.5px solid ${error ? '#D32F2F' : '#D1D5DB'}`,
+                borderRadius: 10, fontSize: 14, outline: 0, background: '#fff',
+              }}
+            />
+            {open && clientes && clientes.length > 0 && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                background: '#fff', border: '1px solid #D1D5DB', borderRadius: 10,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: 200, overflowY: 'auto',
+                marginTop: 4,
+              }}>
+                {clientes.slice(0, 8).map(c => (
+                  <button
+                    key={c.id} type="button"
+                    onClick={() => {
+                      onChange(c.id, c.tipo_cliente, c.direccion ?? '')
+                      setQ(c.nombre)
+                      setOpen(false)
+                    }}
+                    style={{
+                      width: '100%', textAlign: 'left', padding: '10px 14px',
+                      background: 'none', border: 'none', cursor: 'pointer', display: 'block',
+                      borderBottom: '1px solid #F4F6F8',
+                    }}
+                  >
+                    <span style={{ fontWeight: 500, fontSize: 14 }}>{c.nombre}</span>
+                    <span style={{ color: '#4A5568', fontSize: 12, marginLeft: 8 }}>{c.tipo_cliente}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Botón + mini-form inline */}
+          <button type="button" onClick={() => { setMiniOpen(v => !v); setMiniErr('') }}
+            style={{ fontSize: 12, color: '#1B9ED6', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '2px 0', alignSelf: 'flex-start' }}>
+            {miniOpen ? '− Cerrar' : '+ Cliente nuevo'}
+          </button>
+
+          <div style={{ overflow: 'hidden', maxHeight: miniOpen ? 500 : 0, transition: 'max-height 0.2s ease' }}>
             <div style={{
-              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
-              background: '#fff', border: '1px solid #D1D5DB', borderRadius: 10,
-              boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: 200, overflowY: 'auto',
+              background: '#E8F6FC', borderRadius: 12, padding: 12,
+              border: '1px solid #D1D5DB', display: 'flex', flexDirection: 'column', gap: 10,
               marginTop: 4,
             }}>
-              {clientes.slice(0, 8).map(c => (
-                <button
-                  key={c.id} type="button"
-                  onClick={() => {
-                    onChange(c.id, c.tipo_cliente, c.direccion ?? '')
-                    setQ(c.nombre)
-                    setOpen(false)
-                  }}
+              <FloatInput label="Nombre *"  value={miniNombre} onChange={e => setMiniNombre(e.target.value)} />
+              <FloatInput label="Teléfono"  value={miniTel}    onChange={e => setMiniTel(e.target.value)} />
+              <FloatInput label="Dirección" value={miniDir}    onChange={e => setMiniDir(e.target.value)} />
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['minorista', 'mayorista'] as const).map(t => (
+                  <button key={t} type="button" onClick={() => setMiniTipo(t)}
+                    style={{
+                      flex: 1, padding: '8px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                      border: `1.5px solid ${miniTipo === t ? '#0D5C8A' : '#D1D5DB'}`,
+                      background: miniTipo === t ? '#E8F4FF' : '#fff',
+                      color: miniTipo === t ? '#0D5C8A' : '#4A5568',
+                      cursor: 'pointer',
+                    }}>
+                    {t === 'minorista' ? 'Minorista' : 'Mayorista'}
+                  </button>
+                ))}
+              </div>
+
+              {miniErr && <p style={{ color: '#D32F2F', fontSize: 12, margin: 0 }}>{miniErr}</p>}
+
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button type="button" onClick={guardarCliente} disabled={crearCliente.isPending}
                   style={{
-                    width: '100%', textAlign: 'left', padding: '10px 14px',
-                    background: 'none', border: 'none', cursor: 'pointer', display: 'block',
-                    borderBottom: '1px solid #F4F6F8',
-                  }}
-                >
-                  <span style={{ fontWeight: 500, fontSize: 14 }}>{c.nombre}</span>
-                  <span style={{ color: '#4A5568', fontSize: 12, marginLeft: 8 }}>{c.tipo_cliente}</span>
+                    flex: 1,
+                    background: crearCliente.isPending ? 'rgba(13,92,138,0.5)' : '#0D5C8A',
+                    color: '#fff', border: 'none', borderRadius: 10,
+                    padding: '10px', minHeight: 44, fontSize: 14, fontWeight: 600,
+                    cursor: crearCliente.isPending ? 'not-allowed' : 'pointer',
+                  }}>
+                  {crearCliente.isPending ? 'Guardando…' : 'Guardar cliente'}
                 </button>
-              ))}
+                <button type="button" onClick={cancelarMini}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4A5568', fontSize: 14, padding: '10px', whiteSpace: 'nowrap' }}>
+                  Cancelar
+                </button>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        </>
       )}
+
       {error && <p style={{ color: '#D32F2F', fontSize: 11, margin: 0 }}>{error}</p>}
     </div>
   )
@@ -260,16 +359,6 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
 
   const { data: productos } = useProductos()
 
-  const defaultItems = pedido?.pedido_items?.map(i => ({
-    productoId:       i.producto_id,
-    productoNombre:   i.productos?.nombre ?? '',
-    presentacion:     String(i.productos?.presentacion ?? ''),
-    cantidad:         String(i.cantidad),
-    precioUnitario:   String(i.precio_unitario),
-    precioReferencia: String(i.precio_referencia),
-    bidonNuevo:       i.bidon_nuevo,
-  })) ?? []
-
   const { register, control, handleSubmit, watch, setValue, reset, formState: { errors } } =
     useForm<FormData>({
       resolver: zodResolver(schema),
@@ -282,11 +371,44 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
         notasInternas:    pedido?.notas_internas      ?? '',
         costoEnvio:       String(pedido?.costo_envio  ?? 0),
         totalManual:      pedido?.total_manual != null ? String(pedido.total_manual) : '',
-        items:            defaultItems,
+        items: pedido?.pedido_items?.map(i => ({
+          productoId:       i.producto_id,
+          productoNombre:   i.productos?.nombre ?? '',
+          presentacion:     String(i.productos?.presentacion ?? ''),
+          cantidad:         String(i.cantidad),
+          precioUnitario:   String(i.precio_unitario),
+          precioReferencia: String(i.precio_referencia),
+          bidonNuevo:       i.bidon_nuevo,
+        })) ?? [],
       },
     })
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
+
+  // Resetear el form cada vez que se abre con datos distintos
+  useEffect(() => {
+    if (!open) return
+    reset({
+      clienteId:        pedido?.cliente_id         ?? '',
+      tipoPrecio:       pedido?.tipo_precio         ?? 'minorista',
+      fechaProduccion:  pedido?.fecha_produccion    ?? '',
+      direccionEntrega: pedido?.direccion_entrega   ?? '',
+      notasProduccion:  pedido?.notas_produccion    ?? '',
+      notasInternas:    pedido?.notas_internas      ?? '',
+      costoEnvio:       String(pedido?.costo_envio  ?? 0),
+      totalManual:      pedido?.total_manual != null ? String(pedido.total_manual) : '',
+      items: pedido?.pedido_items?.map(i => ({
+        productoId:       i.producto_id,
+        productoNombre:   i.productos?.nombre ?? '',
+        presentacion:     String(i.productos?.presentacion ?? ''),
+        cantidad:         String(i.cantidad),
+        precioUnitario:   String(i.precio_unitario),
+        precioReferencia: String(i.precio_referencia),
+        bidonNuevo:       i.bidon_nuevo,
+      })) ?? [],
+    })
+  }, [open, pedido])
+
   const tipoPrecio  = watch('tipoPrecio')
   const costoEnvio  = watch('costoEnvio')
   const totalManual = watch('totalManual')

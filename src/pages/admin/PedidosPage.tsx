@@ -355,6 +355,7 @@ export default function PedidosPage() {
       )}
 
       <DrawerPedido
+        key={pedidoEdit?.id ?? 'new'}
         open={drawerForm}
         onClose={() => { setDrawerForm(false); setPedidoEdit(null) }}
         pedido={pedidoEdit}

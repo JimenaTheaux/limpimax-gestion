@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -8,7 +8,6 @@ import {
 } from '@/components/ui/sheet'
 import { Skeleton }       from '@/components/ui/skeleton'
 import { FloatInput }     from '@/components/common/FloatInput'
-import { FloatSelect }    from '@/components/common/FloatSelect'
 import { ButtonGroup }    from '@/components/common/ButtonGroup'
 import { BadgeActivo }    from '@/components/common/BadgeEstado'
 import { EmptyState }     from '@/components/common/EmptyState'
@@ -50,8 +49,9 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
   const editar = useEditarProducto()
   const crearCat = useCrearCategoria()
   const { data: categorias } = useCategorias()
-  const [nuevaCat, setNuevaCat] = useState('')
-  const [showCatInput, setShowCatInput] = useState(false)
+  const [catText, setCatText] = useState('')
+  const [catDrop, setCatDrop] = useState(false)
+  const [catErr,  setCatErr]  = useState('')
   const saving = crear.isPending || editar.isPending
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormData>({
@@ -101,6 +101,7 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
         })
         onSaved('Producto creado correctamente')
         reset()
+        setCatText('')
       }
       onClose()
     } catch (e) {
@@ -108,12 +109,48 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
     }
   }
 
-  const handleAgregarCategoria = async () => {
-    if (!nuevaCat.trim()) return
-    await crearCat.mutateAsync(nuevaCat.trim())
-    setNuevaCat('')
-    setShowCatInput(false)
-    onSaved('Categoría creada')
+  // Resetear el form cada vez que se abre con datos distintos
+  useEffect(() => {
+    if (!open) return
+    reset({
+      nombre:          producto?.nombre                                                    ?? '',
+      fragancia:       producto?.fragancia                                                 ?? '',
+      categoriaId:     producto?.categoria_id                                              ?? '',
+      presentacion:    (producto?.presentacion != null ? String(producto.presentacion) : '5') as FormData['presentacion'],
+      precioMinorista: producto?.precio_minorista != null ? String(producto.precio_minorista) : '',
+      precioMayorista: producto?.precio_mayorista != null ? String(producto.precio_mayorista) : '',
+      codigo:          producto?.codigo                                                    ?? '',
+    })
+  }, [open, producto])
+
+  // Sincronizar catText con el nombre de la categoría seleccionada
+  useEffect(() => {
+    if (!open) { setCatText(''); setCatDrop(false); setCatErr(''); return }
+    if (producto?.categoria_id && categorias) {
+      const cat = categorias.find(c => c.id === producto.categoria_id)
+      setCatText(cat?.nombre ?? '')
+    } else if (!producto?.categoria_id) {
+      setCatText('')
+    }
+  }, [open, categorias, producto])
+
+  const catsFiltradas = (categorias ?? []).filter(c =>
+    !catText || c.nombre.toLowerCase().includes(catText.toLowerCase())
+  )
+  const puedeCrear = catText.trim().length > 0 &&
+    !catsFiltradas.some(c => c.nombre.toLowerCase() === catText.trim().toLowerCase())
+
+  const handleCrearCat = async () => {
+    const nombre = catText.trim()
+    if (!nombre) return
+    setCatErr('')
+    try {
+      const nueva = await crearCat.mutateAsync(nombre)
+      setValue('categoriaId', nueva.id)
+      setCatDrop(false)
+    } catch {
+      setCatErr('No se pudo crear la categoría')
+    }
   }
 
   return (
@@ -129,37 +166,74 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
           <FloatInput label="Fragancia" {...register('fragancia')} />
           <FloatInput label="Código (opcional)" {...register('codigo')} />
 
-          {/* Categoría + agregar nueva */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <FloatSelect label="Categoría" value={categoriaVal ?? ''} {...register('categoriaId')}>
-              <option value="">Sin categoría</option>
-              {categorias?.map(cat => (
-                <option key={cat.id} value={cat.id}>{cat.nombre}</option>
-              ))}
-            </FloatSelect>
-            {!showCatInput ? (
-              <button
-                type="button"
-                onClick={() => setShowCatInput(true)}
-                style={{ fontSize: 12, color: '#1B9ED6', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '0 2px' }}
-              >
-                + Nueva categoría
-              </button>
-            ) : (
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  value={nuevaCat}
-                  onChange={e => setNuevaCat(e.target.value)}
-                  placeholder="Nombre de categoría"
-                  style={{ flex: 1, padding: '8px 10px', border: '1px solid #D1D5DB', borderRadius: 8, fontSize: 13 }}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAgregarCategoria() } }}
-                />
-                <button type="button" onClick={handleAgregarCategoria}
-                  style={{ background: '#0D5C8A', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 13, cursor: 'pointer' }}>
-                  Agregar
+          {/* Categoría — combobox con creación inline */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#4A5568' }}>
+              Categoría
+            </span>
+            <input type="hidden" {...register('categoriaId')} />
+            {categoriaVal ? (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '10px 14px', background: '#E8F4FF', borderRadius: 10, border: '1.5px solid #1B9ED6',
+              }}>
+                <span style={{ fontSize: 14, fontWeight: 500, color: '#1A2B3C' }}>{catText}</span>
+                <button type="button"
+                  onClick={() => { setValue('categoriaId', ''); setCatText(''); setCatErr('') }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1B9ED6', fontSize: 12, fontWeight: 600 }}>
+                  Cambiar
                 </button>
               </div>
+            ) : (
+              <div style={{ position: 'relative' }}>
+                <input
+                  value={catText}
+                  onChange={e => { setCatText(e.target.value); setCatDrop(true); setCatErr('') }}
+                  onFocus={() => setCatDrop(true)}
+                  onBlur={() => setTimeout(() => setCatDrop(false), 150)}
+                  onKeyDown={e => {
+                    if (e.key === 'Escape') { setCatDrop(false); return }
+                    if (e.key === 'Enter' && puedeCrear) { e.preventDefault(); handleCrearCat() }
+                  }}
+                  placeholder="Buscar o crear categoría…"
+                  style={{ padding: '10px 14px', border: '1px solid rgba(105,105,105,0.4)', borderRadius: 10, fontSize: 14, outline: 0, width: '100%', fontFamily: 'Inter, sans-serif' }}
+                />
+                {catDrop && (
+                  <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                    background: '#fff', border: '1px solid #D1D5DB', borderRadius: 10,
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto', marginTop: 4,
+                  }}>
+                    {catsFiltradas.map(cat => (
+                      <button key={cat.id} type="button"
+                        onClick={() => { setValue('categoriaId', cat.id); setCatText(cat.nombre); setCatDrop(false) }}
+                        style={{ width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', display: 'block', borderBottom: '1px solid #F4F6F8', fontSize: 14 }}>
+                        {cat.nombre}
+                      </button>
+                    ))}
+                    {puedeCrear && (
+                      <button type="button" onClick={handleCrearCat} disabled={crearCat.isPending}
+                        style={{
+                          width: '100%', textAlign: 'left', padding: '10px 14px',
+                          background: '#F0F7FF', border: 'none',
+                          cursor: crearCat.isPending ? 'not-allowed' : 'pointer',
+                          fontSize: 13, color: '#0D5C8A', fontWeight: 600,
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          borderTop: catsFiltradas.length > 0 ? '1px solid #F4F6F8' : 'none',
+                        }}>
+                        {crearCat.isPending ? 'Creando…' : `+ Crear "${catText.trim()}"`}
+                      </button>
+                    )}
+                    {catsFiltradas.length === 0 && !puedeCrear && (
+                      <div style={{ padding: '10px 14px', fontSize: 13, color: '#4A5568' }}>
+                        {catText.trim() ? 'Sin coincidencias' : 'Escribí para buscar o crear'}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
+            {catErr && <p style={{ color: '#D32F2F', fontSize: 11, margin: '2px 0 0' }}>{catErr}</p>}
           </div>
 
           <ButtonGroup
@@ -375,7 +449,7 @@ export default function ProductosPage() {
         </div>
       )}
 
-      <ProductoDrawer open={drawerOpen} onClose={handleClose} producto={selected} onSaved={handleSaved} />
+      <ProductoDrawer key={selected?.id ?? 'new'} open={drawerOpen} onClose={handleClose} producto={selected} onSaved={handleSaved} />
       <ToastContainer toasts={toasts} dismiss={dismiss} />
     </div>
   )
