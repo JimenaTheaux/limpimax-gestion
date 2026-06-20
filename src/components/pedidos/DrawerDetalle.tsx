@@ -175,14 +175,13 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
     }
     setCerrarError(null)
     try {
-      // Guardar cobro siempre (aunque no haya cambiado, asegura que quede registrado)
       await editarCobro.mutateAsync({
         id:            pedido.id,
         forma_cobro:   cerrarForma,
         monto_cobrado: cerrarMonto.trim() || undefined,
       })
-      // Cambiar estado a cerrado
-      await cambiarEstado.mutateAsync({ id: pedido.id, estadoActual: 'entregado', estado: 'cerrado' })
+      // Usar el estado actual del pedido (puede ser entregado u otro override admin)
+      await cambiarEstado.mutateAsync({ id: pedido.id, estadoActual: pedido.estado, estado: 'cerrado' })
       onSaved('Venta cerrada correctamente')
       setCerrando(false)
     } catch (e) {
@@ -374,176 +373,163 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
                   <Printer size={14} /> Generar documento
                 </button>
 
-                {/* Botón primario — primera transición lógica */}
-                {transiciones.length > 0 && (() => {
-                  const primary   = transiciones[0]
-                  const cfg       = ESTADO_CONFIG[primary]
-                  const label     = ACCION_LABEL[primary] ?? `Pasar a ${cfg.label}`
-                  const isPending = cambiarEstado.isPending || editarCobro.isPending
+                {/* ── Form cerrar venta (siempre disponible cuando cerrando=true) ── */}
+                {cerrando ? (
+                  <div style={{
+                    background: '#F4F6F8', borderRadius: 14, padding: 16,
+                    display: 'flex', flexDirection: 'column', gap: 12,
+                    border: '1.5px solid #145A32',
+                  }}>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#145A32' }}>
+                      Confirmar cobro y cerrar venta
+                    </p>
 
-                  // ── Cerrar venta: flujo especial con form de cobro ──────
-                  if (primary === 'cerrado') {
-                    return cerrando ? (
-                      <div key="cerrar-form" style={{
-                        background: '#F4F6F8', borderRadius: 14, padding: 16,
-                        display: 'flex', flexDirection: 'column', gap: 12,
-                        border: '1.5px solid #145A32',
-                      }}>
-                        <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#145A32' }}>
-                          Confirmar cobro y cerrar venta
-                        </p>
+                    {/* Total de referencia */}
+                    <div style={{
+                      background: '#D4EDDA', borderRadius: 10, padding: '10px 14px',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    }}>
+                      <span style={{ fontSize: 12, color: '#145A32', fontWeight: 600 }}>Total pedido</span>
+                      <span style={{ fontSize: 20, fontWeight: 900, color: '#145A32', letterSpacing: -0.5 }}>
+                        ${Number(totalPedido(p)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
 
-                        {/* Total de referencia */}
-                        <div style={{
-                          background: '#D4EDDA', borderRadius: 10, padding: '10px 14px',
-                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        }}>
-                          <span style={{ fontSize: 12, color: '#145A32', fontWeight: 600 }}>Total pedido</span>
-                          <span style={{ fontSize: 20, fontWeight: 900, color: '#145A32', letterSpacing: -0.5 }}>
-                            ${Number(totalPedido(p)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-
-                        {/* Forma de cobro */}
-                        <div>
-                          <label style={{ fontSize: 11, color: '#4A5568', fontWeight: 600, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                            Forma de cobro
-                          </label>
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            {(['efectivo', 'transferencia', 'pendiente'] as const).map(f => (
-                              <button
-                                key={f}
-                                type="button"
-                                onClick={() => setCerrarForma(f)}
-                                style={{
-                                  flex: 1, padding: '9px 6px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-                                  border: `1.5px solid ${cerrarForma === f ? '#145A32' : '#D1D5DB'}`,
-                                  background: cerrarForma === f ? '#D4EDDA' : '#fff',
-                                  color: cerrarForma === f ? '#145A32' : '#4A5568',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                {f === 'efectivo' ? 'Efectivo' : f === 'transferencia' ? 'Transf.' : 'Pendiente'}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Monto cobrado */}
-                        <div>
-                          <label style={{ fontSize: 11, color: '#4A5568', fontWeight: 600, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                            Monto cobrado {cerrarForma !== 'pendiente' ? '*' : '(opcional)'}
-                          </label>
-                          <input
-                            type="number"
-                            value={cerrarMonto}
-                            onChange={e => setCerrarMonto(e.target.value)}
-                            placeholder="0.00"
-                            inputMode="decimal"
-                            style={{
-                              width: '100%', padding: '10px 12px',
-                              border: `1.5px solid ${cerrarError ? '#D32F2F' : '#D1D5DB'}`,
-                              borderRadius: 10, fontSize: 14, fontFamily: 'Inter, sans-serif',
-                              outline: 0, boxSizing: 'border-box',
-                            }}
-                            onFocus={e => (e.target.style.borderColor = '#145A32')}
-                            onBlur={e  => (e.target.style.borderColor = cerrarError ? '#D32F2F' : '#D1D5DB')}
-                          />
-                        </div>
-
-                        {cerrarError && (
-                          <p style={{ color: '#D32F2F', fontSize: 12, margin: 0 }} role="alert">
-                            {cerrarError}
-                          </p>
-                        )}
-
-                        <div style={{ display: 'flex', gap: 8 }}>
+                    {/* Forma de cobro */}
+                    <div>
+                      <label style={{ fontSize: 11, color: '#4A5568', fontWeight: 600, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        Forma de cobro
+                      </label>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {(['efectivo', 'transferencia', 'pendiente'] as const).map(f => (
                           <button
-                            ref={cerrarBtnRef}
+                            key={f}
                             type="button"
-                            onClick={handleCerrarVenta}
-                            disabled={isPending}
-                            aria-disabled={isPending}
-                            aria-label={`Confirmar cierre de venta — pedido P-${String(p.numero).padStart(5, '0')}`}
+                            onClick={() => setCerrarForma(f)}
                             style={{
-                              flex: 1,
-                              background: isPending ? 'rgba(20,90,50,0.5)' : '#145A32',
-                              color: '#fff', border: 'none', borderRadius: 10,
-                              padding: '13px', minHeight: 48, fontSize: 15, fontWeight: 700,
-                              cursor: isPending ? 'not-allowed' : 'pointer', outlineOffset: 2,
+                              flex: 1, padding: '9px 6px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                              border: `1.5px solid ${cerrarForma === f ? '#145A32' : '#D1D5DB'}`,
+                              background: cerrarForma === f ? '#D4EDDA' : '#fff',
+                              color: cerrarForma === f ? '#145A32' : '#4A5568',
+                              cursor: 'pointer',
                             }}
                           >
-                            {isPending ? 'Cerrando…' : '✓ Confirmar cierre'}
+                            {f === 'efectivo' ? 'Efectivo' : f === 'transferencia' ? 'Transf.' : 'Pendiente'}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setCerrando(false)}
-                            disabled={isPending}
-                            style={{
-                              flex: 1, background: 'transparent', color: '#4A5568',
-                              border: '1.5px solid #D1D5DB', borderRadius: 10,
-                              padding: '12px', fontSize: 14, cursor: 'pointer', minHeight: 48,
-                            }}
-                          >
-                            Cancelar
-                          </button>
-                        </div>
+                        ))}
                       </div>
-                    ) : (
-                      <button
-                        key="cerrar-btn"
-                        type="button"
-                        onClick={() => setCerrando(true)}
-                        disabled={isPending}
-                        aria-disabled={isPending}
-                        aria-label={`Cerrar venta — pedido P-${String(p.numero).padStart(5, '0')}`}
+                    </div>
+
+                    {/* Monto cobrado */}
+                    <div>
+                      <label style={{ fontSize: 11, color: '#4A5568', fontWeight: 600, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        Monto cobrado {cerrarForma !== 'pendiente' ? '*' : '(opcional)'}
+                      </label>
+                      <input
+                        type="number"
+                        value={cerrarMonto}
+                        onChange={e => setCerrarMonto(e.target.value)}
+                        placeholder="0.00"
+                        inputMode="decimal"
                         style={{
-                          background: isPending ? `${cfg.color}80` : cfg.color,
+                          width: '100%', padding: '10px 12px',
+                          border: `1.5px solid ${cerrarError ? '#D32F2F' : '#D1D5DB'}`,
+                          borderRadius: 10, fontSize: 14, fontFamily: 'Inter, sans-serif',
+                          outline: 0, boxSizing: 'border-box',
+                        }}
+                        onFocus={e => (e.target.style.borderColor = '#145A32')}
+                        onBlur={e  => (e.target.style.borderColor = cerrarError ? '#D32F2F' : '#D1D5DB')}
+                      />
+                    </div>
+
+                    {cerrarError && (
+                      <p style={{ color: '#D32F2F', fontSize: 12, margin: 0 }} role="alert">
+                        {cerrarError}
+                      </p>
+                    )}
+
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        ref={cerrarBtnRef}
+                        type="button"
+                        onClick={handleCerrarVenta}
+                        disabled={cambiarEstado.isPending || editarCobro.isPending}
+                        aria-disabled={cambiarEstado.isPending || editarCobro.isPending}
+                        aria-label={`Confirmar cierre de venta — pedido P-${String(p.numero).padStart(5, '0')}`}
+                        style={{
+                          flex: 1,
+                          background: cambiarEstado.isPending || editarCobro.isPending ? 'rgba(20,90,50,0.5)' : '#145A32',
                           color: '#fff', border: 'none', borderRadius: 10,
-                          padding: '14px', minHeight: 48, fontSize: 15, fontWeight: 700,
-                          cursor: isPending ? 'not-allowed' : 'pointer', outlineOffset: 2,
+                          padding: '13px', minHeight: 48, fontSize: 15, fontWeight: 700,
+                          cursor: cambiarEstado.isPending || editarCobro.isPending ? 'not-allowed' : 'pointer',
+                          outlineOffset: 2,
                         }}
                       >
-                        {label}
+                        {cambiarEstado.isPending || editarCobro.isPending ? 'Cerrando…' : '✓ Confirmar cierre'}
                       </button>
-                    )
-                  }
+                      <button
+                        type="button"
+                        onClick={() => { setCerrando(false); setCerrarError(null) }}
+                        disabled={cambiarEstado.isPending || editarCobro.isPending}
+                        style={{
+                          flex: 1, background: 'transparent', color: '#4A5568',
+                          border: '1.5px solid #D1D5DB', borderRadius: 10,
+                          padding: '12px', fontSize: 14, cursor: 'pointer', minHeight: 48,
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Botón primario — primera transición lógica */}
+                    {transiciones.length > 0 && (() => {
+                      const primary   = transiciones[0]
+                      const cfg       = ESTADO_CONFIG[primary]
+                      const label     = ACCION_LABEL[primary] ?? `Pasar a ${cfg.label}`
+                      const isPending = cambiarEstado.isPending
 
-                  // ── Transición genérica ─────────────────────────────────
-                  return (
-                    <button
-                      key={primary}
-                      type="button"
-                      onClick={() => setConfirmando(primary)}
-                      disabled={isPending}
-                      aria-disabled={isPending}
-                      aria-label={`${label} — pedido P-${String(p.numero).padStart(5, '0')}`}
-                      style={{
-                        background: isPending ? `${cfg.color}80` : cfg.color,
-                        color: '#fff', border: 'none', borderRadius: 10,
-                        padding: '14px', minHeight: 48, fontSize: 15, fontWeight: 700,
-                        cursor: isPending ? 'not-allowed' : 'pointer', outlineOffset: 2,
-                      }}
-                    >
-                      {isPending ? 'Procesando…' : label}
-                    </button>
-                  )
-                })()}
+                      return (
+                        <button
+                          key={primary}
+                          type="button"
+                          onClick={() => primary === 'cerrado' ? setCerrando(true) : setConfirmando(primary)}
+                          disabled={isPending}
+                          aria-disabled={isPending}
+                          aria-label={`${label} — pedido P-${String(p.numero).padStart(5, '0')}`}
+                          style={{
+                            background: isPending ? `${cfg.color}80` : cfg.color,
+                            color: '#fff', border: 'none', borderRadius: 10,
+                            padding: '14px', minHeight: 48, fontSize: 15, fontWeight: 700,
+                            cursor: isPending ? 'not-allowed' : 'pointer', outlineOffset: 2,
+                          }}
+                        >
+                          {isPending ? 'Procesando…' : label}
+                        </button>
+                      )
+                    })()}
 
-                {/* Transiciones secundarias (override admin) */}
-                {transiciones.slice(1).map((next: EstadoPedido) => (
-                  <button key={next} type="button" onClick={() => setConfirmando(next)}
-                    disabled={cambiarEstado.isPending}
-                    aria-label={`Pasar a ${ESTADO_CONFIG[next].label} — pedido P-${String(p.numero).padStart(5, '0')}`}
-                    style={{
-                      background: ESTADO_CONFIG[next].bg, color: ESTADO_CONFIG[next].color,
-                      border: `1.5px solid ${ESTADO_CONFIG[next].color}`,
-                      borderRadius: 10, padding: '11px', minHeight: 44, fontSize: 13,
-                      fontWeight: 600, cursor: 'pointer', outlineOffset: 2,
-                    }}>
-                    Pasar a: {ESTADO_CONFIG[next].label}
-                  </button>
-                ))}
+                    {/* Transiciones secundarias (override admin) */}
+                    {transiciones.slice(1).map((next: EstadoPedido) => (
+                      <button
+                        key={next}
+                        type="button"
+                        onClick={() => next === 'cerrado' ? setCerrando(true) : setConfirmando(next)}
+                        disabled={cambiarEstado.isPending}
+                        aria-label={`Pasar a ${ESTADO_CONFIG[next].label} — pedido P-${String(p.numero).padStart(5, '0')}`}
+                        style={{
+                          background: ESTADO_CONFIG[next].bg, color: ESTADO_CONFIG[next].color,
+                          border: `1.5px solid ${ESTADO_CONFIG[next].color}`,
+                          borderRadius: 10, padding: '11px', minHeight: 44, fontSize: 13,
+                          fontWeight: 600, cursor: 'pointer', outlineOffset: 2,
+                        }}
+                      >
+                        Pasar a: {ESTADO_CONFIG[next].label}
+                      </button>
+                    ))}
+                  </>
+                )}
 
                 {['borrador', 'confirmado', 'en_produccion'].includes(p.estado) && (
                   <button type="button" onClick={() => pedido && onEditar(pedido)}
