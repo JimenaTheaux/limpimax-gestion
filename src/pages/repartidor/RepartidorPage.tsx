@@ -41,11 +41,11 @@ function DrawerEntrega({ pedido, isOnline, addAction, onClose, onSaved }: {
 
     try {
       await registrar.mutateAsync({
-        id:           pedido.id,
-        estadoActual: pedido.estado,
-        formaCobro:   forma,
-        montoCobrado: monto || undefined,
-        notas:        notas.trim() || undefined,
+        id:            pedido.id,
+        estadoActual:  pedido.estado,
+        forma_cobro:   forma,
+        monto_cobrado: monto || undefined,
+        notas:         notas.trim() || undefined,
       })
       onSaved('Entrega registrada correctamente')
       onClose()

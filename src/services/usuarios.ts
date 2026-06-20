@@ -40,15 +40,14 @@ export const useUsuarios = () =>
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (perfiles ?? []).map((p: any): UsuarioConEmail => ({
-        id:        p.id,
-        userId:    p.id,
-        user_id:   p.id,
-        nombre:    p.nombre,
-        rol:       p.rol as Rol,
-        activo:    p.activo,
-        createdAt: p.created_at,
-        updatedAt: p.updated_at,
-        email:     emailMap.get(p.id) ?? '',
+        id:         p.id,
+        user_id:    p.id,
+        nombre:     p.nombre,
+        rol:        p.rol as Rol,
+        activo:     p.activo,
+        created_at: p.created_at,
+        updatedAt:  p.updated_at,
+        email:      emailMap.get(p.id) ?? '',
       }))
     },
   })

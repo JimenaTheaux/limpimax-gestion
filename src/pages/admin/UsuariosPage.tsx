@@ -133,7 +133,7 @@ interface EditarDrawerProps {
 function EditarUsuarioDrawer({ open, onClose, usuario, onSaved, selfId }: EditarDrawerProps) {
   const editar = useEditarUsuario()
   const saving = editar.isPending
-  const isSelf = usuario?.userId === selfId
+  const isSelf = usuario?.user_id === selfId
 
   const { register, handleSubmit, watch, setValue: setVal, formState: { errors } } = useForm<EditarForm>({
     resolver: zodResolver(editarSchema),

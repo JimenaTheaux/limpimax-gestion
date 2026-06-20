@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Search, Phone, MapPin, FileText, Edit2, Users } from 'lucide-react'
+import { Plus, Search, Phone, MapPin, Edit2, Users } from 'lucide-react'
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet'
@@ -19,27 +19,14 @@ import {
 import { useDebounce } from '@/hooks/useDebounce'
 import type { Cliente } from '@/types'
 
-// ─── Formato CUIT ─────────────────────────────────────────────────────────────
-
-function fmtCuit(cuit: string | null) {
-  if (!cuit) return null
-  const c = cuit.replace(/\D/g, '')
-  if (c.length !== 11) return cuit
-  return `${c.slice(0,2)}-${c.slice(2,10)}-${c[10]}`
-}
-
 // ─── Schema Zod ───────────────────────────────────────────────────────────────
 
 const schema = z.object({
-  nombre:      z.string().min(1, 'El nombre es obligatorio'),
-  cuit:        z.string()
-                 .regex(/^\d{11}$/, 'Debe tener 11 dígitos sin guiones')
-                 .optional()
-                 .or(z.literal('')),
-  telefono:    z.string().optional(),
-  direccion:   z.string().optional(),
-  tipocliente: z.enum(['minorista', 'mayorista']),
-  notas:       z.string().optional(),
+  nombre:       z.string().min(1, 'El nombre es obligatorio'),
+  telefono:     z.string().optional(),
+  direccion:    z.string().optional(),
+  tipo_cliente: z.enum(['minorista', 'mayorista']),
+  notas:        z.string().optional(),
 })
 
 type FormData = z.infer<typeof schema>
@@ -61,24 +48,37 @@ function ClienteDrawer({ open, onClose, cliente, onSaved }: DrawerProps) {
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      nombre:      cliente?.nombre      ?? '',
-      cuit:        cliente?.cuit        ?? '',
-      telefono:    cliente?.telefono    ?? '',
-      direccion:   cliente?.direccion   ?? '',
-      tipocliente: cliente?.tipocliente ?? 'minorista',
-      notas:       cliente?.notas       ?? '',
+      nombre:       cliente?.nombre       ?? '',
+      telefono:     cliente?.telefono     ?? '',
+      direccion:    cliente?.direccion    ?? '',
+      tipo_cliente: cliente?.tipo_cliente ?? 'minorista',
+      notas:        cliente?.notas        ?? '',
     },
   })
 
-  const tipoVal = watch('tipocliente')
+  const tipoVal = watch('tipo_cliente')
 
   const onSubmit = async (data: FormData) => {
     try {
       if (cliente) {
-        await editar.mutateAsync({ id: cliente.id, ...data, cuit: data.cuit || null })
+        await editar.mutateAsync({
+          id:           cliente.id,
+          nombre:       data.nombre,
+          telefono:     data.telefono    || null,
+          direccion:    data.direccion   || null,
+          tipo_cliente: data.tipo_cliente,
+          notas:        data.notas       || null,
+        })
         onSaved('Cliente actualizado correctamente')
       } else {
-        await crear.mutateAsync({ ...data, cuit: data.cuit || null })
+        await crear.mutateAsync({
+          nombre:       data.nombre,
+          telefono:     data.telefono    || null,
+          direccion:    data.direccion   || null,
+          tipo_cliente: data.tipo_cliente,
+          notas:        data.notas       || null,
+          activo:       true,
+        })
         onSaved('Cliente creado correctamente')
         reset()
       }
@@ -100,15 +100,14 @@ function ClienteDrawer({ open, onClose, cliente, onSaved }: DrawerProps) {
           style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 24 }}
         >
           <FloatInput label="Nombre *" error={errors.nombre?.message} {...register('nombre')} />
-          <FloatInput label="CUIT/CUIL (11 dígitos sin guiones)" error={errors.cuit?.message} {...register('cuit')} inputMode="numeric" />
           <FloatInput label="Teléfono" {...register('telefono')} type="tel" />
           <FloatInput label="Dirección de entrega" {...register('direccion')} />
 
           <ButtonGroup
             label="Tipo de cliente *"
             value={tipoVal}
-            onChange={v => setValue('tipocliente', v, { shouldValidate: true })}
-            error={errors.tipocliente?.message}
+            onChange={v => setValue('tipo_cliente', v, { shouldValidate: true })}
+            error={errors.tipo_cliente?.message}
             options={[
               { value: 'minorista', label: 'Minorista' },
               { value: 'mayorista', label: 'Mayorista', color: '#1B9ED6' },
@@ -181,7 +180,7 @@ function ClienteCard({ cliente, onEdit }: { cliente: Cliente; onEdit: () => void
         borderRadius: 20,
         padding:      '16px 20px',
         boxShadow:    '0 2px 8px rgba(0,0,0,0.06)',
-        borderLeft:   `4px solid ${cliente.tipocliente === 'mayorista' ? '#1B9ED6' : '#4A5568'}`,
+        borderLeft:   `4px solid ${cliente.tipo_cliente === 'mayorista' ? '#1B9ED6' : '#4A5568'}`,
         display:      'flex',
         alignItems:   'flex-start',
         gap:          12,
@@ -195,23 +194,15 @@ function ClienteCard({ cliente, onEdit }: { cliente: Cliente; onEdit: () => void
           </span>
           <BadgeActivo activo={cliente.activo ?? true} />
           <span style={{
-            backgroundColor: cliente.tipocliente === 'mayorista' ? '#E8F4FF' : '#F0F0F0',
-            color:           cliente.tipocliente === 'mayorista' ? '#1B9ED6' : '#9A9A9A',
+            backgroundColor: cliente.tipo_cliente === 'mayorista' ? '#E8F4FF' : '#F0F0F0',
+            color:           cliente.tipo_cliente === 'mayorista' ? '#1B9ED6' : '#9A9A9A',
             fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 99,
           }}>
-            {cliente.tipocliente.toUpperCase()}
+            {cliente.tipo_cliente.toUpperCase()}
           </span>
         </div>
 
-        {/* Fila 2: CUIT */}
-        {cliente.cuit && (
-          <p style={{ fontSize: 12, color: '#4A5568', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <FileText size={12} />
-            {fmtCuit(cliente.cuit)}
-          </p>
-        )}
-
-        {/* Fila 3: teléfono */}
+        {/* Fila 2: teléfono */}
         {cliente.telefono && (
           <p style={{ fontSize: 12, color: '#4A5568', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 4 }}>
             <Phone size={12} />

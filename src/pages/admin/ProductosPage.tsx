@@ -41,7 +41,7 @@ type FormData = z.infer<typeof schema>
 interface DrawerProps {
   open:     boolean
   onClose:  () => void
-  producto: (Producto & { categoriaNombre?: string }) | null
+  producto: Producto | null
   onSaved:  (msg: string) => void
 }
 
@@ -57,13 +57,13 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      nombre:          producto?.nombre          ?? '',
-      fragancia:       producto?.fragancia       ?? '',
-      categoriaId:     producto?.categoriaId     ?? '',
-      presentacion:    (producto?.presentacion as FormData['presentacion']) ?? '5',
-      precioMinorista: producto?.precioMinorista ?? '',
-      precioMayorista: producto?.precioMayorista ?? '',
-      codigo:          producto?.codigo          ?? '',
+      nombre:          producto?.nombre                                                    ?? '',
+      fragancia:       producto?.fragancia                                                 ?? '',
+      categoriaId:     producto?.categoria_id                                              ?? '',
+      presentacion:    (producto?.presentacion != null ? String(producto.presentacion) : '5') as FormData['presentacion'],
+      precioMinorista: producto?.precio_minorista != null ? String(producto.precio_minorista) : '',
+      precioMayorista: producto?.precio_mayorista != null ? String(producto.precio_mayorista) : '',
+      codigo:          producto?.codigo                                                    ?? '',
     },
   })
 
@@ -71,12 +71,34 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
   const categoriaVal    = watch('categoriaId')
 
   const onSubmit = async (data: FormData) => {
+    const presentacionNum = parseFloat(data.presentacion)
+    const minorista       = parseFloat(data.precioMinorista)
+    const mayorista       = parseFloat(data.precioMayorista)
     try {
       if (producto) {
-        await editar.mutateAsync({ id: producto.id, ...data })
+        await editar.mutateAsync({
+          id:               producto.id,
+          nombre:           data.nombre,
+          fragancia:        data.fragancia   || null,
+          categoria_id:     data.categoriaId || null,
+          presentacion:     presentacionNum,
+          precio_minorista: minorista,
+          precio_mayorista: mayorista,
+          codigo:           data.codigo      || null,
+        })
         onSaved('Producto actualizado correctamente')
       } else {
-        await crear.mutateAsync(data)
+        await crear.mutateAsync({
+          nombre:           data.nombre,
+          fragancia:        data.fragancia   || null,
+          categoria_id:     data.categoriaId || null,
+          unidad_medida:    'litros',
+          presentacion:     presentacionNum,
+          precio_minorista: minorista,
+          precio_mayorista: mayorista,
+          activo:           true,
+          codigo:           data.codigo      || null,
+        })
         onSaved('Producto creado correctamente')
         reset()
       }
@@ -205,10 +227,10 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
 
 // ─── Card de producto ─────────────────────────────────────────────────────────
 
-type ProductoConCat = Producto & { categoriaNombre?: string }
+type ProductoConCat = Producto
 
 function ProductoCard({ producto, onEdit }: { producto: ProductoConCat; onEdit: () => void }) {
-  const presentacionLabel = producto.presentacion === '0.5' ? '500 ml' : `${producto.presentacion} L`
+  const presentacionLabel = producto.presentacion === 0.5 ? '500 ml' : `${producto.presentacion} L`
 
   return (
     <div style={{
@@ -234,18 +256,18 @@ function ProductoCard({ producto, onEdit }: { producto: ProductoConCat; onEdit: 
           </span>
 
           {/* Categoría */}
-          {producto.categoriaNombre && (
+          {producto.categorias_producto?.nombre && (
             <span style={{ fontSize: 12, color: '#4A5568', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Tag size={12} /> {producto.categoriaNombre}
+              <Tag size={12} /> {producto.categorias_producto.nombre}
             </span>
           )}
 
           {/* Precios */}
           <span style={{ fontSize: 12, fontWeight: 600, color: '#0D5C8A' }}>
-            Min: ${Number(producto.precioMinorista).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+            Min: ${Number(producto.precio_minorista).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
           </span>
           <span style={{ fontSize: 12, fontWeight: 600, color: '#1B9ED6' }}>
-            May: ${Number(producto.precioMayorista).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+            May: ${Number(producto.precio_mayorista).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
           </span>
         </div>
       </div>
