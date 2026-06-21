@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Chart, registerables } from 'chart.js'
+import { Chart, registerables, type TooltipItem } from 'chart.js'
 import { useQuery } from '@tanstack/react-query'
 import { Clock } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -264,7 +264,7 @@ function GraficoLinea({ labels, anioActual, anioPrev }: {
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: c => ` $${c.parsed.y.toLocaleString('es-AR', { minimumFractionDigits: 0 })}`,
+              label: (c: TooltipItem<'line'>) => ` $${c.parsed.y.toLocaleString('es-AR', { minimumFractionDigits: 0 })}`,
             },
           },
         },
