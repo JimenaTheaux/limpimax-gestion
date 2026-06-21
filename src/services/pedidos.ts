@@ -186,6 +186,48 @@ export const usePedidoDetalle = (id: string | null) =>
     },
   })
 
+// ─── fetchPedidoDetalle — imperativo para uso fuera de hooks ─────────────────
+
+export async function fetchPedidoDetalle(id: string): Promise<PedidoDetalle> {
+  const [
+    { data: pedido,       error: e1 },
+    { data: itemsRaw,     error: e2 },
+    { data: historialRaw, error: e3 },
+  ] = await Promise.all([
+    supabase
+      .from('pedidos')
+      .select(`
+        id, numero, estado, tipo_precio, direccion_entrega, fecha_produccion,
+        total_calculado, total_manual, costo_envio, forma_cobro, monto_cobrado, fecha_cobro,
+        notas_produccion, notas_internas, notas_entrega, motivo_falla,
+        motivo_anulacion, created_at, updated_at, cliente_id, estado_pago,
+        clientes!inner(nombre, direccion, tipo_cliente, telefono)
+      `)
+      .eq('id', id)
+      .maybeSingle(),
+    supabase
+      .from('pedido_items')
+      .select('*, productos(nombre, fragancia, presentacion, precio_minorista, precio_mayorista)')
+      .eq('pedido_id', id),
+    supabase
+      .from('pedido_historial')
+      .select('*, perfiles(nombre)')
+      .eq('pedido_id', id)
+      .order('created_at', { ascending: true }),
+  ])
+
+  if (e1) throw new Error(e1.message)
+  if (e2) throw new Error(e2.message)
+  if (e3) throw new Error(e3.message)
+  if (!pedido) throw new Error('Pedido no encontrado')
+
+  return {
+    ...parsePedido(pedido),
+    pedido_items:     (itemsRaw    ?? []).map(parseItemDetalle),
+    pedido_historial: (historialRaw ?? []) as HistorialDetalle[],
+  } as PedidoDetalle
+}
+
 // ─── useCrearPedido ───────────────────────────────────────────────────────────
 
 export const useCrearPedido = () => {

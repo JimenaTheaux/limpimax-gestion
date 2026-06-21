@@ -2,14 +2,16 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { Plus, Search, ShoppingCart, Printer, X, MoreHorizontal, ChevronDown } from 'lucide-react'
 import { Skeleton }         from '@/components/ui/skeleton'
 import { ToastContainer }   from '@/components/common/ToastContainer'
+import { BtnWhatsapp }      from '@/components/common/BtnWhatsapp'
 import { useToast }         from '@/hooks/useToast'
+import { useCompartirFactura } from '@/hooks/useCompartirFactura'
 import { DrawerPedido }     from '@/components/pedidos/DrawerPedido'
 import { DrawerDetalle }    from '@/components/pedidos/DrawerDetalle'
 import {
   usePedidos, useCambiarEstado, useAnularPedido, totalPedido,
-  type PedidoListItem, type PedidoDetalle,
+  fetchPedidoDetalle, type PedidoListItem, type PedidoDetalle,
 } from '@/services/pedidos'
-import { ESTADO_CONFIG, type EstadoPedido } from '@/types'
+import { ESTADO_CONFIG, type EstadoPedido, formatNumero } from '@/types'
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -276,17 +278,29 @@ function ModalAnular({ pedido, onConfirm, onCancel, loading }: {
 
 // ─── Fila de tabla (desktop) ──────────────────────────────────────────────────
 
-function FilaPedido({ pedido, onVerDetalle, onEditar, onAnularRequest, selected, onSelect }: {
+function FilaPedido({ pedido, onVerDetalle, onEditar, onAnularRequest, selected, onSelect, onToast }: {
   pedido:          PedidoListItem
   onVerDetalle:    () => void
   onEditar:        () => void
   onAnularRequest: () => void
   selected?:       boolean
   onSelect?:       () => void
+  onToast?:        (msg: string, type: 'success' | 'error') => void
 }) {
   const cambiarEstado = useCambiarEstado()
+  const { compartir, loading: loadingWA } = useCompartirFactura()
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState<string | null>(null)
+
+  const handleWhatsapp = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      const detalle = await fetchPedidoDetalle(pedido.id)
+      await compartir(detalle, msg => onToast?.(msg, 'error'))
+    } catch {
+      onToast?.('No se pudo generar la imagen', 'error')
+    }
+  }
 
   const cfg     = ESTADO_CONFIG[pedido.estado]
   const total   = Number(totalPedido(pedido))
@@ -421,6 +435,12 @@ function FilaPedido({ pedido, onVerDetalle, onEditar, onAnularRequest, selected,
               {loading ? '…' : action.labelCorto}
             </button>
           )}
+          <BtnWhatsapp
+            variante="icono"
+            onClick={handleWhatsapp}
+            loading={loadingWA}
+            numeroLabel={formatNumero(pedido.numero)}
+          />
           <AccionesDropdown
             pedido={pedido}
             onVerDetalle={onVerDetalle}
@@ -954,6 +974,7 @@ export default function PedidosPage() {
                     onAnularRequest={() => setAnularPedido(p)}
                     selected={seleccionados.has(p.id)}
                     onSelect={modoSeleccion ? () => toggleSeleccion(p.id) : undefined}
+                    onToast={(msg, type) => type === 'error' ? show(msg, 'error') : show(msg, 'success')}
                   />
                 ))
               )}

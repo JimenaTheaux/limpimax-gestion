@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
 import { Clock, Edit2, XCircle, ChevronRight, Printer } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { BadgeEstado } from '@/components/common/BadgeEstado'
-import { Skeleton }    from '@/components/ui/skeleton'
+import { BadgeEstado }   from '@/components/common/BadgeEstado'
+import { BtnWhatsapp }  from '@/components/common/BtnWhatsapp'
+import { Skeleton }     from '@/components/ui/skeleton'
 import {
   usePedidoDetalle, useCambiarEstado, useAnularPedido, useEditarCobro, useCerrarPedido,
   totalPedido, type PedidoDetalle,
 } from '@/services/pedidos'
-import { ESTADO_CONFIG, type EstadoPedido } from '@/types'
-import { useAuthStore } from '@/store/authStore'
+import { ESTADO_CONFIG, formatNumero, type EstadoPedido } from '@/types'
+import { useAuthStore }      from '@/store/authStore'
+import { useCompartirFactura } from '@/hooks/useCompartirFactura'
 
 // ─── Transiciones secuenciales ────────────────────────────────────────────────
 
@@ -111,6 +113,8 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
 
   const usuario = useAuthStore(s => s.usuario)
   const isAdmin = usuario?.rol === 'admin' || usuario?.rol === 'superadmin'
+
+  const { compartir, loading: loadingWA } = useCompartirFactura()
 
   const [confirmando,      setConfirmando]      = useState<EstadoPedido | null>(null)
   const [anulando,         setAnulando]         = useState(false)
@@ -413,11 +417,19 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
 
               {/* Acciones */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <button type="button" onClick={() => window.open(`/print/${p.id}`, '_blank')}
-                  aria-label={`Generar documento del pedido P-${String(p.numero).padStart(5, '0')}`}
-                  style={{ background: '#F4F6F8', color: '#4A5568', border: '1.5px solid #D1D5DB', borderRadius: 10, padding: '12px', minHeight: 44, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, outlineOffset: 2 }}>
-                  <Printer size={14} /> Generar documento
-                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" onClick={() => window.open(`/print/${p.id}`, '_blank')}
+                    aria-label={`Generar documento del pedido P-${String(p.numero).padStart(5, '0')}`}
+                    style={{ flex: 1, background: '#F4F6F8', color: '#4A5568', border: '1.5px solid #D1D5DB', borderRadius: 10, padding: '12px', minHeight: 44, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, outlineOffset: 2 }}>
+                    <Printer size={14} /> Generar documento
+                  </button>
+                  <BtnWhatsapp
+                    variante="pill"
+                    loading={loadingWA}
+                    numeroLabel={formatNumero(p.numero)}
+                    onClick={() => compartir(p, msg => onSaved(msg + '|error'))}
+                  />
+                </div>
 
                 {/* ── Form cerrar venta ── */}
                 {cerrando ? (

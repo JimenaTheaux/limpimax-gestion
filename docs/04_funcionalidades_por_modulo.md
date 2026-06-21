@@ -268,6 +268,17 @@ Cards KPI:
 - Contenido: pedidos del día con cliente, dirección, productos resumidos, total a cobrar
 - Formato: PDF descargable o vista imprimible
 
+### F9.3 — Compartir factura por WhatsApp (JPG)
+- Disponible desde: detalle de pedido (drawer), tabla de pedidos (acción rápida), panel de pagos pendientes del dashboard
+- Genera la factura del pedido como imagen JPG (600px, escala 2x) usando html2canvas sobre el componente FacturaCanvas
+- En mobile con Web Share API disponible: abre el selector nativo de apps con el JPG adjunto
+- En desktop o mobile sin Web Share API: descarga el JPG automáticamente + abre WhatsApp Web con el número del cliente precargado y un mensaje predeterminado
+- Si el cliente tiene teléfono registrado: `wa.me/54[telefono]` (prefijo Argentina)
+- Si no tiene teléfono: `wa.me/?text=mensaje` (el usuario elige el contacto)
+- Loading state en el botón mientras se genera el JPG: deshabilitado + texto "Generando…"
+- Si html2canvas falla: toast de error "No se pudo generar la imagen"
+- Componentes: `FacturaCanvas`, `BtnWhatsapp` (variantes "icono" y "pill"), hook `useCompartirFactura`
+
 ---
 
 ## MÓDULO 10: Notificaciones (fuera del MVP)

@@ -6,9 +6,11 @@ import { Clock } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { BadgeEstado } from '@/components/common/BadgeEstado'
-import { useEditarCobro } from '@/services/pedidos'
+import { BtnWhatsapp } from '@/components/common/BtnWhatsapp'
+import { useEditarCobro, fetchPedidoDetalle } from '@/services/pedidos'
+import { useCompartirFactura } from '@/hooks/useCompartirFactura'
 import { useDashboard } from '@/services/produccion'
-import { ESTADO_CONFIG, type EstadoPedido } from '@/types'
+import { ESTADO_CONFIG, formatNumero, type EstadoPedido } from '@/types'
 import type { PedidoPendienteCobro } from '@/services/produccion'
 import { supabase } from '@/lib/supabase'
 
@@ -288,6 +290,7 @@ function FilaPendiente({ p, onCobrado }: {
   onCobrado: (msg: string) => void
 }) {
   const editarCobro = useEditarCobro()
+  const { compartir, loading: loadingWA } = useCompartirFactura()
   const [abierto,    setAbierto]    = useState(false)
   const [forma,      setForma]      = useState<'efectivo' | 'transferencia'>('efectivo')
   const [monto,      setMonto]      = useState(String(Math.round(p.totalPedido)))
@@ -374,18 +377,33 @@ function FilaPendiente({ p, onCobrado }: {
             {pesos(p.totalPedido)}
           </p>
           {!abierto && (
-            <button
-              ref={btnRef}
-              onClick={handleAbrir}
-              aria-label={`Marcar cobrado el pedido P-${String(p.numero).padStart(5, '0')}`}
-              style={{
-                background: '#0D5C8A', color: '#fff', border: 'none',
-                borderRadius: 8, padding: '7px 14px',
-                fontSize: 12, fontWeight: 500, cursor: 'pointer', minHeight: 34,
-              }}
-            >
-              Registrar cobro
-            </button>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <BtnWhatsapp
+                variante="icono"
+                loading={loadingWA}
+                numeroLabel={formatNumero(p.numero)}
+                onClick={async () => {
+                  try {
+                    const detalle = await fetchPedidoDetalle(p.id)
+                    await compartir(detalle)
+                  } catch {
+                    // silencioso — el toast de error no está disponible aquí
+                  }
+                }}
+              />
+              <button
+                ref={btnRef}
+                onClick={handleAbrir}
+                aria-label={`Marcar cobrado el pedido P-${String(p.numero).padStart(5, '0')}`}
+                style={{
+                  background: '#0D5C8A', color: '#fff', border: 'none',
+                  borderRadius: 8, padding: '7px 14px',
+                  fontSize: 12, fontWeight: 500, cursor: 'pointer', minHeight: 34,
+                }}
+              >
+                Registrar cobro
+              </button>
+            </div>
           )}
         </div>
       </div>
