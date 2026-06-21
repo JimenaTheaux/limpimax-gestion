@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Plus, Search, ShoppingCart, Printer, X, MoreHorizontal } from 'lucide-react'
+import { Plus, Search, ShoppingCart, Printer, X, MoreHorizontal, ChevronDown } from 'lucide-react'
 import { Skeleton }         from '@/components/ui/skeleton'
 import { ToastContainer }   from '@/components/common/ToastContainer'
 import { useToast }         from '@/hooks/useToast'
@@ -13,16 +13,19 @@ import { ESTADO_CONFIG, type EstadoPedido } from '@/types'
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
-const ESTADOS_FILTRO: { value: EstadoPedido | ''; label: string }[] = [
-  { value: '',               label: 'Todos' },
-  { value: 'borrador',       label: 'Borrador' },
-  { value: 'confirmado',     label: 'Confirmado' },
-  { value: 'en_produccion',  label: 'En producción' },
-  { value: 'listo_reparto',  label: 'Listo reparto' },
-  { value: 'en_reparto',     label: 'En reparto' },
-  { value: 'cerrado',        label: 'Cerrado' },
+const PILLS_PRIMARIOS: { value: EstadoPedido | ''; label: string }[] = [
+  { value: '',              label: 'Todos'         },
+  { value: 'confirmado',   label: 'Confirmado'    },
+  { value: 'en_produccion', label: 'En producción' },
+  { value: 'cerrado',      label: 'Cerrado'       },
+]
+
+const PILLS_MAS: { value: EstadoPedido; label: string }[] = [
+  { value: 'borrador',        label: 'Borrador'        },
+  { value: 'listo_reparto',   label: 'Listo reparto'   },
+  { value: 'en_reparto',      label: 'En reparto'      },
   { value: 'entrega_fallida', label: 'Entrega fallida' },
-  { value: 'anulado',        label: 'Anulado' },
+  { value: 'anulado',         label: 'Anulado'         },
 ]
 
 const PRIMARY_ACTION: Partial<Record<EstadoPedido, { label: string; labelCorto: string; next: EstadoPedido }>> = {
@@ -613,26 +616,54 @@ function PillsFiltro({ pedidos, estadoFiltro, setEstado }: {
   estadoFiltro: EstadoPedido | ''
   setEstado:    (v: EstadoPedido | '') => void
 }) {
+  const [masOpen, setMasOpen] = useState(false)
+  const masRef       = useRef<HTMLDivElement>(null)
+  const masButtonRef = useRef<HTMLButtonElement>(null)
+  const firstItemRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!masOpen) return
+    const onMouseDown = (e: MouseEvent) => {
+      if (masRef.current && !masRef.current.contains(e.target as Node)) setMasOpen(false)
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setMasOpen(false); masButtonRef.current?.focus() }
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [masOpen])
+
+  useEffect(() => {
+    if (masOpen) firstItemRef.current?.focus()
+  }, [masOpen])
+
+  const masActivo = PILLS_MAS.some(p => p.value === estadoFiltro)
+
+  const getCount = (value: EstadoPedido | '') =>
+    value && pedidos ? pedidos.filter(p => p.estado === value).length : null
+
+  const pillBase = (active: boolean): React.CSSProperties => ({
+    flexShrink: 0, height: 32,
+    padding: '0 14px', borderRadius: 99,
+    border: `0.5px solid ${active ? '#0D5C8A' : '#D1D5DB'}`,
+    background: active ? '#0D5C8A' : '#fff',
+    color: active ? '#fff' : '#4A5568',
+    fontSize: 12, fontWeight: active ? 600 : 400,
+    cursor: 'pointer', whiteSpace: 'nowrap',
+    display: 'flex', alignItems: 'center', gap: 5,
+  })
+
   return (
-    <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
-      {ESTADOS_FILTRO.map(e => {
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      {PILLS_PRIMARIOS.map(e => {
         const isActive = estadoFiltro === e.value
-        const count = e.value && pedidos ? pedidos.filter(p => p.estado === e.value).length : null
+        const count = getCount(e.value)
         return (
-          <button
-            key={e.value}
-            onClick={() => setEstado(e.value)}
-            style={{
-              flexShrink: 0, height: 32,
-              padding: '0 14px', borderRadius: 99,
-              border: `1px solid ${isActive ? '#0D5C8A' : '#D1D5DB'}`,
-              background: isActive ? '#0D5C8A' : '#fff',
-              color: isActive ? '#fff' : '#4A5568',
-              fontSize: 12, fontWeight: isActive ? 600 : 400,
-              cursor: 'pointer', whiteSpace: 'nowrap',
-              display: 'flex', alignItems: 'center', gap: 5,
-            }}
-          >
+          <button key={e.value} onClick={() => setEstado(e.value)} style={pillBase(isActive)}>
             {e.label}
             {count !== null && (
               <span style={{
@@ -646,6 +677,70 @@ function PillsFiltro({ pedidos, estadoFiltro, setEstado }: {
           </button>
         )
       })}
+
+      {/* Botón "Más ↓" */}
+      <div ref={masRef} style={{ position: 'relative' }}>
+        <button
+          ref={masButtonRef}
+          onClick={() => setMasOpen(o => !o)}
+          aria-haspopup="listbox"
+          aria-expanded={masOpen}
+          style={{
+            ...pillBase(false),
+            borderColor: masActivo ? '#0D5C8A' : '#D1D5DB',
+            color:       masActivo ? '#0D5C8A' : '#4A5568',
+          }}
+        >
+          Más <ChevronDown size={12} />
+        </button>
+
+        {masOpen && (
+          <div
+            role="listbox"
+            style={{
+              position: 'absolute', top: 'calc(100% + 6px)', left: 0,
+              background: '#fff', border: '0.5px solid #D1D5DB', borderRadius: 10,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+              zIndex: 50, minWidth: 180, padding: '4px 0',
+            }}
+          >
+            {PILLS_MAS.map((e, i) => {
+              const isActive = estadoFiltro === e.value
+              const count = getCount(e.value)
+              return (
+                <button
+                  key={e.value}
+                  ref={i === 0 ? firstItemRef : undefined}
+                  role="option"
+                  aria-selected={isActive}
+                  onClick={() => { setEstado(e.value); setMasOpen(false) }}
+                  style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    width: '100%', padding: '8px 14px',
+                    background: 'none', border: 'none',
+                    fontSize: 12, cursor: 'pointer',
+                    color: isActive ? '#0D5C8A' : '#4A5568',
+                    fontWeight: isActive ? 500 : 400,
+                    textAlign: 'left',
+                  }}
+                  onMouseEnter={ev => (ev.currentTarget.style.background = '#F4F6F8')}
+                  onMouseLeave={ev => (ev.currentTarget.style.background = 'none')}
+                >
+                  {e.label}
+                  {count !== null && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 500, color: '#4A5568',
+                      background: '#F4F6F8', borderRadius: 99, padding: '1px 6px',
+                    }}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
