@@ -292,8 +292,7 @@ function FilaPedido({ pedido, onVerDetalle, onEditar, onAnularRequest, selected,
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState<string | null>(null)
 
-  const handleWhatsapp = async (e: React.MouseEvent) => {
-    e.stopPropagation()
+  const handleWhatsapp = async () => {
     try {
       const detalle = await fetchPedidoDetalle(pedido.id)
       await compartir(detalle, msg => onToast?.(msg, 'error'))

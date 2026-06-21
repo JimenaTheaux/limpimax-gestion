@@ -32,7 +32,7 @@ export function BtnWhatsapp({
     return (
       <button
         type="button"
-        onClick={onClick}
+        onClick={e => { e.stopPropagation(); onClick() }}
         disabled={isDisabled}
         aria-label={ariaLabel}
         style={{
@@ -66,7 +66,7 @@ export function BtnWhatsapp({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={e => { e.stopPropagation(); onClick() }}
       disabled={isDisabled}
       aria-label={ariaLabel}
       style={{
