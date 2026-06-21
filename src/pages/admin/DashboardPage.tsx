@@ -264,7 +264,7 @@ function GraficoLinea({ labels, anioActual, anioPrev }: {
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: (c: TooltipItem<'line'>) => ` $${c.parsed.y.toLocaleString('es-AR', { minimumFractionDigits: 0 })}`,
+              label: (c: TooltipItem<'line'>) => ` $${(c.parsed.y ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 0 })}`,
             },
           },
         },
