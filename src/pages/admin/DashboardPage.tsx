@@ -4,7 +4,7 @@ import { ShoppingCart, Factory, Truck, AlertCircle, DollarSign, RefreshCw, FileT
 import { Skeleton }    from '@/components/ui/skeleton'
 import { BadgeEstado } from '@/components/common/BadgeEstado'
 import { useDashboard } from '@/services/produccion'
-import { useEditarCobro, totalPedido } from '@/services/pedidos'
+import { useEditarCobro } from '@/services/pedidos'
 import { ESTADO_CONFIG, type EstadoPedido } from '@/types'
 import type { PedidoPendienteCobro } from '@/services/produccion'
 
