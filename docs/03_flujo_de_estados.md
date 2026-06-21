@@ -3,10 +3,12 @@
 ## Ciclo de vida
 
 ```
-[BORRADOR] ──► [CONFIRMADO] ──► [EN PRODUCCIÓN] ──► [LISTO PARA REPARTO] ──► [EN REPARTO] ──► [ENTREGADO] ──► [CERRADO]
-                                       │                                                              │
-                                       │ (emergencia: repartidor)                                     └──► [ENTREGA FALLIDA]
-                                       └─────────────────────────────────────────────────────────────►┘
+[BORRADOR] ──► [CONFIRMADO] ──► [EN PRODUCCIÓN] ──► [LISTO PARA REPARTO] ──► [EN REPARTO] ──► [CERRADO]
+                                       │                                              │
+                                       │ (emergencia: repartidor)                     └──► [ENTREGA FALLIDA]
+                                       └──────────────────────────────────────────────────────────────────►┘
+
+ENTREGA FALLIDA ──► LISTO PARA REPARTO (reagendado por Admin)
                     │
                [ANULADO] (desde cualquier estado excepto CERRADO, solo Admin)
 ```
@@ -46,19 +48,18 @@ Cada transición registra: estado anterior, estado nuevo, usuario, timestamp.
 ### `EN REPARTO`
 - **Quién lo establece:** Repartidor, Admin, o por avance de emergencia.
 - **Qué significa:** Pedido en camino al cliente.
-- **Acciones:** Marcar "Entregado" o "Entrega fallida" (Repartidor o Admin).
+- **Acciones:** Cerrar pedido con registro de cobro, o registrar entrega fallida (Repartidor o Admin).
 - **Visible para:** Admin, Repartidor.
 
-### `ENTREGADO`
-- **Quién lo establece:** Repartidor al confirmar la entrega.
-- **Campos que se completan:** forma de cobro, monto cobrado, observaciones.
-- **Acciones:** Admin puede cerrarlo.
-- **Visible para:** Admin, Repartidor (solo lectura).
-
 ### `CERRADO`
-- **Quién lo establece:** Administración.
-- **Qué significa:** Venta completamente cerrada y verificada.
-- **Acciones:** Solo editar forma de pago y monto cobrado (correcciones). No se puede anular ni retroceder.
+- **Quién lo establece:** Repartidor (al confirmar entrega) o Administración.
+- **Qué significa:** Pedido entregado y cobro registrado. Estado final de entrega.
+- **Campos obligatorios al cerrar:**
+  - `forma_cobro`: efectivo / transferencia / pendiente
+  - `monto_cobrado`: numérico (obligatorio si forma ≠ pendiente)
+  - `estado_pago`: cobrado | pendiente (se deriva automáticamente de forma_cobro)
+- **Acciones disponibles:** Admin puede editar cobro (forma_cobro, monto_cobrado, estado_pago).
+- **No se puede anular ni retroceder.**
 - **Visible para:** Administración.
 
 ### `ENTREGA FALLIDA`
@@ -95,7 +96,6 @@ Cada transición registra: estado anterior, estado nuevo, usuario, timestamp.
 | EN_PRODUCCION | `#FFF3E0` | `#F57C00` |
 | LISTO_REPARTO | `#FFFDE7` | `#F9A825` |
 | EN_REPARTO | `#E3F2FD` | `#1565C0` |
-| ENTREGADO | `#E8F8F0` | `#2E9E5C` |
 | CERRADO | `#D4EDDA` | `#145A32` |
 | ENTREGA_FALLIDA | `#FDECEA` | `#D32F2F` |
 | ANULADO | `#ECEFF1` | `#455A64` |

@@ -139,10 +139,18 @@ Se abre en un drawer/sheet lateral (50% desktop, 100% mobile) con fondo oscureci
 - Botón "Salir a repartir" pasa todos los LISTO PARA REPARTO a EN REPARTO de una vez
 - O acción individual por pedido
 
-### F4.4 — Registrar entrega
-- Se abre drawer/sheet desde la card del pedido
-- Campos: forma de cobro (radio: Efectivo / Transferencia / Pendiente), monto cobrado, observaciones (opcional)
-- Botón "Confirmar entrega" (primary, 48px)
+### F4.4 — Cerrar pedido (entrega + cobro)
+- Se abre mini-form inline en la card del pedido
+- Campos:
+  - Forma de cobro (radio: Efectivo / Transferencia / Pendiente de cobro)
+  - Monto cobrado (obligatorio si forma ≠ pendiente; vacío/cero si es pendiente)
+  - Observaciones (opcional)
+- Estado de pago se deriva automáticamente:
+  - si forma = pendiente → estado_pago = 'pendiente'
+  - si forma = efectivo o transferencia → estado_pago = 'cobrado'
+- Botón "Confirmar y cerrar pedido" (primary, 48px)
+- Al confirmar: pedido pasa a estado CERRADO (no a entregado)
+- Badge en la card pasa a CERRADO visualmente
 
 ### F4.5 — Registrar entrega fallida
 - Se abre drawer/sheet
@@ -164,11 +172,10 @@ Se abre en un drawer/sheet lateral (50% desktop, 100% mobile) con fondo oscureci
 Cards KPI:
 - Total de pedidos
 - Pedidos en producción
-- Pedidos listos para reparto
-- Pedidos en reparto
-- Pedidos entregados / cerrados
+- Pedidos en reparto (listos + en camino)
 - Pedidos con entrega fallida (alerta visual)
-- Total cobrado en el día (efectivo + transferencia)
+- **Cobrado hoy:** pedidos estado=cerrado AND estado_pago=cobrado · suma de monto_cobrado · desglose efectivo/transferencia
+- **Pendiente de cobro** (alerta visual): pedidos estado=cerrado AND estado_pago=pendiente · conteo + monto total · click abre panel con listado detallado
 
 ### F5.2 — Tablero de estados
 - Lista agrupada por estado con conteo por grupo
@@ -176,9 +183,9 @@ Cards KPI:
 - Clic → abre drawer lateral con detalle completo y acciones de override
 
 ### F5.3 — Seguimiento de cobros
-- Lista de pedidos entregados con detalle de cobro
+- Lista de pedidos cerrados con detalle de cobro
 - Total cobrado en efectivo / total por transferencia del día
-- Pedidos con cobro pendiente resaltados
+- Pedidos con estado_pago=pendiente resaltados con alerta visual
 
 ### F5.4 — Dashboard de ventas (KPIs)
 - Filtros de fecha: hoy, esta semana, este mes, rango personalizado

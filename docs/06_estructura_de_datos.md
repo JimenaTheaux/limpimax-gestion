@@ -180,7 +180,7 @@ export type EstadoPedido =
   | 'en_produccion'
   | 'listo_reparto'
   | 'en_reparto'
-  | 'entregado'
+  | 'entregado'   // deprecated — no usar en lógica nueva; se mantiene por registros históricos
   | 'cerrado'
   | 'entrega_fallida'
   | 'anulado'
@@ -200,6 +200,7 @@ export type Pedido = {
   total_manual: number | null
   forma_cobro: 'efectivo' | 'transferencia' | 'pendiente' | null
   monto_cobrado: number | null
+  estado_pago: 'cobrado' | 'pendiente' | null   // se deriva de forma_cobro al cerrar
   notas_entrega: string | null
   motivo_falla: string | null
   motivo_anulacion: string | null
@@ -407,6 +408,20 @@ await supabase
   })
 ```
 
+### Cobros pendientes (pedidos cerrados sin cobro confirmado)
+```typescript
+const { data: pendientes } = await supabase
+  .from('pedidos')
+  .select(`
+    id, numero, fecha_produccion, total_calculado, total_manual,
+    forma_cobro, monto_cobrado, estado_pago, created_at,
+    clientes(nombre)
+  `)
+  .eq('estado', 'cerrado')
+  .eq('estado_pago', 'pendiente')
+  .order('fecha_produccion', { ascending: true })
+```
+
 ### KPIs del dashboard (una query por métrica)
 ```typescript
 // Contar por estado — usar .select con count
@@ -531,9 +546,11 @@ export const ESTADO_CONFIG: Record<EstadoPedido, { bg: string; color: string; la
   en_produccion:   { bg: '#FFF3E0', color: '#F57C00', label: 'En producción' },
   listo_reparto:   { bg: '#FFFDE7', color: '#F9A825', label: 'Listo para reparto' },
   en_reparto:      { bg: '#E3F2FD', color: '#1565C0', label: 'En reparto' },
-  entregado:       { bg: '#E8F8F0', color: '#2E9E5C', label: 'Entregado' },
+  entregado:       { bg: '#E8F8F0', color: '#2E9E5C', label: 'Entregado' }, // deprecated
   cerrado:         { bg: '#D4EDDA', color: '#145A32', label: 'Cerrado' },
   entrega_fallida: { bg: '#FDECEA', color: '#D32F2F', label: 'Entrega fallida' },
   anulado:         { bg: '#ECEFF1', color: '#455A64', label: 'Anulado' },
 }
+// Nota: 'entregado' se mantiene en ESTADO_CONFIG solo por backward compat con registros históricos.
+// No usar en lógica nueva. El flujo en_reparto → cerrado reemplaza los dos pasos anteriores.
 ```

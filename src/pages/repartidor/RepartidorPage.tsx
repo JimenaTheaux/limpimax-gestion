@@ -8,7 +8,7 @@ import { ToastContainer } from '@/components/common/ToastContainer'
 import { useToast }       from '@/hooks/useToast'
 import { useOffline }     from '@/hooks/useOffline'
 import {
-  usePedidos, useCambiarEstado, useRegistrarEntrega, totalPedido,
+  usePedidos, useCambiarEstado, useCerrarPedido, totalPedido,
   type PedidoListItem,
 } from '@/services/pedidos'
 import { ESTADO_CONFIG }  from '@/types'
@@ -22,14 +22,14 @@ function CardRepartidor({ pedido, isOnline, addAction, onSaved }: {
   addAction: (a: AddActionInput) => Promise<void>
   onSaved:   (msg: string) => void
 }) {
-  const cambiar   = useCambiarEstado()
-  const registrar = useRegistrarEntrega()
+  const cambiar = useCambiarEstado()
+  const cerrar  = useCerrarPedido()
 
   const [formEntrega, setFormEntrega] = useState(false)
   const [formFalla,   setFormFalla]   = useState(false)
   const [confEmerg,   setConfEmerg]   = useState(false)
 
-  // Form entrega
+  // Form entrega / cierre
   const [forma,  setForma]  = useState<'efectivo' | 'transferencia' | 'pendiente'>('efectivo')
   const [monto,  setMonto]  = useState(String(Math.round(Number(totalPedido(pedido)))))
   const [notas,  setNotas]  = useState('')
@@ -74,32 +74,40 @@ function CardRepartidor({ pedido, isOnline, addAction, onSaved }: {
     }
   }
 
-  // en_reparto → entregado
-  const handleConfirmarEntrega = async () => {
+  // en_reparto → cerrado (con cobro)
+  const handleConfirmarCierre = async () => {
     if (forma !== 'pendiente' && !monto.trim()) {
       showError('El monto cobrado es obligatorio')
       return
     }
+    const estadoPago: 'cobrado' | 'pendiente' = forma === 'pendiente' ? 'pendiente' : 'cobrado'
     setLoading(true)
     try {
       if (!isOnline) {
-        await addAction({ type: 'cambiarEstado', pedidoId: pedido.id, estadoNuevo: 'entregado', notas: notas.trim() || undefined })
-        await addAction({ type: 'editarCobro', pedidoId: pedido.id, formaCobro: forma, montoCobrado: monto || undefined })
-        onSaved('Entrega guardada offline — se enviará al reconectar')
+        await addAction({
+          type:         'cerrarPedido',
+          pedidoId:     pedido.id,
+          formaCobro:   forma,
+          montoCobrado: monto || undefined,
+          estadoPago,
+          notasEntrega: notas.trim() || undefined,
+        })
+        onSaved('Cierre guardado offline — se enviará al reconectar')
         setFormEntrega(false)
         return
       }
-      await registrar.mutateAsync({
+      await cerrar.mutateAsync({
         id:            pedido.id,
         estadoActual:  pedido.estado,
         forma_cobro:   forma,
         monto_cobrado: monto || undefined,
-        notas:         notas.trim() || undefined,
+        estado_pago:   estadoPago,
+        notas_entrega: notas.trim() || undefined,
       })
-      onSaved('Entrega registrada correctamente')
+      onSaved('Pedido cerrado correctamente')
       setFormEntrega(false)
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Error al registrar entrega')
+      showError(e instanceof Error ? e.message : 'Error al cerrar pedido')
     } finally {
       setLoading(false)
     }
@@ -208,20 +216,20 @@ function CardRepartidor({ pedido, isOnline, addAction, onSaved }: {
           </button>
         )}
 
-        {/* ── en_reparto: form entrega o form falla ────────────────────── */}
+        {/* ── en_reparto: form cierre o form falla ─────────────────────── */}
         {pedido.estado === 'en_reparto' && !formFalla && (
           formEntrega ? (
-            // Form inline registrar entrega
+            // Form inline cerrar pedido
             <div style={{ background: '#F4F6F8', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#1A2B3C' }}>Registrar entrega</p>
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#1A2B3C' }}>Cerrar pedido</p>
 
               {/* Total a cobrar */}
               <div style={{
-                background: '#E8F4FF', borderRadius: 10, padding: '10px 14px',
+                background: '#D4EDDA', borderRadius: 10, padding: '10px 14px',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               }}>
-                <span style={{ fontSize: 12, color: '#1B9ED6', fontWeight: 600 }}>Total a cobrar</span>
-                <span style={{ fontSize: 20, fontWeight: 900, color: '#0D5C8A', letterSpacing: -0.5 }}>
+                <span style={{ fontSize: 12, color: '#145A32', fontWeight: 600 }}>Total a cobrar</span>
+                <span style={{ fontSize: 20, fontWeight: 900, color: '#145A32', letterSpacing: -0.5 }}>
                   ${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                 </span>
               </div>
@@ -266,19 +274,19 @@ function CardRepartidor({ pedido, isOnline, addAction, onSaved }: {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <button
                   ref={confirmEntregaBtnRef}
-                  onClick={handleConfirmarEntrega}
+                  onClick={handleConfirmarCierre}
                   disabled={loading}
                   aria-disabled={loading}
-                  aria-label={`Confirmar entrega del pedido P-${String(pedido.numero).padStart(5, '0')}`}
+                  aria-label={`Confirmar cierre del pedido P-${String(pedido.numero).padStart(5, '0')}`}
                   className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                   style={{
-                    background: loading ? 'rgba(46,158,92,0.5)' : '#2E9E5C',
+                    background: loading ? 'rgba(20,90,50,0.5)' : '#145A32',
                     color: '#fff', border: 'none', borderRadius: 10,
                     padding: '13px', minHeight: 48, fontSize: 15, fontWeight: 700,
                     cursor: loading ? 'not-allowed' : 'pointer', outlineOffset: 2,
                   }}
                 >
-                  {loading ? 'Guardando…' : isOnline ? '✓ Confirmar entrega' : '✓ Guardar offline'}
+                  {loading ? 'Guardando…' : isOnline ? '✓ Confirmar y cerrar pedido' : '✓ Guardar offline'}
                 </button>
                 <button
                   onClick={() => setFormEntrega(false)}
@@ -299,15 +307,15 @@ function CardRepartidor({ pedido, isOnline, addAction, onSaved }: {
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 onClick={() => setFormEntrega(true)}
-                aria-label={`Registrar entrega del pedido P-${String(pedido.numero).padStart(5, '0')}`}
+                aria-label={`Cerrar pedido P-${String(pedido.numero).padStart(5, '0')}`}
                 className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                 style={{
-                  flex: 1, background: '#2E9E5C', color: '#fff', border: 'none',
+                  flex: 1, background: '#145A32', color: '#fff', border: 'none',
                   borderRadius: 10, padding: '13px', minHeight: 48, fontSize: 14,
                   fontWeight: 700, cursor: 'pointer', outlineOffset: 2,
                 }}
               >
-                ✓ Registrar entrega
+                ✓ Cerrar pedido
               </button>
               <button
                 onClick={() => setFormFalla(true)}

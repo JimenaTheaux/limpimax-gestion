@@ -8,11 +8,11 @@ export default function HistorialPage() {
   const { data: pedidos, isLoading } = usePedidos({ fechaProduccion: HOY })
 
   const historial = pedidos?.filter(p =>
-    ['entregado', 'cerrado', 'entrega_fallida'].includes(p.estado)
+    ['cerrado', 'entrega_fallida'].includes(p.estado)
   ) ?? []
 
   const totalCobrado = historial
-    .filter(p => p.forma_cobro && p.forma_cobro !== 'pendiente' && p.monto_cobrado)
+    .filter(p => p.estado === 'cerrado' && p.estado_pago === 'cobrado' && p.monto_cobrado)
     .reduce((acc, p) => acc + Number(p.monto_cobrado ?? 0), 0)
 
   return (
@@ -51,7 +51,7 @@ export default function HistorialPage() {
             }}>
               {p.estado === 'entrega_fallida'
                 ? <XCircle size={20} color="#D32F2F" />
-                : <CheckCircle size={20} color="#2E9E5C" />
+                : <CheckCircle size={20} color="#145A32" />
               }
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>

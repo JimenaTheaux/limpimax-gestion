@@ -1,13 +1,16 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShoppingCart, Factory, Truck, CheckCircle, AlertCircle, DollarSign, RefreshCw, FileText } from 'lucide-react'
+import { ShoppingCart, Factory, Truck, AlertCircle, DollarSign, RefreshCw, FileText, Clock, X } from 'lucide-react'
 import { Skeleton }    from '@/components/ui/skeleton'
 import { BadgeEstado } from '@/components/common/BadgeEstado'
 import { useDashboard } from '@/services/produccion'
+import { useEditarCobro, totalPedido } from '@/services/pedidos'
 import { ESTADO_CONFIG, type EstadoPedido } from '@/types'
+import type { PedidoPendienteCobro } from '@/services/produccion'
 
 // ─── Card KPI ─────────────────────────────────────────────────────────────────
 
-function CardKPI({ label, valor, sublabel, icon: Icon, color, bg, onClick }: {
+function CardKPI({ label, valor, sublabel, icon: Icon, color, bg, onClick, alerta }: {
   label:    string
   valor:    string | number
   sublabel?: string
@@ -15,20 +18,25 @@ function CardKPI({ label, valor, sublabel, icon: Icon, color, bg, onClick }: {
   color:    string
   bg:       string
   onClick?: () => void
+  alerta?:  boolean
 }) {
   return (
     <button
       onClick={onClick}
       style={{
         background: '#fff', borderRadius: 20, padding: '18px 20px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+        boxShadow: alerta
+          ? '0 2px 8px rgba(211,47,47,0.15), 0 0 0 2px #D32F2F'
+          : '0 2px 8px rgba(0,0,0,0.06)',
         display: 'flex', flexDirection: 'column', gap: 8,
         border: 'none', cursor: onClick ? 'pointer' : 'default',
         textAlign: 'left', transition: 'box-shadow 0.2s',
         flex: 1, minWidth: 140,
       }}
       onMouseEnter={e => onClick && (e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.10)')}
-      onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)')}
+      onMouseLeave={e => (e.currentTarget.style.boxShadow = alerta
+        ? '0 2px 8px rgba(211,47,47,0.15), 0 0 0 2px #D32F2F'
+        : '0 2px 8px rgba(0,0,0,0.06)')}
     >
       <div style={{
         width: 40, height: 40, borderRadius: 12, background: bg,
@@ -44,6 +52,219 @@ function CardKPI({ label, valor, sublabel, icon: Icon, color, bg, onClick }: {
         {sublabel && <p style={{ margin: '2px 0 0', fontSize: 11, color: '#9A9A9A' }}>{sublabel}</p>}
       </div>
     </button>
+  )
+}
+
+// ─── Panel pendientes de cobro ────────────────────────────────────────────────
+
+function PanelPendientes({ pedidos, onClose, onCobrado }: {
+  pedidos:   PedidoPendienteCobro[]
+  onClose:   () => void
+  onCobrado: (id: string, msg: string) => void
+}) {
+  const editarCobro = useEditarCobro()
+  const [cobrandoId,    setCobrandoId]    = useState<string | null>(null)
+  const [cobForma,      setCobForma]      = useState('efectivo')
+  const [cobMonto,      setCobMonto]      = useState('')
+  const [loading,       setLoading]       = useState(false)
+  const [errorId,       setErrorId]       = useState<string | null>(null)
+
+  const totalAcumulado = pedidos.reduce((acc, p) => acc + p.totalPedido, 0)
+
+  const handleMarcarCobrado = async (p: PedidoPendienteCobro) => {
+    setLoading(true)
+    setErrorId(null)
+    try {
+      await editarCobro.mutateAsync({
+        id:            p.id,
+        forma_cobro:   cobForma,
+        monto_cobrado: cobMonto || undefined,
+        estado_pago:   'cobrado',
+      })
+      setCobrandoId(null)
+      setCobMonto('')
+      onCobrado(p.id, `P-${String(p.numero).padStart(5,'0')} marcado como cobrado`)
+    } catch (e) {
+      setErrorId(p.id)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const diasDesde = (createdAt: string) => {
+    const ms = Date.now() - new Date(createdAt).getTime()
+    return Math.floor(ms / 86_400_000)
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 300,
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+    }} onClick={onClose}>
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: '#fff', borderRadius: '20px 20px 0 0',
+          width: '100%', maxWidth: 600, maxHeight: '80vh',
+          display: 'flex', flexDirection: 'column',
+          boxShadow: '0 -4px 24px rgba(0,0,0,0.15)',
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '16px 20px', borderBottom: '1px solid #F4F6F8',
+        }}>
+          <div>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: '#1A2B3C' }}>
+              Pendientes de cobro
+            </p>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: '#4A5568' }}>
+              {pedidos.length} pedido{pedidos.length !== 1 ? 's' : ''} · Total ${totalAcumulado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4A5568', padding: 4 }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Lista */}
+        <div style={{ overflowY: 'auto', padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {pedidos.length === 0 ? (
+            <p style={{ textAlign: 'center', color: '#4A5568', fontSize: 14, padding: '20px 0' }}>
+              Sin cobros pendientes
+            </p>
+          ) : pedidos.map(p => (
+            <div key={p.id} style={{
+              background: '#FFFDE7', borderRadius: 14, border: '1px solid #F9A825',
+              overflow: 'hidden',
+            }}>
+              {/* Fila resumen */}
+              <div style={{
+                padding: '12px 14px',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: '#1A2B3C' }}>
+                      P-{String(p.numero).padStart(5, '0')}
+                    </span>
+                    {diasDesde(p.createdAt) > 0 && (
+                      <span style={{ fontSize: 10, fontWeight: 700, background: '#FDECEA', color: '#D32F2F', padding: '2px 6px', borderRadius: 99, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <Clock size={9} /> {diasDesde(p.createdAt)}d
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: '#1A2B3C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {p.clienteNombre}
+                  </p>
+                  {p.fechaProduccion && (
+                    <p style={{ margin: '2px 0 0', fontSize: 11, color: '#4A5568' }}>
+                      {new Date(p.fechaProduccion + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })}
+                    </p>
+                  )}
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <p style={{ margin: '0 0 6px', fontWeight: 900, fontSize: 16, color: '#0D5C8A', letterSpacing: -0.5 }}>
+                    ${p.totalPedido.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                  </p>
+                  {cobrandoId !== p.id ? (
+                    <button
+                      onClick={() => { setCobrandoId(p.id); setCobMonto(String(Math.round(p.totalPedido))); setCobForma('efectivo') }}
+                      style={{
+                        background: '#0D5C8A', color: '#fff', border: 'none',
+                        borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      }}
+                    >
+                      Marcar cobrado
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Mini-form cobro inline */}
+              {cobrandoId === p.id && (
+                <div style={{ padding: '12px 14px', background: '#fff', borderTop: '1px solid #F9A825', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {(['efectivo', 'transferencia'] as const).map(f => (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setCobForma(f)}
+                        style={{
+                          flex: 1, padding: '8px 4px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                          border: `1.5px solid ${cobForma === f ? '#145A32' : '#D1D5DB'}`,
+                          background: cobForma === f ? '#D4EDDA' : '#fff',
+                          color: cobForma === f ? '#145A32' : '#4A5568',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {f === 'efectivo' ? '💵 Efectivo' : '🏦 Transf.'}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="number"
+                    value={cobMonto}
+                    onChange={e => setCobMonto(e.target.value)}
+                    placeholder="Monto cobrado"
+                    inputMode="decimal"
+                    style={{
+                      width: '100%', padding: '10px 12px',
+                      border: '1.5px solid #D1D5DB', borderRadius: 10,
+                      fontSize: 14, fontFamily: 'Inter, sans-serif', outline: 0, boxSizing: 'border-box',
+                    }}
+                  />
+                  {errorId === p.id && (
+                    <p style={{ color: '#D32F2F', fontSize: 12, margin: 0 }}>Error al guardar</p>
+                  )}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={() => handleMarcarCobrado(p)}
+                      disabled={loading || !cobMonto.trim()}
+                      style={{
+                        flex: 1,
+                        background: loading || !cobMonto.trim() ? 'rgba(20,90,50,0.4)' : '#145A32',
+                        color: '#fff', border: 'none', borderRadius: 8,
+                        padding: '10px', fontSize: 13, fontWeight: 700,
+                        cursor: loading || !cobMonto.trim() ? 'not-allowed' : 'pointer', minHeight: 40,
+                      }}
+                    >
+                      {loading ? 'Guardando…' : '✓ Confirmar cobro'}
+                    </button>
+                    <button
+                      onClick={() => setCobrandoId(null)}
+                      disabled={loading}
+                      style={{
+                        flex: 1, background: 'transparent', color: '#4A5568',
+                        border: '1.5px solid #D1D5DB', borderRadius: 8,
+                        padding: '10px', fontSize: 13, cursor: 'pointer', minHeight: 40,
+                      }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Total pie */}
+          {pedidos.length > 0 && (
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '12px 14px', background: '#F4F6F8', borderRadius: 14,
+              borderTop: '2px solid #D1D5DB', marginTop: 4,
+            }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#1A2B3C' }}>Total pendiente</span>
+              <span style={{ fontSize: 20, fontWeight: 900, color: '#D32F2F', letterSpacing: -0.5 }}>
+                ${totalAcumulado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -134,14 +355,6 @@ function SeguimientoCobros({ data }: { data: { totalEfectivo: number; totalTrans
             ${data.totalCobrado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
           </span>
         </div>
-        {data.cobrandoPendientes > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#FFFDE7', borderRadius: 12, border: '1px solid #F9A825' }}>
-            <AlertCircle size={16} color="#F9A825" />
-            <span style={{ fontSize: 13, color: '#F57C00', fontWeight: 600 }}>
-              {data.cobrandoPendientes} cobro{data.cobrandoPendientes !== 1 ? 's' : ''} pendiente{data.cobrandoPendientes !== 1 ? 's' : ''}
-            </span>
-          </div>
-        )}
       </div>
     </div>
   )
@@ -152,6 +365,7 @@ function SeguimientoCobros({ data }: { data: { totalEfectivo: number; totalTrans
 export default function DashboardPage() {
   const navigate = useNavigate()
   const { data, isLoading, refetch } = useDashboard()
+  const [panelPendientes, setPanelPendientes] = useState(false)
 
   if (isLoading) {
     return (
@@ -164,8 +378,9 @@ export default function DashboardPage() {
     )
   }
 
-  const hoy = data?.hoy
-  const activos = data?.activos
+  const hoy       = data?.hoy
+  const activos   = data?.activos
+  const pendientes = data?.pendientes
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -224,10 +439,21 @@ export default function DashboardPage() {
         <CardKPI
           label="Cobrado hoy"
           valor={`$${(hoy?.totalCobrado ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`}
-          sublabel={hoy?.cobrandoPendientes ? `${hoy.cobrandoPendientes} pendiente${hoy.cobrandoPendientes !== 1 ? 's' : ''}` : 'Al día'}
+          sublabel="Efectivo + transferencia"
           icon={DollarSign}
           color="#2E9E5C" bg="#E8F8F0"
         />
+        {(pendientes?.count ?? 0) > 0 && (
+          <CardKPI
+            label="Pendiente cobro"
+            valor={pendientes!.count}
+            sublabel={`$${pendientes!.total.toLocaleString('es-AR', { maximumFractionDigits: 0 })} sin cobrar`}
+            icon={AlertCircle}
+            color="#D32F2F" bg="#FDECEA"
+            onClick={() => setPanelPendientes(true)}
+            alerta
+          />
+        )}
       </div>
 
       {/* Alertas */}
@@ -249,19 +475,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Entregados hoy */}
-      {data && (hoy?.porEstado?.entregado ?? 0) > 0 && (
-        <div style={{
-          background: '#E8F8F0', borderRadius: 14, padding: '12px 16px',
-          display: 'flex', alignItems: 'center', gap: 10,
-        }}>
-          <CheckCircle size={18} color="#2E9E5C" />
-          <span style={{ fontSize: 14, color: '#2E9E5C', fontWeight: 600 }}>
-            {data!.hoy.porEstado.entregado} entrega{data!.hoy.porEstado.entregado !== 1 ? 's' : ''} completada{data!.hoy.porEstado.entregado !== 1 ? 's' : ''} hoy
-          </span>
-        </div>
-      )}
-
       {/* Grid tablero + cobros */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
         {data && (
@@ -272,6 +485,15 @@ export default function DashboardPage() {
         )}
         {hoy && <SeguimientoCobros data={hoy} />}
       </div>
+
+      {/* Panel pendientes */}
+      {panelPendientes && pendientes && (
+        <PanelPendientes
+          pedidos={pendientes.pedidos}
+          onClose={() => setPanelPendientes(false)}
+          onCobrado={() => { setPanelPendientes(false); refetch() }}
+        />
+      )}
     </div>
   )
 }

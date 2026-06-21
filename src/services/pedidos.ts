@@ -402,26 +402,29 @@ export const useAnularPedido = () => {
   })
 }
 
-// ─── useRegistrarEntrega ──────────────────────────────────────────────────────
+// ─── useCerrarPedido ──────────────────────────────────────────────────────────
+// Cierra un pedido en_reparto: registra cobro y cambia estado a 'cerrado' en un solo RPC.
 
-export const useRegistrarEntrega = () => {
+export const useCerrarPedido = () => {
   const qc      = useQueryClient()
   const usuario = useAuthStore(s => s.usuario)
 
   return useMutation({
-    mutationFn: async ({ id, estadoActual, forma_cobro, monto_cobrado, notas }: {
-      id:             string
-      estadoActual:   EstadoPedido
-      forma_cobro:    string
-      monto_cobrado?: string
-      notas?:         string
+    mutationFn: async ({ id, estadoActual, forma_cobro, monto_cobrado, estado_pago, notas_entrega }: {
+      id:              string
+      estadoActual:    EstadoPedido
+      forma_cobro:     'efectivo' | 'transferencia' | 'pendiente'
+      monto_cobrado?:  string
+      estado_pago:     'cobrado' | 'pendiente'
+      notas_entrega?:  string
     }) => {
-      const { error } = await supabase.rpc('registrar_entrega', {
+      const { error } = await supabase.rpc('cerrar_pedido', {
         p_pedido_id:       id,
         p_estado_anterior: estadoActual,
         p_forma_cobro:     forma_cobro,
         p_monto_cobrado:   monto_cobrado ? parseFloat(monto_cobrado) : null,
-        p_notas_entrega:   notas ?? null,
+        p_estado_pago:     estado_pago,
+        p_notas_entrega:   notas_entrega ?? null,
         p_usuario_id:      usuario?.id ?? null,
       })
       if (error) throw new Error(error.message)
@@ -432,7 +435,7 @@ export const useRegistrarEntrega = () => {
       const snapshots = qc.getQueriesData<PedidoConCliente[]>({ queryKey: KEY })
       qc.setQueriesData<PedidoConCliente[]>({ queryKey: KEY }, (old) => {
         if (!Array.isArray(old)) return old
-        return old.map(p => p.id === id ? { ...p, estado: 'entregado' } : p)
+        return old.map(p => p.id === id ? { ...p, estado: 'cerrado' as EstadoPedido } : p)
       })
       return { snapshots }
     },
@@ -448,18 +451,22 @@ export const useRegistrarEntrega = () => {
 export const useEditarCobro = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, forma_cobro, monto_cobrado }: {
-      id:             string
-      forma_cobro:    string
-      monto_cobrado?: string
+    mutationFn: async ({ id, forma_cobro, monto_cobrado, estado_pago }: {
+      id:              string
+      forma_cobro:     string
+      monto_cobrado?:  string
+      estado_pago?:    'cobrado' | 'pendiente'
     }) => {
+      const patch: Record<string, unknown> = {
+        forma_cobro,
+        monto_cobrado: monto_cobrado ? parseFloat(monto_cobrado) : null,
+        updated_at:    new Date().toISOString(),
+      }
+      if (estado_pago !== undefined) patch.estado_pago = estado_pago
+
       const { error } = await supabase
         .from('pedidos')
-        .update({
-          forma_cobro,
-          monto_cobrado: monto_cobrado ? parseFloat(monto_cobrado) : null,
-          updated_at:    new Date().toISOString(),
-        })
+        .update(patch)
         .eq('id', id)
 
       if (error) throw new Error(error.message)

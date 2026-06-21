@@ -4,32 +4,30 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { BadgeEstado } from '@/components/common/BadgeEstado'
 import { Skeleton }    from '@/components/ui/skeleton'
 import {
-  usePedidoDetalle, useCambiarEstado, useAnularPedido, useEditarCobro,
+  usePedidoDetalle, useCambiarEstado, useAnularPedido, useEditarCobro, useCerrarPedido,
   totalPedido, type PedidoDetalle,
 } from '@/services/pedidos'
 import { ESTADO_CONFIG, type EstadoPedido } from '@/types'
 import { useAuthStore } from '@/store/authStore'
 
-// ─── Transiciones secuenciales (roles no-admin) ───────────────────────────────
+// ─── Transiciones secuenciales ────────────────────────────────────────────────
 
 const TRANSICIONES: Partial<Record<EstadoPedido, EstadoPedido[]>> = {
   borrador:        ['confirmado'],
   confirmado:      ['en_produccion'],
   en_produccion:   ['listo_reparto'],
   listo_reparto:   ['en_reparto'],
-  en_reparto:      ['entregado', 'entrega_fallida'],
-  entregado:       ['cerrado'],
+  en_reparto:      ['cerrado', 'entrega_fallida'],
   entrega_fallida: ['listo_reparto'],
 }
 
 const TRANSICIONES_ADMIN: Partial<Record<EstadoPedido, EstadoPedido[]>> = {
-  borrador:        ['confirmado', 'en_produccion', 'listo_reparto', 'en_reparto', 'entregado', 'cerrado'],
-  confirmado:      ['en_produccion', 'listo_reparto', 'en_reparto', 'entregado', 'cerrado'],
-  en_produccion:   ['listo_reparto', 'en_reparto', 'entregado', 'cerrado'],
-  listo_reparto:   ['en_reparto', 'entregado', 'cerrado'],
-  en_reparto:      ['entregado', 'entrega_fallida', 'cerrado'],
-  entregado:       ['cerrado'],
-  entrega_fallida: ['listo_reparto', 'en_reparto', 'entregado', 'cerrado'],
+  borrador:        ['confirmado', 'en_produccion', 'listo_reparto', 'en_reparto', 'cerrado'],
+  confirmado:      ['en_produccion', 'listo_reparto', 'en_reparto', 'cerrado'],
+  en_produccion:   ['listo_reparto', 'en_reparto', 'cerrado'],
+  listo_reparto:   ['en_reparto', 'cerrado'],
+  en_reparto:      ['cerrado', 'entrega_fallida'],
+  entrega_fallida: ['listo_reparto', 'en_reparto', 'cerrado'],
 }
 
 // Etiqueta de acción para la transición primaria
@@ -38,8 +36,7 @@ const ACCION_LABEL: Partial<Record<EstadoPedido, string>> = {
   confirmado:      'Enviar a producción',
   en_produccion:   'Marcar listo para reparto',
   listo_reparto:   'Iniciar reparto',
-  en_reparto:      'Registrar entrega',
-  entregado:       'Cerrar venta',
+  en_reparto:      'Cerrar pedido',
   entrega_fallida: 'Reagendar entrega',
   cerrado:         'Cerrado',
 }
@@ -98,6 +95,7 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
   const cambiarEstado = useCambiarEstado()
   const anular        = useAnularPedido()
   const editarCobro   = useEditarCobro()
+  const cerrarPedido  = useCerrarPedido()
 
   const usuario = useAuthStore(s => s.usuario)
   const isAdmin = usuario?.rol === 'admin' || usuario?.rol === 'superadmin'
@@ -174,18 +172,19 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
       return
     }
     setCerrarError(null)
+    const estadoPago: 'cobrado' | 'pendiente' = cerrarForma === 'pendiente' ? 'pendiente' : 'cobrado'
     try {
-      await editarCobro.mutateAsync({
+      await cerrarPedido.mutateAsync({
         id:            pedido.id,
+        estadoActual:  pedido.estado,
         forma_cobro:   cerrarForma,
         monto_cobrado: cerrarMonto.trim() || undefined,
+        estado_pago:   estadoPago,
       })
-      // Usar el estado actual del pedido (puede ser entregado u otro override admin)
-      await cambiarEstado.mutateAsync({ id: pedido.id, estadoActual: pedido.estado, estado: 'cerrado' })
-      onSaved('Venta cerrada correctamente')
+      onSaved('Pedido cerrado correctamente')
       setCerrando(false)
     } catch (e) {
-      setCerrarError(e instanceof Error ? e.message : 'No se pudo cerrar la venta')
+      setCerrarError(e instanceof Error ? e.message : 'No se pudo cerrar el pedido')
     }
   }
 
@@ -194,7 +193,7 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
     ? (isAdmin ? TRANSICIONES_ADMIN[p.estado] : TRANSICIONES[p.estado]) ?? []
     : []
 
-  const showCobro = p?.estado === 'entregado' || p?.estado === 'cerrado'
+  const showCobro = p?.estado === 'cerrado'
 
   return (
     <>
@@ -453,24 +452,24 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
                         ref={cerrarBtnRef}
                         type="button"
                         onClick={handleCerrarVenta}
-                        disabled={cambiarEstado.isPending || editarCobro.isPending}
-                        aria-disabled={cambiarEstado.isPending || editarCobro.isPending}
-                        aria-label={`Confirmar cierre de venta — pedido P-${String(p.numero).padStart(5, '0')}`}
+                        disabled={cerrarPedido.isPending}
+                        aria-disabled={cerrarPedido.isPending}
+                        aria-label={`Confirmar cierre de pedido P-${String(p.numero).padStart(5, '0')}`}
                         style={{
                           flex: 1,
-                          background: cambiarEstado.isPending || editarCobro.isPending ? 'rgba(20,90,50,0.5)' : '#145A32',
+                          background: cerrarPedido.isPending ? 'rgba(20,90,50,0.5)' : '#145A32',
                           color: '#fff', border: 'none', borderRadius: 10,
                           padding: '13px', minHeight: 48, fontSize: 15, fontWeight: 700,
-                          cursor: cambiarEstado.isPending || editarCobro.isPending ? 'not-allowed' : 'pointer',
+                          cursor: cerrarPedido.isPending ? 'not-allowed' : 'pointer',
                           outlineOffset: 2,
                         }}
                       >
-                        {cambiarEstado.isPending || editarCobro.isPending ? 'Cerrando…' : '✓ Confirmar cierre'}
+                        {cerrarPedido.isPending ? 'Cerrando…' : '✓ Confirmar cierre'}
                       </button>
                       <button
                         type="button"
                         onClick={() => { setCerrando(false); setCerrarError(null) }}
-                        disabled={cambiarEstado.isPending || editarCobro.isPending}
+                        disabled={cerrarPedido.isPending}
                         style={{
                           flex: 1, background: 'transparent', color: '#4A5568',
                           border: '1.5px solid #D1D5DB', borderRadius: 10,

@@ -22,7 +22,6 @@ const ESTADOS_FILTRO: { value: EstadoPedido | ''; label: string }[] = [
   { value: 'en_produccion',  label: 'En producción' },
   { value: 'listo_reparto',  label: 'Listo reparto' },
   { value: 'en_reparto',     label: 'En reparto' },
-  { value: 'entregado',      label: 'Entregado' },
   { value: 'cerrado',        label: 'Cerrado' },
   { value: 'entrega_fallida', label: 'Entrega fallida' },
   { value: 'anulado',        label: 'Anulado' },
@@ -34,8 +33,7 @@ const PRIMARY_ACTION: Partial<Record<EstadoPedido, { label: string; next: Estado
   confirmado:      { label: 'Enviar a producción', next: 'en_produccion' },
   en_produccion:   { label: 'Marcar listo',        next: 'listo_reparto' },
   listo_reparto:   { label: 'Iniciar reparto',     next: 'en_reparto'    },
-  en_reparto:      { label: 'Registrar entrega',   next: 'entregado'     },
-  entregado:       { label: 'Cerrar venta',        next: 'cerrado'       },
+  en_reparto:      { label: 'Cerrar pedido',       next: 'cerrado'       },
   entrega_fallida: { label: 'Reagendar',           next: 'listo_reparto' },
 }
 
@@ -76,7 +74,7 @@ function CardPedido({ pedido, onClick, onSaved, seleccionado, modoSeleccion }: {
     e.stopPropagation()
     if (!action) return
     // estas transiciones requieren form de cobro: abrir drawer detalle
-    if (pedido.estado === 'en_reparto' || pedido.estado === 'entregado') { onClick(); return }
+    if (pedido.estado === 'en_reparto') { onClick(); return }
     setLoading(true)
     try {
       await cambiarEstado.mutateAsync({ id: pedido.id, estadoActual: pedido.estado, estado: action.next })

@@ -11,6 +11,7 @@ import type { EstadoPedido } from '@/types'
 export type AddActionInput =
   | { type: 'cambiarEstado'; pedidoId: string; estadoNuevo: EstadoPedido; notas?: string }
   | { type: 'editarCobro';   pedidoId: string; formaCobro: string; montoCobrado?: string }
+  | { type: 'cerrarPedido';  pedidoId: string; formaCobro: string; montoCobrado?: string; estadoPago: 'cobrado' | 'pendiente'; notasEntrega?: string }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -53,6 +54,19 @@ export function useOffline() {
               .update({
                 forma_cobro:   action.formaCobro,
                 monto_cobrado: action.montoCobrado ? parseFloat(action.montoCobrado) : null,
+              })
+              .eq('id', action.pedidoId)
+            if (error) throw new Error(error.message)
+          } else if (action.type === 'cerrarPedido') {
+            const { error } = await supabase
+              .from('pedidos')
+              .update({
+                estado:        'cerrado',
+                forma_cobro:   action.formaCobro,
+                monto_cobrado: action.montoCobrado ? parseFloat(action.montoCobrado) : null,
+                estado_pago:   action.estadoPago,
+                notas_entrega: action.notasEntrega ?? null,
+                updated_at:    new Date().toISOString(),
               })
               .eq('id', action.pedidoId)
             if (error) throw new Error(error.message)

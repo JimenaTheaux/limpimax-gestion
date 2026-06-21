@@ -49,6 +49,15 @@ export interface ResumenProduccion {
   total_bidon_nuevo: number
 }
 
+export interface PedidoPendienteCobro {
+  id:              string
+  numero:          number
+  clienteNombre:   string
+  fechaProduccion: string | null
+  totalPedido:     number
+  createdAt:       string
+}
+
 export interface DashboardData {
   hoy: {
     total:              number
@@ -61,6 +70,11 @@ export interface DashboardData {
   activos: {
     total:     number
     porEstado: Record<string, number>
+  }
+  pendientes: {
+    count:    number
+    total:    number
+    pedidos:  PedidoPendienteCobro[]
   }
   pedidosHoy: {
     id: string; numero: number; estado: EstadoPedido
@@ -242,21 +256,31 @@ async function fallbackDashboard(hoy: string): Promise<DashboardData> {
   const desde = `${hoy}T00:00:00`
   const hasta = `${hoy}T23:59:59`
 
-  const [{ data: pedidosHoyRaw, error: e1 }, { data: pedidosActivosRaw, error: e2 }] =
-    await Promise.all([
-      supabase
-        .from('pedidos')
-        .select('id, numero, estado, total_calculado, total_manual, forma_cobro, monto_cobrado, fecha_produccion, cliente_id')
-        .gte('created_at', desde)
-        .lte('created_at', hasta),
-      supabase
-        .from('pedidos')
-        .select('id, estado')
-        .not('estado', 'in', `(${ESTADOS_TERMINALES.join(',')})`),
-    ])
+  const [
+    { data: pedidosHoyRaw,    error: e1 },
+    { data: pedidosActivosRaw, error: e2 },
+    { data: pendientesRaw,    error: e3 },
+  ] = await Promise.all([
+    supabase
+      .from('pedidos')
+      .select('id, numero, estado, total_calculado, total_manual, forma_cobro, monto_cobrado, estado_pago, fecha_produccion, cliente_id')
+      .gte('created_at', desde)
+      .lte('created_at', hasta),
+    supabase
+      .from('pedidos')
+      .select('id, estado')
+      .not('estado', 'in', `(${ESTADOS_TERMINALES.join(',')})`),
+    supabase
+      .from('pedidos')
+      .select('id, numero, total_calculado, total_manual, forma_cobro, monto_cobrado, estado_pago, fecha_produccion, created_at, clientes(nombre)')
+      .eq('estado', 'cerrado')
+      .eq('estado_pago', 'pendiente')
+      .order('fecha_produccion', { ascending: true }),
+  ])
 
   if (e1) throw new Error(e1.message)
   if (e2) throw new Error(e2.message)
+  if (e3) throw new Error(e3.message)
 
   const pedidosHoy = pedidosHoyRaw ?? []
   const porEstadoHoy: Record<string, number> = {}
@@ -264,12 +288,17 @@ async function fallbackDashboard(hoy: string): Promise<DashboardData> {
 
   for (const p of pedidosHoy) {
     porEstadoHoy[p.estado] = (porEstadoHoy[p.estado] ?? 0) + 1
-    if (p.estado === 'entregado' || p.estado === 'cerrado') {
+    if (p.estado === 'cerrado') {
       const monto = parseFloat(p.monto_cobrado ?? '0') || 0
-      totalCobrado += monto
-      if (p.forma_cobro === 'efectivo')      totalEfectivo      += monto
-      if (p.forma_cobro === 'transferencia') totalTransferencia += monto
-      if (p.forma_cobro === 'pendiente' || !p.forma_cobro) cobrandoPendientes++
+      // estado_pago='cobrado' o forma_cobro efectivo/transferencia (compat legacy)
+      const esCobrado = p.estado_pago === 'cobrado' || (p.estado_pago == null && p.forma_cobro && p.forma_cobro !== 'pendiente')
+      if (esCobrado) {
+        totalCobrado += monto
+        if (p.forma_cobro === 'efectivo')      totalEfectivo      += monto
+        if (p.forma_cobro === 'transferencia') totalTransferencia += monto
+      } else {
+        cobrandoPendientes++
+      }
     }
   }
 
@@ -278,6 +307,12 @@ async function fallbackDashboard(hoy: string): Promise<DashboardData> {
   for (const p of activos) {
     porEstadoActivos[p.estado] = (porEstadoActivos[p.estado] ?? 0) + 1
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pendientesData = (pendientesRaw ?? []) as any[]
+  const pendienteTotal = pendientesData.reduce((acc, p) => {
+    return acc + (parseFloat(p.total_manual ?? p.total_calculado ?? '0') || 0)
+  }, 0)
 
   return {
     hoy: {
@@ -289,6 +324,18 @@ async function fallbackDashboard(hoy: string): Promise<DashboardData> {
       cobrandoPendientes,
     },
     activos: { total: activos.length, porEstado: porEstadoActivos },
+    pendientes: {
+      count:   pendientesData.length,
+      total:   pendienteTotal,
+      pedidos: pendientesData.map(p => ({
+        id:              p.id,
+        numero:          p.numero,
+        clienteNombre:   p.clientes?.nombre ?? '—',
+        fechaProduccion: p.fecha_produccion,
+        totalPedido:     parseFloat(p.total_manual ?? p.total_calculado ?? '0') || 0,
+        createdAt:       p.created_at,
+      })),
+    },
     pedidosHoy: pedidosHoy.map(p => ({
       id:              p.id,
       numero:          p.numero,

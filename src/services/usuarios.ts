@@ -3,14 +3,18 @@ import { createClient } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Perfil, Rol } from '@/types'
 
-// Cliente con service_role — solo para operaciones de Admin sobre auth.users.
-// La key se expone en VITE_ solo para poder usar esta feature desde el cliente
-// (solo admins llegan a esta pantalla; RLS protege el resto).
-const supabaseAdmin = createClient(
-  import.meta.env.VITE_SUPABASE_URL as string,
-  import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY as string,
-  { auth: { autoRefreshToken: false, persistSession: false } },
-)
+// Cliente admin — solo para listUsers (emails) si la service role key está configurada.
+// Si no está configurada, los emails aparecen vacíos pero el listado funciona igual.
+const SERVICE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY as string | undefined
+const SERVICE_KEY_VALID = SERVICE_KEY && !SERVICE_KEY.startsWith('REEMPLAZAR')
+
+const supabaseAdmin = SERVICE_KEY_VALID
+  ? createClient(
+      import.meta.env.VITE_SUPABASE_URL as string,
+      SERVICE_KEY,
+      { auth: { autoRefreshToken: false, persistSession: false } },
+    )
+  : null
 
 export interface UsuarioConEmail extends Omit<Perfil, 'updatedAt'> {
   email:     string
@@ -26,17 +30,22 @@ export const useUsuarios = () =>
   useQuery({
     queryKey: KEY,
     queryFn: async () => {
-      const { data: perfiles, error } = await supabaseAdmin
+      // Perfiles via cliente normal — RLS permite a admins ver todos (ver SQL en docs).
+      const { data: perfiles, error } = await supabase
         .from('perfiles')
         .select('id, nombre, rol, activo, created_at, updated_at')
         .order('nombre')
 
       if (error) throw new Error(error.message)
 
-      const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.listUsers()
-      if (authErr) throw new Error(authErr.message)
-
-      const emailMap = new Map(authData.users.map(u => [u.id, u.email ?? '']))
+      // Emails via service role (opcional — solo si la key está configurada)
+      let emailMap = new Map<string, string>()
+      if (supabaseAdmin) {
+        const { data: authData } = await supabaseAdmin.auth.admin.listUsers()
+        if (authData?.users) {
+          emailMap = new Map(authData.users.map(u => [u.id, u.email ?? '']))
+        }
+      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (perfiles ?? []).map((p: any): UsuarioConEmail => ({
@@ -58,6 +67,8 @@ export const useCrearUsuario = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (data: { nombre: string; email: string; password: string; rol: string }) => {
+      if (!supabaseAdmin) throw new Error('Service role key no configurada — configurá VITE_SUPABASE_SERVICE_ROLE_KEY en .env.local')
+
       // 1. Crear en auth.users con email confirmado
       const { data: authUser, error: authErr } = await supabaseAdmin.auth.admin.createUser({
         email:         data.email,
@@ -75,7 +86,6 @@ export const useCrearUsuario = () => {
         .insert({ id: userId, nombre: data.nombre, rol: data.rol, activo: true })
 
       if (perfilErr) {
-        // Revertir: eliminar usuario de auth si falla el perfil
         await supabaseAdmin.auth.admin.deleteUser(userId)
         throw new Error(perfilErr.message)
       }

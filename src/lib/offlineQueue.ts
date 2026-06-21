@@ -3,12 +3,17 @@ import type { EstadoPedido } from '@/types'
 
 export interface OfflineAction {
   id:           string
-  type:         'cambiarEstado' | 'editarCobro'
+  type:         'cambiarEstado' | 'editarCobro' | 'cerrarPedido'
   pedidoId:     string
+  // cambiarEstado
   estadoNuevo?: EstadoPedido
   notas?:       string
+  // editarCobro
   formaCobro?:  string
   montoCobrado?: string
+  // cerrarPedido
+  estadoPago?:  'cobrado' | 'pendiente'
+  notasEntrega?: string
   timestamp:    number
 }
 
