@@ -233,18 +233,20 @@ export const useDashboard = () => {
   return useQuery({
     queryKey: ['dashboard', hoy],
     queryFn: async () => {
-      // Usa la RPC get_dashboard_stats: 1 HTTP request en vez de 2
-      const { data, error } = await supabase.rpc('get_dashboard_stats', {
-        p_fecha: hoy,
-      })
+      const { data, error } = await supabase.rpc('get_dashboard_stats', { p_fecha: hoy })
 
       if (error) {
-        // Fallback si la RPC aún no existe: 2 queries directas
         console.warn('RPC get_dashboard_stats no disponible, usando fallback:', error.message)
         return fallbackDashboard(hoy)
       }
 
-      // La RPC devuelve JSON — los keys ya están en camelCase (definidos en el SQL)
+      // Si la RPC no incluye pendientes o cobros_por_estado_pago (versión anterior),
+      // usamos el fallback completo que ya tiene la lógica de estado_pago correcta.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (!(data as any).pendientes) {
+        return fallbackDashboard(hoy)
+      }
+
       return data as DashboardData
     },
     refetchInterval: 60_000,
