@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Plus, Search, ShoppingCart, Printer, X, MoreHorizontal } from 'lucide-react'
 import { Skeleton }         from '@/components/ui/skeleton'
-import { EmptyState }       from '@/components/common/EmptyState'
 import { ToastContainer }   from '@/components/common/ToastContainer'
 import { useToast }         from '@/hooks/useToast'
 import { DrawerPedido }     from '@/components/pedidos/DrawerPedido'
@@ -274,11 +273,13 @@ function ModalAnular({ pedido, onConfirm, onCancel, loading }: {
 
 // ─── Fila de tabla (desktop) ──────────────────────────────────────────────────
 
-function FilaPedido({ pedido, onVerDetalle, onEditar, onAnularRequest }: {
+function FilaPedido({ pedido, onVerDetalle, onEditar, onAnularRequest, selected, onSelect }: {
   pedido:          PedidoListItem
   onVerDetalle:    () => void
   onEditar:        () => void
   onAnularRequest: () => void
+  selected?:       boolean
+  onSelect?:       () => void
 }) {
   const cambiarEstado = useCambiarEstado()
   const [loading,  setLoading]  = useState(false)
@@ -310,17 +311,37 @@ function FilaPedido({ pedido, onVerDetalle, onEditar, onAnularRequest }: {
   const fColor = fechaColor(pedido.fecha_produccion, pedido.estado)
   const fBold  = pedido.fecha_produccion === hoy
 
+  const baseBg = selected ? '#EFF6FF' : vencida ? '#FFF8F8' : '#fff'
+  const hoverBg = selected ? '#DBEAFE' : vencida ? '#FFF0F0' : '#F4F6F8'
+
   return (
     <tr
-      style={{ background: vencida ? '#FFF8F8' : '#fff', cursor: 'default' }}
-      onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = vencida ? '#FFF0F0' : '#F4F6F8')}
-      onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = vencida ? '#FFF8F8' : '#fff')}
+      style={{ background: baseBg, cursor: onSelect ? 'pointer' : 'default' }}
+      onClick={onSelect}
+      onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = hoverBg)}
+      onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = baseBg)}
     >
       {/* N° pedido */}
       <td style={{ padding: '10px 12px', borderBottom: '0.5px solid #F4F6F8', whiteSpace: 'nowrap' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#0D5C8A', fontVariantNumeric: 'tabular-nums' }}>
-          P-{String(pedido.numero).padStart(5, '0')}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {onSelect && (
+            <div style={{
+              width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+              background: selected ? '#0D5C8A' : '#fff',
+              border: `1.5px solid ${selected ? '#0D5C8A' : '#D1D5DB'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {selected && (
+                <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                  <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </div>
+          )}
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#0D5C8A', fontVariantNumeric: 'tabular-nums' }}>
+            P-{String(pedido.numero).padStart(5, '0')}
+          </span>
+        </div>
       </td>
 
       {/* Cliente + dirección */}
@@ -411,12 +432,11 @@ function FilaPedido({ pedido, onVerDetalle, onEditar, onAnularRequest }: {
 
 // ─── Card mobile expandible ───────────────────────────────────────────────────
 
-function CardMobile({ pedido, expandida, onToggle, onVerDetalle, onEditar, onAnularRequest }: {
+function CardMobile({ pedido, expandida, onToggle, onVerDetalle, onAnularRequest }: {
   pedido:          PedidoListItem
   expandida:       boolean
   onToggle:        () => void
   onVerDetalle:    () => void
-  onEditar:        () => void
   onAnularRequest: () => void
 }) {
   const cambiarEstado = useCambiarEstado()
@@ -680,14 +700,13 @@ export default function PedidosPage() {
     }
   }
 
-  const toggleSeleccion = (id: string) => {
+  const toggleSeleccion = (id: string) =>
     setSeleccionados(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
     })
-  }
 
   const imprimirSeleccionados = () => {
     if (!seleccionados.size) return
@@ -836,8 +855,10 @@ export default function PedidosPage() {
                     key={p.id}
                     pedido={p}
                     onVerDetalle={() => handleVerDetalle(p.id)}
-                    onEditar={() => { /* abre drawer con detalle primero */ handleVerDetalle(p.id) }}
+                    onEditar={() => handleVerDetalle(p.id)}
                     onAnularRequest={() => setAnularPedido(p)}
+                    selected={seleccionados.has(p.id)}
+                    onSelect={modoSeleccion ? () => toggleSeleccion(p.id) : undefined}
                   />
                 ))
               )}
@@ -901,10 +922,9 @@ export default function PedidosPage() {
               <CardMobile
                 key={p.id}
                 pedido={p}
-                expandida={expandidaId === p.id}
-                onToggle={() => handleToggleCard(p.id)}
+                expandida={!modoSeleccion && expandidaId === p.id}
+                onToggle={() => modoSeleccion ? toggleSeleccion(p.id) : handleToggleCard(p.id)}
                 onVerDetalle={() => handleVerDetalle(p.id)}
-                onEditar={() => handleVerDetalle(p.id)}
                 onAnularRequest={() => setAnularPedido(p)}
               />
             ))}
