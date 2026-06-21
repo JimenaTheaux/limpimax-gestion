@@ -31,9 +31,13 @@ export const useUsuarios = () =>
     queryKey: KEY,
     queryFn: async () => {
       // RPC con SECURITY DEFINER — bypasea RLS para devolver todos los perfiles.
-      const { data: perfiles, error } = await supabase.rpc('get_all_perfiles')
+      const { data: perfilesRaw, error } = await supabase.rpc('get_all_perfiles')
 
       if (error) throw new Error(error.message)
+
+      const perfiles = (perfilesRaw ?? []) as {
+        id: string; nombre: string; rol: string; activo: boolean; created_at: string
+      }[]
 
       // Emails via service role (opcional — solo si la key está configurada)
       let emailMap = new Map<string, string>()
@@ -44,8 +48,7 @@ export const useUsuarios = () =>
         }
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (perfiles ?? []).map((p: any): UsuarioConEmail => ({
+      return perfiles.map((p): UsuarioConEmail => ({
         id:         p.id,
         user_id:    p.id,
         nombre:     p.nombre,
