@@ -47,34 +47,12 @@
 
 @layer components {
   .section-title {
-    font-size: 18px;
-    font-weight: 700;
+    font-size: 20px;
+    font-weight: 600;
     color: #0D5C8A;
-    display: flex;
-    align-items: center;
-    padding-left: 26px;
-    position: relative;
-  }
-
-  .section-title::before {
-    position: absolute;
-    content: "";
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    left: 0;
-    background: #0D5C8A;
-  }
-
-  .section-title::after {
-    position: absolute;
-    content: "";
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    left: 0;
-    background: #0D5C8A;
-    animation: pulse-dot 1.2s ease-out infinite;
+    letter-spacing: -0.3px;
+    line-height: 1.2;
+    margin: 0;
   }
 
   .form-label {
@@ -125,7 +103,3 @@
   @page { margin: 16mm; size: A4; }
 }
 
-@keyframes pulse-dot {
-  0%   { transform: scale(0.9); opacity: 1; }
-  100% { transform: scale(2.2); opacity: 0; }
-}

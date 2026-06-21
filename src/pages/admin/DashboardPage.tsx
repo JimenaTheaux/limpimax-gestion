@@ -672,9 +672,7 @@ export default function DashboardPage() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         minHeight: 48, flexWrap: 'wrap', gap: 8,
       }}>
-        <span style={{ fontSize: 13, fontWeight: 500, color: '#1A2B3C', letterSpacing: '-0.3px' }}>
-          Dashboard
-        </span>
+        <h1 className="section-title">Dashboard</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <input
             type="date"

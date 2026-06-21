@@ -395,7 +395,7 @@ export default function ProductosPage() {
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-        <h1 style={{ fontSize: 16, fontWeight: 500, color: '#1A2B3C', margin: 0 }}>Productos</h1>
+        <h1 className="section-title">Productos</h1>
         <button
           onClick={handleNew}
           style={{
