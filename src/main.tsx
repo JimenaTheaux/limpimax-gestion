@@ -8,13 +8,11 @@ import App from './App'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime:            1000 * 60 * 2,  // 2 min — datos frescos no se re-piden
-      gcTime:               1000 * 60 * 10, // 10 min en caché aunque no se use
-      retry:                2,
-      retryDelay:           1000,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect:   true,
-      // refetchOnMount default = true = refetch solo si stale (no hace falta declararlo)
+      staleTime:            1000 * 60 * 3, // 3 min — no refetch innecesario
+      gcTime:               1000 * 60 * 5, // 5 min en caché
+      retry:                1,
+      refetchOnWindowFocus: false,          // no refetch al volver al tab
+      refetchOnReconnect:   true,           // sí refetch al reconectar (repartidor)
     },
   },
 })

@@ -100,66 +100,45 @@ const LIST_SELECT = `
 
 const KEY = ['pedidos']
 
-// ─── Tipo de filtros de lista ─────────────────────────────────────────────────
+// ─── usePedidos ───────────────────────────────────────────────────────────────
 
-type PedidosFiltros = {
+export const usePedidos = (filtros?: {
   estado?:          EstadoPedido
   estados?:         EstadoPedido[]
   clienteId?:       string
   fechaProduccion?: string
   q?:               string
-}
-
-// Elimina props undefined para que el mismo "sin filtros" siempre genere la
-// misma queryKey (permite que el prefetch del Sidebar coincida con la página).
-function normalizeFiltros(f?: PedidosFiltros): PedidosFiltros | undefined {
-  if (!f) return undefined
-  const n: PedidosFiltros = {}
-  if (f.estado)          n.estado          = f.estado
-  if (f.estados?.length) n.estados         = f.estados
-  if (f.clienteId)       n.clienteId       = f.clienteId
-  if (f.fechaProduccion) n.fechaProduccion = f.fechaProduccion
-  if (f.q)               n.q               = f.q
-  return Object.keys(n).length ? n : undefined
-}
-
-// Standalone queryFn — exportado para prefetchQuery en Sidebar/BottomNav
-export async function pedidosListQueryFn(filtros?: PedidosFiltros): Promise<PedidoConCliente[]> {
-  let q = supabase
-    .from('pedidos')
-    .select(LIST_SELECT)
-    .order('created_at', { ascending: false })
-
-  if (filtros?.estado)          q = q.eq('estado', filtros.estado)
-  if (filtros?.estados?.length) q = q.in('estado', filtros.estados)
-  if (filtros?.clienteId)       q = q.eq('cliente_id', filtros.clienteId)
-  if (filtros?.fechaProduccion) q = q.eq('fecha_produccion', filtros.fechaProduccion)
-
-  const { data, error } = await q
-  if (error) throw new Error(error.message)
-
-  let pedidos = (data ?? []).map(parsePedido)
-  if (filtros?.q) {
-    const lower = filtros.q.toLowerCase()
-    pedidos = pedidos.filter(p =>
-      String(p.numero).includes(filtros.q!) ||
-      (p.clientes?.nombre ?? '').toLowerCase().includes(lower)
-    )
-  }
-  return pedidos
-}
-
-// ─── usePedidos ───────────────────────────────────────────────────────────────
-
-export const usePedidos = (filtros?: PedidosFiltros) => {
-  const normFiltros = normalizeFiltros(filtros)
-  return useQuery({
-    queryKey:        [...KEY, normFiltros],
+}) =>
+  useQuery({
+    queryKey:        [...KEY, filtros],
     placeholderData: keepPreviousData,
-    queryFn:         () => pedidosListQueryFn(normFiltros),
+    queryFn: async () => {
+      let q = supabase
+        .from('pedidos')
+        .select(LIST_SELECT)
+        .order('created_at', { ascending: false })
+
+      if (filtros?.estado)          q = q.eq('estado', filtros.estado)
+      if (filtros?.estados?.length) q = q.in('estado', filtros.estados)
+      if (filtros?.clienteId)       q = q.eq('cliente_id', filtros.clienteId)
+      if (filtros?.fechaProduccion) q = q.eq('fecha_produccion', filtros.fechaProduccion)
+
+      const { data, error } = await q
+      if (error) throw new Error(error.message)
+
+      let pedidos = (data ?? []).map(parsePedido)
+
+      if (filtros?.q) {
+        const lower = filtros.q.toLowerCase()
+        pedidos = pedidos.filter(p =>
+          String(p.numero).includes(filtros.q!) ||
+          (p.clientes?.nombre ?? '').toLowerCase().includes(lower)
+        )
+      }
+      return pedidos
+    },
     refetchInterval: 30_000,
   })
-}
 
 // ─── usePedidoDetalle ─────────────────────────────────────────────────────────
 

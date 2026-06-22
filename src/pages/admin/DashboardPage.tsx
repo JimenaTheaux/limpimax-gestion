@@ -77,6 +77,7 @@ function usePedidosPeriodo(inicio: string, fin: string) {
       return (data ?? []) as unknown as PedidoRow[]
     },
     refetchInterval: 30_000,
+    staleTime:       0,
   })
 }
 
@@ -95,6 +96,7 @@ function useCobrosperiodo(inicio: string, fin: string) {
       return (data ?? []) as CobroRow[]
     },
     refetchInterval: 30_000,
+    staleTime:       0,
   })
 }
 
@@ -121,6 +123,7 @@ function useEvolucionRango(desde: string, hasta: string) {
       return (data ?? []) as EvolItem[]
     },
     refetchInterval: 30_000,
+    staleTime:       0,
   })
 }
 

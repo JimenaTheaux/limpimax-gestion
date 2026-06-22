@@ -2,17 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@keyframes fetching-progress {
-  0%   { transform: translateX(-100%) }
-  100% { transform: translateX(100%) }
-}
-
-@keyframes shimmer {
-  0%   { opacity: 1 }
-  50%  { opacity: 0.4 }
-  100% { opacity: 1 }
-}
-
 @layer base {
   :root {
     --background: 0 0% 100%;
