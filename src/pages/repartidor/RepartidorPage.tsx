@@ -25,11 +25,6 @@ const MESES_CORTO = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'se
 const MESES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
   'septiembre', 'octubre', 'noviembre', 'diciembre']
 
-function labelFechaCorta(fecha: string): string {
-  const d = new Date(fecha + 'T00:00:00')
-  return `${DIAS_CORTO[d.getDay()]} ${d.getDate()} ${MESES_CORTO[d.getMonth()]}`
-}
-
 function labelFechaLarga(fecha: string): string {
   const d = new Date(fecha + 'T00:00:00')
   return `${DIAS_CORTO[d.getDay()].toLowerCase()} ${d.getDate()} de ${MESES_LARGO[d.getMonth()]}`

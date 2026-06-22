@@ -74,7 +74,7 @@ function usePedidosPeriodo(inicio: string, fin: string) {
         .gte('fecha_produccion', inicio)
         .lte('fecha_produccion', fin)
       if (error) throw new Error(error.message)
-      return (data ?? []) as PedidoRow[]
+      return (data ?? []) as unknown as PedidoRow[]
     },
     refetchInterval: 30_000,
     staleTime:       0,
