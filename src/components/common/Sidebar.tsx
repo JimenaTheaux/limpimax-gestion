@@ -67,36 +67,18 @@ export function Sidebar() {
           borderBottom:'1px solid rgba(255,255,255,0.08)',
         }}
       >
-        <div
-          style={{
-            width:         32,
-            height:        32,
-            borderRadius:  8,
-            background:    '#1B9ED6',
-            display:       'flex',
-            alignItems:    'center',
-            justifyContent:'center',
-            color:         '#fff',
-            fontSize:      13,
-            fontWeight:    900,
-            flexShrink:    0,
-            letterSpacing: -0.5,
-          }}
-        >
-          LM
-        </div>
-        {isOpen && (
-          <span
-            style={{
-              color:       '#fff',
-              fontWeight:  700,
-              fontSize:    15,
-              whiteSpace:  'nowrap',
-              overflow:    'hidden',
-            }}
-          >
-            Limpimax
-          </span>
+        {isOpen ? (
+          <img
+            src="/logo.png"
+            alt="Limpimax"
+            style={{ maxWidth: 120, height: 'auto' }}
+          />
+        ) : (
+          <img
+            src="/logo-mark.png"
+            alt="Limpimax"
+            style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'contain' }}
+          />
         )}
       </div>
 

@@ -57,18 +57,11 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div style={{
-            width: 64, height: 64, borderRadius: 16,
-            background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontSize: 22, fontWeight: 900, letterSpacing: -1,
-            marginBottom: 16,
-          }}>
-            LM
-          </div>
-          <h1 style={{ fontSize: 28, fontWeight: 900, letterSpacing: -1, color: '#fff', margin: 0 }}>
-            Limpimax
-          </h1>
+          <img
+            src="/logo.png"
+            alt="Limpimax"
+            style={{ maxWidth: 180, height: 'auto', marginBottom: 24 }}
+          />
           <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 4 }}>
             Sistema de gestión de pedidos
           </p>
