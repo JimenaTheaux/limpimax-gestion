@@ -14,7 +14,7 @@ const queryClient = new QueryClient({
       retryDelay:           1000,
       refetchOnWindowFocus: false,
       refetchOnReconnect:   true,
-      refetchOnMount:       'stale',        // re-fetch solo si los datos están viejos
+      // refetchOnMount default = true = refetch solo si stale (no hace falta declararlo)
     },
   },
 })
