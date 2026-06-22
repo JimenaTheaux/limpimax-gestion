@@ -1,47 +1,20 @@
-import { useMemo }  from 'react'
-import { Outlet }  from 'react-router-dom'
+import { Outlet } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, Users, Package,
 } from 'lucide-react'
-import { useQueryClient } from '@tanstack/react-query'
-import { Sidebar }    from './Sidebar'
-import { BottomNav }  from './BottomNav'
+import { Sidebar }   from './Sidebar'
+import { BottomNav } from './BottomNav'
 import { useSidebar } from '@/hooks/useSidebar'
-import { pedidosListQueryFn }   from '@/services/pedidos'
-import { clientesListQueryFn }  from '@/services/clientes'
-import { productosListQueryFn } from '@/services/productos'
+
+const BOTTOM_NAV_ITEMS = [
+  { to: '/admin',           icon: LayoutDashboard, label: 'Dashboard', end: true },
+  { to: '/admin/pedidos',   icon: ShoppingCart,    label: 'Pedidos' },
+  { to: '/admin/clientes',  icon: Users,           label: 'Clientes' },
+  { to: '/admin/productos', icon: Package,         label: 'Productos' },
+]
 
 export function AdminLayout() {
   const { isOpen } = useSidebar()
-  const qc = useQueryClient()
-
-  const BOTTOM_NAV_ITEMS = useMemo(() => [
-    { to: '/admin',           icon: LayoutDashboard, label: 'Dashboard', end: true },
-    {
-      to: '/admin/pedidos', icon: ShoppingCart, label: 'Pedidos',
-      prefetch: () => qc.prefetchQuery({
-        queryKey: ['pedidos', undefined],
-        queryFn:  () => pedidosListQueryFn(undefined),
-        staleTime: 1000 * 60 * 2,
-      }),
-    },
-    {
-      to: '/admin/clientes', icon: Users, label: 'Clientes',
-      prefetch: () => qc.prefetchQuery({
-        queryKey: ['clientes', undefined, true],
-        queryFn:  () => clientesListQueryFn(undefined, true),
-        staleTime: 1000 * 60 * 2,
-      }),
-    },
-    {
-      to: '/admin/productos', icon: Package, label: 'Productos',
-      prefetch: () => qc.prefetchQuery({
-        queryKey: ['productos', undefined, undefined, true],
-        queryFn:  () => productosListQueryFn(undefined, undefined, true),
-        staleTime: 1000 * 60 * 5,
-      }),
-    },
-  ], [qc])
 
   return (
     <div style={{ minHeight: '100vh', background: '#F4F6F8' }}>
