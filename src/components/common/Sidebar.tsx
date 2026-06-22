@@ -3,8 +3,12 @@ import {
   LayoutDashboard, Package, Users, ShoppingCart,
   ChevronRight, LogOut, Settings,
 } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useSidebar } from '@/hooks/useSidebar'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuth }    from '@/hooks/useAuth'
+import { pedidosListQueryFn }  from '@/services/pedidos'
+import { clientesListQueryFn } from '@/services/clientes'
+import { productosListQueryFn } from '@/services/productos'
 
 interface NavItem {
   to:    string
@@ -32,10 +36,30 @@ export function Sidebar() {
   const { isOpen, toggle } = useSidebar()
   const { usuario, cerrarSesion } = useAuth()
   const navigate = useNavigate()
+  const qc = useQueryClient()
 
   const handleLogout = async () => {
     await cerrarSesion()
     navigate('/login', { replace: true })
+  }
+
+  // Prefetch map: ruta → función de precarga (se activa en hover)
+  const prefetchMap: Record<string, () => void> = {
+    '/admin/pedidos': () => qc.prefetchQuery({
+      queryKey: ['pedidos', undefined],
+      queryFn:  () => pedidosListQueryFn(undefined),
+      staleTime: 1000 * 60 * 2,
+    }),
+    '/admin/clientes': () => qc.prefetchQuery({
+      queryKey: ['clientes', undefined, true],
+      queryFn:  () => clientesListQueryFn(undefined, true),
+      staleTime: 1000 * 60 * 2,
+    }),
+    '/admin/productos': () => qc.prefetchQuery({
+      queryKey: ['productos', undefined, undefined, true],
+      queryFn:  () => productosListQueryFn(undefined, undefined, true),
+      staleTime: 1000 * 60 * 5,
+    }),
   }
 
   return (
@@ -90,6 +114,7 @@ export function Sidebar() {
             to={item.to}
             end={item.to === '/admin'}
             title={!isOpen ? item.label : undefined}
+            onMouseEnter={prefetchMap[item.to]}
             style={({ isActive }) => ({
               display:        'flex',
               alignItems:     'center',

@@ -17,6 +17,22 @@ function parseProducto(row: any): Producto {
   } as Producto
 }
 
+// Standalone queryFn — exportado para prefetchQuery en Sidebar/BottomNav
+export async function productosListQueryFn(q?: string, categoriaId?: string, activo: boolean | null = true): Promise<Producto[]> {
+  let query = supabase
+    .from('productos')
+    .select('*, categorias_producto(id, nombre)')
+    .order('nombre', { ascending: true })
+
+  if (activo !== null) query = query.eq('activo', activo)
+  if (categoriaId)     query = query.eq('categoria_id', categoriaId)
+  if (q)               query = query.ilike('nombre', `%${q}%`)
+
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(parseProducto)
+}
+
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
 export const useProductos = (q?: string, categoriaId?: string, activo: boolean | null = true) =>
@@ -24,20 +40,7 @@ export const useProductos = (q?: string, categoriaId?: string, activo: boolean |
     queryKey:        [...KEY, q, categoriaId, activo],
     placeholderData: keepPreviousData,
     staleTime:       1000 * 60 * 5,
-    queryFn: async () => {
-      let query = supabase
-        .from('productos')
-        .select('*, categorias_producto(id, nombre)')
-        .order('nombre', { ascending: true })
-
-      if (activo !== null) query = query.eq('activo', activo)
-      if (categoriaId)     query = query.eq('categoria_id', categoriaId)
-      if (q)               query = query.ilike('nombre', `%${q}%`)
-
-      const { data, error } = await query
-      if (error) throw new Error(error.message)
-      return (data ?? []).map(parseProducto)
-    },
+    queryFn:         () => productosListQueryFn(q, categoriaId, activo),
   })
 
 export const useCategorias = () =>

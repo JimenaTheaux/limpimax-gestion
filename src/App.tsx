@@ -4,6 +4,7 @@ import { ProtectedRoute }   from '@/components/common/ProtectedRoute'
 import { AdminLayout }      from '@/components/common/AdminLayout'
 import { ProduccionLayout } from '@/components/common/ProduccionLayout'
 import { RepartidorLayout } from '@/components/common/RepartidorLayout'
+import { FetchingBar }      from '@/components/common/FetchingBar'
 import LoginPage            from '@/pages/LoginPage'
 
 // ─── Lazy loading por rol — cada grupo carga su chunk independiente ────────────
@@ -44,6 +45,8 @@ function PageLoader() {
 
 export default function App() {
   return (
+    <>
+    <FetchingBar />
     <Routes>
       {/* Pública */}
       <Route path="/login" element={<LoginPage />} />
@@ -119,5 +122,6 @@ export default function App() {
       <Route path="/"  element={<Navigate to="/login" replace />} />
       <Route path="*"  element={<Navigate to="/login" replace />} />
     </Routes>
+    </>
   )
 }

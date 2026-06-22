@@ -9,10 +9,11 @@ type NavIcon = React.ComponentType<{
 }>
 
 interface NavItem {
-  to:    string
-  icon:  NavIcon
-  label: string
-  end?:  boolean
+  to:        string
+  icon:      NavIcon
+  label:     string
+  end?:      boolean
+  prefetch?: () => void
 }
 
 interface Props {
@@ -44,6 +45,8 @@ export function BottomNav({ items }: Props) {
             key={item.to}
             to={item.to}
             end={item.end}
+            onTouchStart={item.prefetch}
+            onMouseEnter={item.prefetch}
             style={({ isActive }) => ({
               display:        'flex',
               flexDirection:  'column',

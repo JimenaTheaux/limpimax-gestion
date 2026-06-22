@@ -6,6 +6,21 @@ const KEY = ['clientes']
 
 const SELECT = 'id, nombre, telefono, direccion, tipo_cliente, notas, activo, created_at, updated_at'
 
+// Standalone queryFn — exportado para prefetchQuery en Sidebar/BottomNav
+export async function clientesListQueryFn(q?: string, activo: boolean | null = true): Promise<Cliente[]> {
+  let query = supabase
+    .from('clientes')
+    .select(SELECT)
+    .order('nombre', { ascending: true })
+
+  if (activo !== null) query = query.eq('activo', activo)
+  if (q)               query = query.ilike('nombre', `%${q}%`)
+
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+  return (data ?? []) as Cliente[]
+}
+
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
 export const useClientes = (q?: string, activo: boolean | null = true) =>
@@ -13,19 +28,7 @@ export const useClientes = (q?: string, activo: boolean | null = true) =>
     queryKey:        [...KEY, q, activo],
     placeholderData: keepPreviousData,
     staleTime:       1000 * 60 * 2,
-    queryFn: async () => {
-      let query = supabase
-        .from('clientes')
-        .select(SELECT)
-        .order('nombre', { ascending: true })
-
-      if (activo !== null) query = query.eq('activo', activo)
-      if (q)               query = query.ilike('nombre', `%${q}%`)
-
-      const { data, error } = await query
-      if (error) throw new Error(error.message)
-      return (data ?? []) as Cliente[]
-    },
+    queryFn:         () => clientesListQueryFn(q, activo),
   })
 
 export const useCliente = (id: string) =>
