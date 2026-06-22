@@ -1,75 +1,222 @@
-import { CheckCircle, XCircle } from 'lucide-react'
-import { BadgeEstado }  from '@/components/common/BadgeEstado'
-import { Skeleton }     from '@/components/ui/skeleton'
-import { usePedidos, totalPedido } from '@/services/pedidos'
+import { useState } from 'react'
+import {
+  IconCash, IconBuildingBank, IconClock, IconX, IconChevronRight,
+} from '@tabler/icons-react'
+import { BadgeEstado }   from '@/components/common/BadgeEstado'
+import { SelectorFecha } from '@/components/common/SelectorFecha'
+import { Skeleton }      from '@/components/ui/skeleton'
+import { usePedidos, usePedidoDetalle, totalPedido } from '@/services/pedidos'
+import { ESTADO_CONFIG } from '@/types'
+
+// ─── Date helpers ──────────────────────────────────────────────────────────────
+
+const _d  = new Date()
+const HOY = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`
+
+const DIAS_CORTO  = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+const MESES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
+  'septiembre', 'octubre', 'noviembre', 'diciembre']
+
+function labelFechaLarga(fecha: string): string {
+  const d = new Date(fecha + 'T00:00:00')
+  return `${DIAS_CORTO[d.getDay()].toLowerCase()} ${d.getDate()} de ${MESES_LARGO[d.getMonth()]}`
+}
+
+// ─── Expanded items — lazy load ───────────────────────────────────────────────
+
+function ExpandedItemsHistorial({ pedidoId }: { pedidoId: string }) {
+  const { data, isLoading } = usePedidoDetalle(pedidoId)
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: '8px 14px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {[1, 2].map(i => <Skeleton key={i} style={{ height: 13, borderRadius: 4 }} />)}
+      </div>
+    )
+  }
+
+  const items = data?.pedido_items ?? []
+  if (!items.length) return null
+
+  return (
+    <div style={{ padding: '8px 14px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+      {items.map((item, i) => {
+        const prod = item.productos as typeof item.productos | null
+        return (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, color: '#4A5568' }}>
+              {prod?.nombre ?? '—'}
+              {prod?.presentacion ? ` · ${prod.presentacion}L` : ''}
+              {' · '}{item.cantidad}
+            </span>
+            {item.bidon_nuevo && (
+              <span style={{
+                fontSize: 9, fontWeight: 500,
+                background: '#FFF3E0', color: '#E65100',
+                padding: '2px 6px', borderRadius: 99, whiteSpace: 'nowrap',
+              }}>
+                BIDÓN NUEVO
+              </span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Historial card ────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function CardHistorial({ pedido }: { pedido: any }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  const cfg    = ESTADO_CONFIG[pedido.estado as keyof typeof ESTADO_CONFIG]
+  const total  = Number(totalPedido(pedido))
+  const numStr = `P-${String(pedido.numero).padStart(5, '0')}`
+
+  const formaIcon = pedido.forma_cobro === 'efectivo'
+    ? <IconCash size={13} color="#2E9E5C" style={{ flexShrink: 0 }} />
+    : pedido.forma_cobro === 'transferencia'
+    ? <IconBuildingBank size={13} color="#1565C0" style={{ flexShrink: 0 }} />
+    : <IconClock size={13} color="#F57C00" style={{ flexShrink: 0 }} />
+
+  return (
+    <div
+      style={{
+        background:   '#fff',
+        borderRadius: 10,
+        border:       '0.5px solid #D1D5DB',
+        borderLeft:   `3px solid ${cfg.color}`,
+        marginBottom: 6,
+        overflow:     'hidden',
+      }}
+    >
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        aria-label={`${numStr}, ${pedido.clientes?.nombre ?? ''}`}
+        onClick={() => setIsExpanded(v => !v)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsExpanded(v => !v) }
+        }}
+        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1B9ED6] focus-visible:ring-offset-2"
+        style={{ padding: '12px 14px', cursor: 'pointer' }}
+      >
+        {/* Line 1: número · badge · spacer · total · chevron */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+          <span style={{ fontSize: 11, fontWeight: 500, color: '#0D5C8A', whiteSpace: 'nowrap' }}>
+            {numStr}
+          </span>
+          <BadgeEstado estado={pedido.estado} />
+          <div style={{ flex: 1 }} />
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#1A2B3C', whiteSpace: 'nowrap' }}>
+            ${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+          </span>
+          <IconChevronRight
+            size={14}
+            color="#D1D5DB"
+            style={{
+              transform:  isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+              flexShrink: 0,
+            }}
+          />
+        </div>
+
+        {/* Line 2: nombre cliente */}
+        <div style={{ marginBottom: 2 }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#1A2B3C' }}>
+            {pedido.clientes?.nombre}
+          </span>
+        </div>
+
+        {/* Line 3: forma de cobro o motivo falla */}
+        {pedido.estado === 'entrega_fallida' ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <IconX size={13} color="#D32F2F" style={{ flexShrink: 0 }} />
+            <span style={{
+              fontSize: 12, color: '#4A5568',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              maxWidth: '70vw',
+            }}>
+              {pedido.motivo_falla ?? 'Entrega fallida'}
+            </span>
+          </div>
+        ) : pedido.forma_cobro ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            {formaIcon}
+            <span style={{ fontSize: 12, color: '#4A5568' }}>
+              {pedido.forma_cobro}
+              {pedido.monto_cobrado
+                ? ` — $${Number(pedido.monto_cobrado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+                : ''
+              }
+            </span>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Ítems expandidos */}
+      {isExpanded && (
+        <div>
+          <div style={{ borderTop: '0.5px solid #F4F6F8' }} />
+          <ExpandedItemsHistorial pedidoId={pedido.id} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function HistorialPage() {
-  const HOY = new Date().toISOString().split('T')[0]
-  const { data: pedidos, isLoading } = usePedidos({ fechaProduccion: HOY })
+  const [fechaHistorial, setFechaHistorial] = useState(HOY)
+  const esHoy = fechaHistorial === HOY
 
-  const historial = pedidos?.filter(p =>
-    ['cerrado', 'entrega_fallida'].includes(p.estado)
-  ) ?? []
+  const { data: pedidos = [], isLoading } = usePedidos({
+    fechaProduccion: fechaHistorial,
+    estados: ['cerrado', 'entrega_fallida'],
+  })
 
-  const totalCobrado = historial
-    .filter(p => p.estado === 'cerrado' && p.estado_pago === 'cobrado' && p.monto_cobrado)
-    .reduce((acc, p) => acc + Number(p.monto_cobrado ?? 0), 0)
+  const pedidosOrdenados = [...pedidos].sort((a, b) => b.numero - a.numero)
 
   return (
     <div>
-      <h1 className="section-title" style={{ marginBottom: 20 }}>Historial del día</h1>
-
-      {/* Resumen cobros */}
-      {totalCobrado > 0 && (
-        <div style={{
-          background: '#E8F8F0', borderRadius: 14, padding: '12px 16px',
-          marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        }}>
-          <span style={{ fontSize: 13, color: '#2E9E5C', fontWeight: 600 }}>Total cobrado hoy</span>
-          <span style={{ fontSize: 20, fontWeight: 900, color: '#2E9E5C', letterSpacing: -0.5 }}>
-            ${totalCobrado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-          </span>
-        </div>
-      )}
+      {/* Selector de fecha — encima del listado */}
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'center' }}>
+        <SelectorFecha fecha={fechaHistorial} onChange={setFechaHistorial} />
+      </div>
 
       {isLoading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {[1,2].map(i => <Skeleton key={i} style={{ height: 80, borderRadius: 16 }} />)}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {[1, 2].map(i => <Skeleton key={i} style={{ height: 78, borderRadius: 10 }} />)}
         </div>
-      ) : !historial.length ? (
-        <div style={{ background: '#fff', borderRadius: 20, padding: 32, textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-          <CheckCircle size={48} strokeWidth={1.2} color="#D1D5DB" style={{ marginBottom: 12 }} />
-          <p style={{ fontWeight: 600, fontSize: 15, color: '#1A2B3C', margin: 0 }}>Sin entregas registradas aún</p>
+
+      ) : !pedidosOrdenados.length ? (
+        <div style={{ textAlign: 'center', padding: '40px 0' }}>
+          <p style={{ fontSize: 13, color: '#4A5568', margin: '0 0 8px' }}>
+            No hay entregas registradas para el {labelFechaLarga(fechaHistorial)}
+          </p>
+          {!esHoy && (
+            <button
+              onClick={() => setFechaHistorial(HOY)}
+              style={{
+                background: 'none', border: 'none', color: '#0D5C8A',
+                fontSize: 13, cursor: 'pointer', textDecoration: 'underline',
+                padding: 0, fontFamily: 'Inter, sans-serif',
+              }}
+            >
+              Ver hoy →
+            </button>
+          )}
         </div>
+
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {historial.map(p => (
-            <div key={p.id} style={{
-              background: '#fff', borderRadius: 16, padding: '14px 16px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-              display: 'flex', alignItems: 'center', gap: 12,
-            }}>
-              {p.estado === 'entrega_fallida'
-                ? <XCircle size={20} color="#D32F2F" />
-                : <CheckCircle size={20} color="#145A32" />
-              }
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                  <span style={{ fontWeight: 700, fontSize: 13 }}>P-{String(p.numero).padStart(5, '0')}</span>
-                  <BadgeEstado estado={p.estado} />
-                </div>
-                <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>{p.clientes?.nombre}</p>
-                {p.forma_cobro && (
-                  <p style={{ margin: '2px 0 0', fontSize: 12, color: '#4A5568' }}>
-                    {p.forma_cobro === 'efectivo' ? '💵' : p.forma_cobro === 'transferencia' ? '🏦' : '⏳'} {p.forma_cobro}
-                    {p.monto_cobrado ? ` — $${Number(p.monto_cobrado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}` : ''}
-                  </p>
-                )}
-              </div>
-              <span style={{ fontWeight: 900, fontSize: 16, color: '#0D5C8A', letterSpacing: -0.5 }}>
-                ${Number(totalPedido(p)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
+        <div>
+          {pedidosOrdenados.map(p => (
+            <CardHistorial key={p.id} pedido={p} />
           ))}
         </div>
       )}

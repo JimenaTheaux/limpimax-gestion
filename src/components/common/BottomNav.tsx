@@ -1,9 +1,16 @@
+import React from 'react'
 import { NavLink } from 'react-router-dom'
-import type { LucideIcon } from 'lucide-react'
+
+type NavIcon = React.ComponentType<{
+  size?:      number
+  color?:     string
+  className?: string
+  style?:     React.CSSProperties
+}>
 
 interface NavItem {
   to:    string
-  icon:  LucideIcon
+  icon:  NavIcon
   label: string
   end?:  boolean
 }
@@ -22,7 +29,7 @@ export function BottomNav({ items }: Props) {
         right:          0,
         height:         56,
         background:     '#fff',
-        borderTop:      '1px solid #D1D5DB',
+        borderTop:      '0.5px solid #D1D5DB',
         display:        'flex',
         alignItems:     'center',
         justifyContent: 'space-around',
@@ -43,15 +50,15 @@ export function BottomNav({ items }: Props) {
               alignItems:     'center',
               gap:            3,
               textDecoration: 'none',
-              color:          isActive ? '#0D5C8A' : '#4A5568',
+              color:          isActive ? '#0D5C8A' : '#9A9A9A',
               minWidth:       48,
               padding:        '4px 8px',
             })}
           >
             {({ isActive }) => (
               <>
-                <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
-                <span style={{ fontSize: 10, fontWeight: isActive ? 600 : 400 }}>
+                <Icon size={20} color={isActive ? '#0D5C8A' : '#9A9A9A'} />
+                <span style={{ fontSize: 10, fontWeight: 400, color: isActive ? '#0D5C8A' : '#9A9A9A' }}>
                   {item.label}
                 </span>
               </>

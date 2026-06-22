@@ -1,13 +1,17 @@
+import { useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
-import { Truck, History, LogOut, Wifi, WifiOff, RefreshCw } from 'lucide-react'
-import { BottomNav }    from './BottomNav'
-import { useAuth }      from '@/hooks/useAuth'
-import { useOffline }   from '@/hooks/useOffline'
+import {
+  IconWifi, IconWifiOff, IconLogout, IconTruck, IconClockHour3, IconRefresh,
+} from '@tabler/icons-react'
+import { BottomNav } from './BottomNav'
+import { useAuth }   from '@/hooks/useAuth'
+import { useOffline } from '@/hooks/useOffline'
 
 export function RepartidorLayout() {
-  const { usuario, cerrarSesion }              = useAuth()
-  const navigate                               = useNavigate()
-  const { isOnline, pendingCount, syncing, sync } = useOffline()
+  const { cerrarSesion }                            = useAuth()
+  const navigate                                    = useNavigate()
+  const { isOnline, pendingCount, syncing, sync }   = useOffline()
+  const [logoutHover, setLogoutHover]               = useState(false)
 
   const handleLogout = async () => {
     await cerrarSesion()
@@ -19,19 +23,19 @@ export function RepartidorLayout() {
       {/* Topbar */}
       <header
         style={{
-          height:         56,
-          background:     'rgba(255,255,255,0.85)',
-          backdropFilter: 'blur(8px)',
-          borderBottom:   '1px solid #D1D5DB',
-          padding:        '0 16px',
-          display:        'flex',
-          alignItems:     'center',
-          gap:            10,
-          position:       'sticky',
-          top:            0,
-          zIndex:         50,
+          height:       56,
+          background:   '#fff',
+          borderBottom: '0.5px solid #D1D5DB',
+          padding:      '0 16px',
+          display:      'flex',
+          alignItems:   'center',
+          gap:          10,
+          position:     'sticky',
+          top:          0,
+          zIndex:       50,
         }}
       >
+        {/* LM mark */}
         <div
           style={{
             width:          28,
@@ -43,104 +47,140 @@ export function RepartidorLayout() {
             justifyContent: 'center',
             color:          '#fff',
             fontSize:       11,
-            fontWeight:     900,
+            fontWeight:     700,
             flexShrink:     0,
+            letterSpacing:  '-0.5px',
           }}
         >
           LM
         </div>
 
-        <div style={{ flex: 1 }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#1A2B3C' }}>
+        {/* Título */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'baseline', gap: 4 }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#1A2B3C' }}>
             Reparto
           </span>
-          {usuario && (
-            <span style={{ fontSize: 12, color: '#4A5568', marginLeft: 6 }}>
-              — {usuario.nombre}
-            </span>
-          )}
+          <span style={{ fontSize: 12, color: '#4A5568' }}>
+            — Repartidor
+          </span>
         </div>
 
-        {/* Indicador de conexión — SIEMPRE visible */}
+        {/* Indicador de conexión — inline, sin pill */}
         <div
+          aria-live="polite"
           style={{
             display:    'flex',
             alignItems: 'center',
-            gap:        5,
-            padding:    '4px 10px',
-            borderRadius: 99,
-            background: isOnline ? '#E8F8F0' : '#F0F0F0',
-            fontSize:   11,
-            fontWeight: 600,
-            color:      isOnline ? '#2E9E5C' : '#9A9A9A',
+            gap:        4,
             flexShrink: 0,
           }}
         >
-          {isOnline
-            ? <><Wifi size={12} /> En línea</>
-            : <><WifiOff size={12} /> Sin conexión</>
-          }
+          {isOnline ? (
+            <>
+              <IconWifi size={13} color="#2E9E5C" aria-label="En línea" />
+              <span className="hidden sm:inline" style={{ fontSize: 11, color: '#2E9E5C' }}>
+                En línea
+              </span>
+            </>
+          ) : (
+            <>
+              <IconWifiOff size={13} color="#9A9A9A" aria-label="Sin conexión" />
+              <span className="hidden sm:inline" style={{ fontSize: 11, color: '#9A9A9A' }}>
+                Sin conexión
+              </span>
+            </>
+          )}
         </div>
 
+        {/* Logout */}
         <button
           onClick={handleLogout}
+          onMouseEnter={() => setLogoutHover(true)}
+          onMouseLeave={() => setLogoutHover(false)}
+          aria-label="Cerrar sesión"
+          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1B9ED6] focus-visible:ring-offset-2"
           style={{
+            width:        32,
+            height:       32,
             background:   'transparent',
             border:       'none',
             cursor:       'pointer',
-            color:        '#4A5568',
-            padding:      6,
-            borderRadius: 6,
+            color:        logoutHover ? '#D32F2F' : '#4A5568',
             display:      'flex',
             alignItems:   'center',
+            justifyContent: 'center',
+            borderRadius: 6,
+            flexShrink:   0,
+            transition:   'color 0.15s ease',
           }}
-          title="Cerrar sesión"
         >
-          <LogOut size={18} />
+          <IconLogout size={16} color={logoutHover ? '#D32F2F' : '#4A5568'} />
         </button>
       </header>
 
-      {/* Banner: sin conexión o sincronizando o pendientes */}
-      {(!isOnline || pendingCount > 0 || syncing) && (
+      {/* Banner: cambios pendientes de sincronizar */}
+      {pendingCount > 0 && isOnline && !syncing && (
         <div
           style={{
-            background:  !isOnline ? '#FFFDE7' : '#E8F4FF',
-            borderBottom: `1px solid ${!isOnline ? '#F9A825' : '#1B9ED6'}`,
-            padding:     '8px 16px',
-            fontSize:    13,
-            color:       !isOnline ? '#F57C00' : '#0D5C8A',
-            fontWeight:  500,
-            display:     'flex',
-            alignItems:  'center',
+            background:   '#FFFDE7',
+            borderBottom: '0.5px solid #F9A825',
+            padding:      '6px 16px',
+            fontSize:     11,
+            color:        '#F57F17',
+            display:      'flex',
+            alignItems:   'center',
             justifyContent: 'space-between',
-            gap:         8,
+            gap:          8,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {!isOnline
-              ? <><WifiOff size={14} /> Sin conexión</>
-              : <><RefreshCw size={14} style={{ animation: syncing ? 'spin 0.8s linear infinite' : undefined }} /> Sincronizando…</>
-            }
-            {pendingCount > 0 && !syncing && (
-              <span style={{ fontWeight: 700 }}>
-                — {pendingCount} cambio{pendingCount !== 1 ? 's' : ''} pendiente{pendingCount !== 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-          {isOnline && pendingCount > 0 && !syncing && (
-            <button
-              onClick={sync}
-              style={{
-                background: '#0D5C8A', color: '#fff', border: 'none',
-                borderRadius: 6, padding: '4px 10px', fontSize: 12,
-                fontWeight: 600, cursor: 'pointer',
-              }}
-            >
-              Sincronizar
-            </button>
-          )}
+          <span>{pendingCount} cambio{pendingCount !== 1 ? 's' : ''} pendiente{pendingCount !== 1 ? 's' : ''} de sincronizar</span>
+          <button
+            onClick={sync}
+            style={{
+              background: '#F9A825', color: '#fff', border: 'none',
+              borderRadius: 6, padding: '3px 10px', fontSize: 11,
+              fontWeight: 500, cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+            }}
+          >
+            Sincronizar
+          </button>
         </div>
       )}
+
+      {/* Banner: sincronizando */}
+      {syncing && (
+        <div
+          style={{
+            background:   '#E8F4FF',
+            borderBottom: '0.5px solid #1B9ED6',
+            padding:      '6px 16px',
+            fontSize:     11,
+            color:        '#0D5C8A',
+            display:      'flex',
+            alignItems:   'center',
+            gap:          6,
+          }}
+        >
+          <IconRefresh size={12} style={{ animation: 'spin 0.8s linear infinite' }} />
+          Sincronizando…
+        </div>
+      )}
+
+      {/* Banner: sin conexión con cambios pendientes */}
+      {!isOnline && pendingCount > 0 && (
+        <div
+          style={{
+            background:   '#FFFDE7',
+            borderBottom: '0.5px solid #F9A825',
+            padding:      '6px 16px',
+            fontSize:     11,
+            color:        '#F57F17',
+          }}
+        >
+          Sin conexión — {pendingCount} cambio{pendingCount !== 1 ? 's' : ''} en espera
+        </div>
+      )}
+
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       {/* Contenido */}
@@ -150,8 +190,8 @@ export function RepartidorLayout() {
 
       {/* Bottom nav */}
       <BottomNav items={[
-        { to: '/repartidor',           icon: Truck,   label: 'Pedidos', end: true },
-        { to: '/repartidor/historial', icon: History, label: 'Historial' },
+        { to: '/repartidor',           icon: IconTruck,      label: 'Pedidos',   end: true },
+        { to: '/repartidor/historial', icon: IconClockHour3, label: 'Historial' },
       ]} />
     </div>
   )

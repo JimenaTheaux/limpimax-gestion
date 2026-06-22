@@ -93,6 +93,7 @@ function parseItemDetalle(item: any): ItemDetalle {
 const LIST_SELECT = `
   id, numero, estado, tipo_precio, direccion_entrega, fecha_produccion,
   total_calculado, total_manual, costo_envio, forma_cobro, monto_cobrado,
+  fecha_cobro, estado_pago, motivo_falla,
   notas_produccion, notas_internas, created_at, updated_at, cliente_id,
   clientes!inner(nombre, direccion, tipo_cliente, telefono)
 ` as const
