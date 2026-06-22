@@ -27,7 +27,6 @@ export function useCompartirFactura() {
       await new Promise<void>(resolve => {
         const root = createRoot(container)
         root.render(createElement(FacturaCanvas, { pedido }))
-        // Esperar un tick para que React termine el render
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
       })
 
@@ -41,31 +40,30 @@ export function useCompartirFactura() {
       })
     } catch (err) {
       console.error('useCompartirFactura: error al generar imagen', err)
-      onError?.('No se pudo generar la imagen')
+      onError?.('No se pudo generar la imagen. Intentá de nuevo.')
       document.body.removeChild(container)
       setLoading(false)
       return
     } finally {
-      // 4. Limpiar el container del DOM (siempre, éxito o fallo)
       if (document.body.contains(container)) {
         document.body.removeChild(container)
       }
     }
 
     if (!canvas) {
-      onError?.('No se pudo generar la imagen')
+      onError?.('No se pudo generar la imagen. Intentá de nuevo.')
       setLoading(false)
       return
     }
 
-    // 5. Convertir canvas a Blob JPG
+    // 4. Convertir canvas a Blob JPG
     let blob: Blob
     try {
       blob = await new Promise<Blob>((resolve, reject) =>
         canvas!.toBlob(b => (b ? resolve(b) : reject(new Error('toBlob falló'))), 'image/jpeg', 0.95)
       )
     } catch {
-      onError?.('No se pudo generar la imagen')
+      onError?.('No se pudo generar la imagen. Intentá de nuevo.')
       setLoading(false)
       return
     }
@@ -75,47 +73,68 @@ export function useCompartirFactura() {
     const file     = new File([blob], fileName, { type: 'image/jpeg' })
     const numero   = formatNumero(pedido.numero)
 
-    // 6. Compartir nativo (mobile) si está disponible
-    if (
-      navigator.share &&
-      typeof navigator.canShare === 'function' &&
-      navigator.canShare({ files: [file] })
-    ) {
-      try {
-        await navigator.share({
-          files: [file],
-          title: `Factura ${numero}`,
-        })
-        setLoading(false)
-        return
-      } catch (err) {
-        // Si el usuario cancela el share nativo, no es error
-        if ((err as Error)?.name !== 'AbortError') {
-          console.warn('useCompartirFactura: share nativo falló, usando fallback', err)
-        } else {
+    // Limpiar teléfono: quitar no-dígitos, 0 inicial y 54 si ya lo tenía
+    const telefono = pedido.clientes?.telefono
+      ?.replace(/\D/g, '')
+      ?.replace(/^0/, '')
+      ?.replace(/^54/, '') ?? ''
+
+    const mensaje = encodeURIComponent(
+      `Hola! Confirmamos el pedido! ${numero}. Adjuntamos la imagen con la factura.`
+    )
+
+    const esMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+
+    if (esMobile) {
+      // Intentar Web Share API primero (más moderno)
+      if (
+        navigator.share &&
+        typeof navigator.canShare === 'function' &&
+        navigator.canShare({ files: [file] })
+      ) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: `Factura ${numero}`,
+          })
           setLoading(false)
           return
+        } catch (err) {
+          if ((err as Error)?.name !== 'AbortError') {
+            console.warn('useCompartirFactura: share nativo falló, usando fallback', err)
+          } else {
+            setLoading(false)
+            return
+          }
         }
       }
+
+      // Fallback mobile: descargar JPG + abrir WhatsApp nativo
+      const objectUrl = URL.createObjectURL(blob)
+      const a         = document.createElement('a')
+      a.href          = objectUrl
+      a.download      = fileName
+      a.click()
+      URL.revokeObjectURL(objectUrl)
+
+      const waUrl = telefono
+        ? `whatsapp://send?phone=54${telefono}&text=${mensaje}`
+        : `whatsapp://send?text=${mensaje}`
+      window.location.href = waUrl
+    } else {
+      // Desktop: descargar JPG + abrir WhatsApp Web en nueva pestaña
+      const objectUrl = URL.createObjectURL(blob)
+      const a         = document.createElement('a')
+      a.href          = objectUrl
+      a.download      = fileName
+      a.click()
+      URL.revokeObjectURL(objectUrl)
+
+      const waUrl = telefono
+        ? `https://web.whatsapp.com/send?phone=54${telefono}&text=${mensaje}`
+        : `https://web.whatsapp.com/send?text=${mensaje}`
+      window.open(waUrl, '_blank')
     }
-
-    // 7. Fallback desktop: descargar el JPG + abrir WhatsApp Web
-    const objectUrl = URL.createObjectURL(blob)
-    const a         = document.createElement('a')
-    a.href          = objectUrl
-    a.download      = fileName
-    a.click()
-    URL.revokeObjectURL(objectUrl)
-
-    const telefono = pedido.clientes?.telefono?.replace(/\D/g, '') ?? ''
-    const mensaje  = encodeURIComponent(
-      `Hola! Te enviamos la factura del pedido ${numero} de LIMPIMAX. Adjuntamos la imagen.`
-    )
-    const waUrl = telefono
-      ? `https://wa.me/54${telefono}?text=${mensaje}`
-      : `https://wa.me/?text=${mensaje}`
-
-    window.open(waUrl, '_blank')
 
     setLoading(false)
   }
