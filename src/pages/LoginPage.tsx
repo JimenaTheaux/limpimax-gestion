@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import type { Rol } from '@/types'
 
@@ -12,25 +12,24 @@ const RUTA_POR_ROL: Record<Rol, string> = {
 }
 
 export default function LoginPage() {
-  const navigate              = useNavigate()
+  const navigate = useNavigate()
   const { login, usuario, cargando } = useAuth()
-  const [email,            setEmail]            = useState('')
-  const [password,         setPassword]         = useState('')
-  const [loading,          setLoading]          = useState(false)
-  const [error,            setError]            = useState('')
-  const [mostrarPassword,  setMostrarPassword]  = useState(false)
+  const [email,           setEmail]           = useState('')
+  const [password,        setPassword]        = useState('')
+  const [loading,         setLoading]         = useState(false)
+  const [error,           setError]           = useState('')
+  const [mostrarPassword, setMostrarPassword] = useState(false)
 
   const emailRef    = useRef<HTMLInputElement>(null)
   const passwordRef = useRef<HTMLInputElement>(null)
 
-  // Redirigir si ya está autenticado
   useEffect(() => {
     if (!cargando && usuario) {
       navigate(RUTA_POR_ROL[usuario.rol as Rol] ?? '/admin', { replace: true })
     }
   }, [cargando, usuario, navigate])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!email.trim() || !password) return
 
@@ -39,7 +38,6 @@ export default function LoginPage() {
 
     try {
       await login(email.trim().toLowerCase(), password)
-      // La navegación la dispara el useEffect cuando `usuario` se actualiza
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       setError(msg)
@@ -52,119 +50,271 @@ export default function LoginPage() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4"
-      style={{ background: 'linear-gradient(135deg, #0D5C8A 0%, #1B9ED6 100%)' }}
+      style={{
+        minHeight: '100vh',
+        background: '#0D5C8A',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '32px 24px',
+        position: 'relative',
+        overflow: 'hidden',
+        fontFamily: 'Inter, sans-serif',
+      }}
     >
-      <div className="w-full max-w-sm">
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <img
-            src="/logo.png"
-            alt="Limpimax"
-            style={{ maxWidth: 180, height: 'auto', marginBottom: 24 }}
-          />
-          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 4 }}>
-            Sistema de gestión de pedidos
-          </p>
+      {/* SVG decorativo de fondo */}
+      <svg
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.18 }}
+        viewBox="0 0 390 600"
+        preserveAspectRatio="xMidYMid slice"
+        aria-hidden="true"
+      >
+        <path d="M0 480 C80 460, 160 500, 240 475 S340 450, 390 470 L390 600 L0 600Z" fill="#1B9ED6"/>
+        <path d="M0 510 C90 490, 180 530, 270 505 S360 480, 390 500 L390 600 L0 600Z" fill="rgba(255,255,255,0.06)"/>
+        <path d="M40 80 C40 60, 28 40, 28 25 C28 11, 38 2, 48 2 C58 2, 68 11, 68 25 C68 40, 56 60, 56 80 C56 90, 40 90, 40 80Z" fill="#1B9ED6"/>
+        <path d="M330 50 C330 36, 321 20, 321 9 C321 -1, 329 -7, 337 -7 C345 -7, 353 -1, 353 9 C353 20, 344 36, 344 50 C344 58, 330 58, 330 50Z" fill="rgba(255,255,255,0.25)"/>
+        <path d="M360 200 C360 191, 354 181, 354 174 C354 167, 359 163, 364 163 C369 163, 374 167, 374 174 C374 181, 368 191, 368 200 C368 206, 360 206, 360 200Z" fill="rgba(255,255,255,0.15)"/>
+        <circle cx="22" cy="280" r="14" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1"/>
+        <circle cx="22" cy="280" r="5" fill="rgba(255,255,255,0.1)"/>
+        <circle cx="370" cy="360" r="22" fill="none" stroke="rgba(27,158,214,0.5)" strokeWidth="1"/>
+        <circle cx="370" cy="360" r="8" fill="rgba(27,158,214,0.2)"/>
+        <circle cx="55" cy="170" r="8" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="0.8"/>
+        <path d="M310 120 Q325 150, 315 180 Q305 210, 320 240" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M75 320 Q88 345, 78 370 Q68 395, 82 420" fill="none" stroke="rgba(27,158,214,0.3)" strokeWidth="1.5" strokeLinecap="round"/>
+        <g transform="translate(18, 430)" opacity="0.2">
+          <rect x="0" y="12" width="36" height="48" rx="4" fill="none" stroke="white" strokeWidth="1.2"/>
+          <rect x="10" y="6" width="16" height="10" rx="3" fill="none" stroke="white" strokeWidth="1"/>
+          <line x1="0" y1="28" x2="36" y2="28" stroke="white" strokeWidth="0.8"/>
+          <circle cx="18" cy="42" r="5" fill="none" stroke="white" strokeWidth="0.8"/>
+        </g>
+        <g transform="translate(340, 30)" opacity="0.12">
+          <rect x="0" y="9" width="28" height="36" rx="3" fill="none" stroke="white" strokeWidth="1"/>
+          <rect x="8" y="4" width="12" height="8" rx="2" fill="none" stroke="white" strokeWidth="0.8"/>
+          <line x1="0" y1="20" x2="28" y2="20" stroke="white" strokeWidth="0.6"/>
+        </g>
+      </svg>
+
+      {/* Logo mark + nombre */}
+      <div style={{ zIndex: 1, textAlign: 'center', marginBottom: 28 }}>
+        <div
+          style={{
+            width: 48,
+            height: 48,
+            background: 'rgba(255,255,255,0.12)',
+            borderRadius: 14,
+            border: '0.5px solid rgba(255,255,255,0.18)',
+            margin: '0 auto 14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <img src="/logo-mark.png" width={32} height={32} alt="" />
+        </div>
+        <div style={{ fontSize: 22, fontWeight: 600, color: '#fff', letterSpacing: '-0.3px' }}>
+          Limpimax
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 400, color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>
+          Sistema de gestión de pedidos
+        </div>
+      </div>
+
+      {/* Card */}
+      <div
+        style={{
+          zIndex: 1,
+          width: '100%',
+          maxWidth: 360,
+          background: '#fff',
+          borderRadius: 20,
+          padding: '28px 24px',
+        }}
+      >
+        <div style={{ fontSize: 15, fontWeight: 500, color: '#1A2B3C', marginBottom: 20 }}>
+          Iniciá sesión
         </div>
 
-        {/* Card */}
-        <div style={{ background: '#fff', borderRadius: 20, padding: 28, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1A2B3C', marginBottom: 24 }}>
-            Iniciá sesión
-          </h2>
-
-          <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <label className="form-label">
-              <input
-                ref={emailRef}
-                className="input"
-                type="email"
-                placeholder=" "
-                autoComplete="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                disabled={loading}
-              />
-              <span>Email</span>
+        <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Email */}
+          <div>
+            <label
+              htmlFor="email"
+              style={{
+                fontSize: 10,
+                fontWeight: 500,
+                color: '#4A5568',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                display: 'block',
+                marginBottom: 6,
+              }}
+            >
+              Email
             </label>
+            <input
+              id="email"
+              ref={emailRef}
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              autoFocus
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              disabled={loading}
+              aria-invalid={!!error}
+              aria-describedby={error ? 'login-error' : undefined}
+              style={{
+                height: 48,
+                padding: '0 14px',
+                border: '0.5px solid #D1D5DB',
+                borderRadius: 10,
+                fontSize: 15,
+                fontFamily: 'Inter, sans-serif',
+                color: '#1A2B3C',
+                outline: 'none',
+                width: '100%',
+                boxSizing: 'border-box',
+              }}
+              onFocus={e => { e.currentTarget.style.borderColor = '#1B9ED6' }}
+              onBlur={e => { e.currentTarget.style.borderColor = '#D1D5DB' }}
+            />
+          </div>
 
+          {/* Contraseña */}
+          <div>
+            <label
+              htmlFor="password"
+              style={{
+                fontSize: 10,
+                fontWeight: 500,
+                color: '#4A5568',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                display: 'block',
+                marginBottom: 6,
+              }}
+            >
+              Contraseña
+            </label>
             <div style={{ position: 'relative' }}>
-              <label className="form-label">
-                <input
-                  ref={passwordRef}
-                  className="input"
-                  type={mostrarPassword ? 'text' : 'password'}
-                  placeholder=" "
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  disabled={loading}
-                  style={{ paddingRight: 44 }}
-                />
-                <span>Contraseña</span>
-              </label>
+              <input
+                id="password"
+                ref={passwordRef}
+                type={mostrarPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                disabled={loading}
+                aria-invalid={!!error}
+                aria-describedby={error ? 'login-error' : undefined}
+                style={{
+                  height: 48,
+                  padding: '0 48px 0 14px',
+                  border: '0.5px solid #D1D5DB',
+                  borderRadius: 10,
+                  fontSize: 16,
+                  fontFamily: 'Inter, sans-serif',
+                  color: '#1A2B3C',
+                  outline: 'none',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                }}
+                onFocus={e => { e.currentTarget.style.borderColor = '#1B9ED6' }}
+                onBlur={e => { e.currentTarget.style.borderColor = '#D1D5DB' }}
+              />
               <button
                 type="button"
-                tabIndex={0}
                 onClick={() => setMostrarPassword(prev => !prev)}
                 aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 style={{
-                  position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                  width: 32, height: 32,
-                  background: 'transparent', border: 'none', cursor: 'pointer',
-                  color: '#4A5568',
-                  padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  position: 'absolute',
+                  right: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: 32,
+                  height: 32,
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#9CA3AF',
+                  padding: 0,
                 }}
-                onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.color = '#0D5C8A')}
-                onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.color = '#4A5568')}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#0D5C8A' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#9CA3AF' }}
               >
-                {mostrarPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                {mostrarPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
 
             {error && (
-              <div style={{
-                background: '#FDECEA', border: '1px solid #D32F2F',
-                borderRadius: 10, padding: '10px 14px',
-                color: '#D32F2F', fontSize: 13,
-              }}>
+              <p
+                id="login-error"
+                role="alert"
+                style={{ marginTop: 4, marginBottom: 0, fontSize: 12, color: '#D32F2F' }}
+              >
                 {error}
-              </div>
+              </p>
             )}
+          </div>
 
-            <button
-              type="submit"
-              disabled={!canSubmit}
-              style={{
-                background:  !canSubmit ? 'rgba(13,92,138,0.5)' : '#0D5C8A',
-                color:       '#fff', border: 'none', borderRadius: 10,
-                padding:     '13px 20px', minHeight: 44,
-                fontSize:    15, fontWeight: 600,
-                cursor:      !canSubmit ? 'not-allowed' : 'pointer',
-                transition:  'background 0.2s ease',
-                display:     'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                marginTop:   4,
-              }}
-            >
-              {loading ? (
-                <>
-                  <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                  Ingresando…
-                </>
-              ) : (
-                'Ingresar'
-              )}
-            </button>
-          </form>
-        </div>
-
-        <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, textAlign: 'center', marginTop: 20 }}>
-          Sin acceso? Contactá al administrador.
-        </p>
+          {/* Botón ingresar */}
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            aria-label="Ingresar al sistema"
+            style={{
+              width: '100%',
+              height: 48,
+              background: canSubmit ? '#0D5C8A' : 'rgba(13,92,138,0.5)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 14,
+              fontWeight: 500,
+              fontFamily: 'Inter, sans-serif',
+              cursor: canSubmit ? 'pointer' : 'not-allowed',
+              marginTop: 8,
+              transition: 'background 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            onMouseEnter={e => { if (canSubmit) (e.currentTarget as HTMLButtonElement).style.background = '#0a4f7a' }}
+            onMouseLeave={e => { if (canSubmit) (e.currentTarget as HTMLButtonElement).style.background = '#0D5C8A' }}
+            onMouseDown={e => { if (canSubmit) (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.98)' }}
+            onMouseUp={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)' }}
+          >
+            {loading ? 'Ingresando...' : 'Ingresar'}
+          </button>
+        </form>
       </div>
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      {/* Footer */}
+      <p
+        style={{
+          zIndex: 1,
+          fontSize: 11,
+          color: 'rgba(255,255,255,0.45)',
+          textAlign: 'center',
+          marginTop: 20,
+        }}
+      >
+        ¿Sin acceso? Contactá con{' '}
+        <a
+          href="https://www.decidata.com.ar"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: 'rgba(255,255,255,0.75)', fontWeight: 500, textDecoration: 'underline' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = '#fff' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.75)' }}
+        >
+          deciDATA
+        </a>
+      </p>
     </div>
   )
 }
