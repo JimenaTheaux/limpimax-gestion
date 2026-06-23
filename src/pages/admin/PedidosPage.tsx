@@ -452,14 +452,28 @@ function FilaPedido({ pedido, onVerDetalle, onEditar, onAnularRequest, selected,
   )
 }
 
+// ─── Long press hook ──────────────────────────────────────────────────────────
+
+function useLongPress(callback: () => void, ms = 500) {
+  const timerRef = useRef<number>(0)
+  return {
+    onTouchStart: () => { timerRef.current = window.setTimeout(callback, ms) },
+    onTouchEnd:   () => window.clearTimeout(timerRef.current),
+    onTouchMove:  () => window.clearTimeout(timerRef.current),
+  }
+}
+
 // ─── Card mobile expandible ───────────────────────────────────────────────────
 
-function CardMobile({ pedido, expandida, onToggle, onVerDetalle, onAnularRequest }: {
+function CardMobile({ pedido, expandida, onToggle, onVerDetalle, onAnularRequest, modoSeleccion, selected, onLongPress }: {
   pedido:          PedidoListItem
   expandida:       boolean
   onToggle:        () => void
   onVerDetalle:    () => void
   onAnularRequest: () => void
+  modoSeleccion?:  boolean
+  selected?:       boolean
+  onLongPress?:    () => void
 }) {
   const cambiarEstado = useCambiarEstado()
   const [loading,    setLoading]    = useState(false)
@@ -471,6 +485,7 @@ function CardMobile({ pedido, expandida, onToggle, onVerDetalle, onAnularRequest
   const action = PRIMARY_ACTION[pedido.estado]
   const nextCfg = action ? ESTADO_CONFIG[action.next] : null
   const canAnular = !['cerrado', 'anulado'].includes(pedido.estado)
+  const longPress = useLongPress(() => onLongPress?.())
 
   const handleAccion = async () => {
     if (!action) return
@@ -498,6 +513,7 @@ function CardMobile({ pedido, expandida, onToggle, onVerDetalle, onAnularRequest
       {/* Cabecera clickeable */}
       <button
         onClick={onToggle}
+        {...longPress}
         style={{
           width: '100%', background: 'none', border: 'none',
           padding: '14px 16px', textAlign: 'left', cursor: 'pointer',
@@ -507,6 +523,20 @@ function CardMobile({ pedido, expandida, onToggle, onVerDetalle, onAnularRequest
       >
         {/* Línea 1 */}
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+          {modoSeleccion && (
+            <div style={{
+              width: 20, height: 20, borderRadius: 4, flexShrink: 0, marginRight: 8,
+              background: selected ? '#0D5C8A' : '#fff',
+              border: `1.5px solid ${selected ? '#0D5C8A' : '#D1D5DB'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {selected && (
+                <svg width="10" height="8" viewBox="0 0 9 7" fill="none" style={{ maxWidth: 'none' }}>
+                  <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </div>
+          )}
           <span style={{ fontSize: 12, fontWeight: 700, color: '#0D5C8A', fontVariantNumeric: 'tabular-nums' }}>
             P-{String(pedido.numero).padStart(5, '0')}
           </span>
@@ -825,7 +855,14 @@ export default function PedidosPage() {
 
   const imprimirSeleccionados = () => {
     if (!seleccionados.size) return
-    window.open(`/print/facturas?ids=${Array.from(seleccionados).join(',')}`, '_blank')
+    const ids = Array.from(seleccionados).join(',')
+    const url = `/print/facturas?ids=${ids}`
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    if (isMobile) {
+      window.location.href = url
+    } else {
+      window.open(url, '_blank')
+    }
   }
 
   const nSel = seleccionados.size
@@ -1053,6 +1090,12 @@ export default function PedidosPage() {
                 onToggle={() => modoSeleccion ? toggleSeleccion(p.id) : handleToggleCard(p.id)}
                 onVerDetalle={() => handleVerDetalle(p.id)}
                 onAnularRequest={() => setAnularPedido(p)}
+                modoSeleccion={modoSeleccion}
+                selected={seleccionados.has(p.id)}
+                onLongPress={() => {
+                  setModoSeleccion(true)
+                  setSeleccionados(new Set([p.id]))
+                }}
               />
             ))}
             <p style={{ fontSize: 12, color: '#4A5568', textAlign: 'center', marginTop: 4 }}>
@@ -1065,24 +1108,41 @@ export default function PedidosPage() {
       {/* Barra flotante de selección */}
       {modoSeleccion && nSel > 0 && (
         <div style={{
-          position: 'fixed', bottom: 70, left: '50%', transform: 'translateX(-50%)',
-          background: '#1A2B3C', color: '#fff', borderRadius: 99, padding: '12px 20px',
-          display: 'flex', alignItems: 'center', gap: 14, zIndex: 100,
-          boxShadow: '0 4px 24px rgba(0,0,0,0.35)', whiteSpace: 'nowrap',
+          position: 'fixed',
+          bottom: 'calc(64px + env(safe-area-inset-bottom) + 8px)',
+          left: 16, right: 16,
+          background: '#1A2B3C', color: '#fff',
+          borderRadius: 12, padding: '12px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          zIndex: 200,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
         }}>
-          <span style={{ fontSize: 13, fontWeight: 600 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>
             {nSel} pedido{nSel !== 1 ? 's' : ''} seleccionado{nSel !== 1 ? 's' : ''}
           </span>
-          <button
-            onClick={imprimirSeleccionados}
-            style={{
-              background: '#0D5C8A', color: '#fff', border: 'none', borderRadius: 20,
-              padding: '8px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}
-          >
-            <Printer size={14} /> Imprimir facturas
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => { setModoSeleccion(false); setSeleccionados(new Set()) }}
+              style={{
+                background: 'transparent', border: '0.5px solid rgba(255,255,255,0.3)',
+                color: '#fff', borderRadius: 8, padding: '6px 12px',
+                fontSize: 12, cursor: 'pointer',
+              }}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={imprimirSeleccionados}
+              style={{
+                background: '#1B9ED6', border: 'none',
+                color: '#fff', borderRadius: 8, padding: '6px 12px',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}
+            >
+              <Printer size={12} style={{ flexShrink: 0 }} /> Imprimir
+            </button>
+          </div>
         </div>
       )}
 

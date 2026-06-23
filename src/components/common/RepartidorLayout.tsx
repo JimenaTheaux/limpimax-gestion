@@ -21,7 +21,7 @@ export function RepartidorLayout() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F4F6F8' }}>
+    <div style={{ minHeight: '100dvh', background: '#F4F6F8', overflowX: 'hidden' }}>
       {/* Topbar — se oculta al scrollear hacia abajo en mobile */}
       <header
         className="topbar-scroll-aware"
@@ -189,7 +189,7 @@ export function RepartidorLayout() {
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       {/* Contenido */}
-      <main style={{ padding: '16px', paddingBottom: 72 }}>
+      <main style={{ padding: '16px', paddingBottom: 'calc(72px + env(safe-area-inset-bottom))' }}>
         <Outlet />
       </main>
 

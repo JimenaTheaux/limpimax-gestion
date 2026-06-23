@@ -17,7 +17,7 @@ export function AdminLayout() {
   const { isOpen } = useSidebar()
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F4F6F8' }}>
+    <div style={{ minHeight: '100dvh', background: '#F4F6F8', overflowX: 'hidden' }}>
       {/* Sidebar — solo desktop */}
       <div className="hidden md:block">
         <Sidebar />
@@ -26,15 +26,13 @@ export function AdminLayout() {
       {/* Contenido principal */}
       <main
         style={{
-          minHeight:   '100vh',
-          background:  '#F4F6F8',
-          padding:     '24px 16px',
-          paddingBottom: 80, // espacio bottom nav en mobile
-          // En desktop, margin left respeta el sidebar
-          transition:  'margin-left 0.25s ease',
+          minHeight:     '100dvh',
+          background:    '#F4F6F8',
+          padding:       '24px 16px',
+          paddingBottom: 'calc(80px + env(safe-area-inset-bottom))',
+          transition:    'margin-left 0.25s ease',
         }}
         className="md:pb-8"
-        // Margin dinámico según estado del sidebar (solo en md+)
       >
         {/* Spacer desktop para sidebar */}
         <div

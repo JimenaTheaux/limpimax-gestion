@@ -87,8 +87,9 @@ export function Drawer({ open, onClose, title, children, footer }: DrawerProps) 
         <div style={{
           flex: 1,
           overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
           padding: 16,
-          paddingBottom: footer ? 8 : 32,
+          paddingBottom: footer ? 8 : 'max(32px, calc(16px + env(safe-area-inset-bottom)))',
           overscrollBehavior: 'contain',
         }}>
           {children}

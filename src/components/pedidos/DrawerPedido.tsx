@@ -468,7 +468,7 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
 
   return (
     <Sheet open={open} onOpenChange={v => { if (!v) handleClose() }}>
-      <SheetContent side="right" style={{ width: '100%', maxWidth: 560, overflowY: 'auto' }}>
+      <SheetContent side="right" style={{ width: '100%', maxWidth: 560, overflowY: 'auto', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
         <SheetHeader>
           <SheetTitle>
             {pedido

@@ -225,7 +225,7 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
       <Sheet open={open} onOpenChange={v => { if (!v) onClose() }}>
         <SheetContent
           side="right"
-          style={{ width: '100%', maxWidth: 500, overflowY: 'auto' }}
+          style={{ width: '100%', maxWidth: 500, overflowY: 'auto', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}
           onPointerDownOutside={e => { if (confirmando || anulando || cerrando) e.preventDefault() }}
           onInteractOutside={e => { if (confirmando || anulando || cerrando) e.preventDefault() }}
         >

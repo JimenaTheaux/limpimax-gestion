@@ -27,14 +27,14 @@ export function BottomNav({ items }: Props) {
         bottom:         0,
         left:           0,
         right:          0,
-        height:         56,
+        height:         'calc(56px + env(safe-area-inset-bottom))',
         background:     '#fff',
         borderTop:      '0.5px solid #D1D5DB',
         display:        'flex',
         alignItems:     'stretch',
         justifyContent: 'space-around',
         zIndex:         100,
-        paddingBottom:  'max(0px, env(safe-area-inset-bottom))',
+        paddingBottom:  'env(safe-area-inset-bottom)',
       }}
     >
       {items.map((item) => {
