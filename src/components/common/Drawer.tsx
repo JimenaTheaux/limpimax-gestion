@@ -7,7 +7,7 @@ interface DrawerProps {
   title:       string
   children:    React.ReactNode
   footer?:     React.ReactNode
-  scrollRef?:  React.RefObject<HTMLDivElement>
+  scrollRef?:  React.RefObject<HTMLDivElement | null>
   panelStyle?: React.CSSProperties
 }
 
