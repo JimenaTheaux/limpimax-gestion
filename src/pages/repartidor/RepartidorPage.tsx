@@ -641,8 +641,7 @@ export default function RepartidorPage() {
                 disabled={cambiar.isPending}
                 aria-label={`Salir a repartir ${listos.length} pedido${listos.length !== 1 ? 's' : ''} listos`}
                 aria-disabled={cambiar.isPending}
-                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                className="btn-press"
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 btn-press"
                 style={{
                   width: '100%',
                   background: cambiar.isPending ? 'rgba(21,101,192,0.5)' : '#1565C0',
