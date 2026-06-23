@@ -2,14 +2,16 @@ import { useEffect } from 'react'
 import { X } from 'lucide-react'
 
 interface DrawerProps {
-  open:     boolean
-  onClose:  () => void
-  title:    string
-  children: React.ReactNode
-  footer?:  React.ReactNode
+  open:        boolean
+  onClose:     () => void
+  title:       string
+  children:    React.ReactNode
+  footer?:     React.ReactNode
+  scrollRef?:  React.RefObject<HTMLDivElement>
+  panelStyle?: React.CSSProperties
 }
 
-export function Drawer({ open, onClose, title, children, footer }: DrawerProps) {
+export function Drawer({ open, onClose, title, children, footer, scrollRef, panelStyle }: DrawerProps) {
   useEffect(() => {
     if (!open) return
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -52,6 +54,7 @@ export function Drawer({ open, onClose, title, children, footer }: DrawerProps) 
           flexDirection: 'column',
           animation: 'slideInDrawer 0.25s ease',
           overflow: 'hidden',
+          ...panelStyle,
         }}
       >
         {/* Header sticky */}
@@ -84,14 +87,17 @@ export function Drawer({ open, onClose, title, children, footer }: DrawerProps) 
         </div>
 
         {/* Body scrollable */}
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          padding: 16,
-          paddingBottom: footer ? 8 : 'max(32px, calc(16px + env(safe-area-inset-bottom)))',
-          overscrollBehavior: 'contain',
-        }}>
+        <div
+          ref={scrollRef}
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            padding: 16,
+            paddingBottom: footer ? 8 : 'max(32px, calc(16px + env(safe-area-inset-bottom)))',
+            overscrollBehavior: 'contain',
+          }}
+        >
           {children}
         </div>
 

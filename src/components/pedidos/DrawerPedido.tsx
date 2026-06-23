@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useForm, useFieldArray, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Trash2, AlertTriangle, Package } from 'lucide-react'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { X, AlertTriangle, Package, ChevronDown, ChevronUp } from 'lucide-react'
+import { Drawer }      from '@/components/common/Drawer'
 import { FloatInput }  from '@/components/common/FloatInput'
 import { ButtonGroup } from '@/components/common/ButtonGroup'
 import { useClientes, useCrearCliente } from '@/services/clientes'
@@ -47,18 +47,93 @@ interface Props {
   onSaved: (msg: string) => void
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function SectionHeader({ num, title, badge }: { num: string; title: string; badge?: string }) {
+  return (
+    <div style={{
+      display:       'flex',
+      alignItems:    'center',
+      gap:           6,
+      paddingBottom: 8,
+      borderBottom:  '0.5px solid #D1D5DB',
+      marginBottom:  14,
+    }}>
+      <span style={{ fontSize: 11, fontWeight: 600, color: '#4A5568', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        {num}. {title}
+      </span>
+      {badge && (
+        <span style={{
+          fontSize: 10, fontWeight: 700, background: '#E8F4FF', color: '#1B9ED6',
+          padding: '1px 7px', borderRadius: 99,
+        }}>
+          {badge}
+        </span>
+      )}
+    </div>
+  )
+}
+
+// ─── Toggle switch (bidón nuevo) ──────────────────────────────────────────────
+
+function ToggleSwitch({ value, onChange, label }: {
+  value:    boolean
+  onChange: (v: boolean) => void
+  label:    string
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+      <span style={{ fontSize: 13, color: '#1A2B3C' }}>{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={value}
+        onClick={() => onChange(!value)}
+        style={{
+          width:      36,
+          height:     20,
+          borderRadius: 99,
+          background: value ? '#0D5C8A' : '#D1D5DB',
+          border:     'none',
+          cursor:     'pointer',
+          position:   'relative',
+          transition: 'background 0.2s ease',
+          flexShrink: 0,
+          padding:    0,
+        }}
+      >
+        <span style={{
+          position:     'absolute',
+          top:          2,
+          left:         value ? 18 : 2,
+          width:        16,
+          height:       16,
+          background:   '#fff',
+          borderRadius: '50%',
+          transition:   'left 0.2s ease',
+          boxShadow:    '0 1px 3px rgba(0,0,0,0.2)',
+          display:      'block',
+        }} />
+      </button>
+    </div>
+  )
+}
+
 // ─── Selector de cliente ──────────────────────────────────────────────────────
 
 function SelectorCliente({
   value, onChange, error,
-}: { value: string; onChange: (id: string, tipo: 'minorista' | 'mayorista', dir: string) => void; error?: string }) {
+}: {
+  value:    string
+  onChange: (id: string, tipo: 'minorista' | 'mayorista', dir: string) => void
+  error?:   string
+}) {
   const [q, setQ]       = useState('')
   const [open, setOpen] = useState(false)
   const qDebounced      = useDebounce(q, 300)
   const { data: clientes } = useClientes(qDebounced || undefined)
   const crearCliente       = useCrearCliente()
 
-  // mini-form
   const [miniOpen,     setMiniOpen]     = useState(false)
   const [miniNombre,   setMiniNombre]   = useState('')
   const [miniTel,      setMiniTel]      = useState('')
@@ -67,7 +142,6 @@ function SelectorCliente({
   const [miniErr,      setMiniErr]      = useState('')
   const [recienCreado, setRecienCreado] = useState<Cliente | null>(null)
 
-  // Cuando el cliente se deselecciona externamente (reset del form), limpiar estado local
   useEffect(() => {
     if (!value) { setQ(''); setOpen(false); setMiniOpen(false); setRecienCreado(null) }
   }, [value])
@@ -104,24 +178,32 @@ function SelectorCliente({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#4A5568' }}>
-        Cliente *
-      </span>
+      <SectionHeader num="1" title="Cliente" />
 
       {selected ? (
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '10px 14px', background: '#E8F4FF', borderRadius: 10,
-          border: '1.5px solid #1B9ED6',
+          display:         'flex',
+          alignItems:      'center',
+          justifyContent:  'space-between',
+          padding:         '10px 14px',
+          background:      '#F4F6F8',
+          borderRadius:    10,
+          border:          '0.5px solid #D1D5DB',
         }}>
           <div>
             <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: '#1A2B3C' }}>{selected.nombre}</p>
             <p style={{ margin: 0, fontSize: 12, color: '#4A5568' }}>
-              {selected.tipo_cliente} {selected.direccion ? `· ${selected.direccion}` : ''}
+              {selected.tipo_cliente}{selected.direccion ? ` · ${selected.direccion}` : ''}
             </p>
           </div>
-          <button type="button" onClick={() => { onChange('', 'minorista', ''); setQ(''); setRecienCreado(null) }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1B9ED6', fontSize: 12, fontWeight: 600 }}>
+          <button
+            type="button"
+            onClick={() => { onChange('', 'minorista', ''); setQ(''); setRecienCreado(null) }}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: '#1B9ED6', fontSize: 12, fontWeight: 600, padding: '4px 8px',
+            }}
+          >
             Cambiar
           </button>
         </div>
@@ -135,10 +217,13 @@ function SelectorCliente({
               onBlur={() => setTimeout(() => setOpen(false), 150)}
               placeholder="Buscar cliente…"
               style={{
-                width: '100%', padding: '10px 14px',
-                border: `1.5px solid ${error ? '#D32F2F' : '#D1D5DB'}`,
-                borderRadius: 10, fontSize: 14, outline: 0, background: '#fff',
+                width: '100%', height: 48, padding: '0 14px',
+                border: `0.5px solid ${error ? '#D32F2F' : '#D1D5DB'}`,
+                borderRadius: 10, fontSize: 16, outline: 0, background: '#fff',
+                fontFamily: 'Inter, sans-serif', boxSizing: 'border-box',
               }}
+              onFocusCapture={e => { e.currentTarget.style.borderColor = '#1B9ED6' }}
+              onBlurCapture={e  => { e.currentTarget.style.borderColor = error ? '#D32F2F' : '#D1D5DB' }}
             />
             {open && clientes && clientes.length > 0 && (
               <div style={{
@@ -150,11 +235,7 @@ function SelectorCliente({
                 {clientes.slice(0, 8).map(c => (
                   <button
                     key={c.id} type="button"
-                    onClick={() => {
-                      onChange(c.id, c.tipo_cliente, c.direccion ?? '')
-                      setQ(c.nombre)
-                      setOpen(false)
-                    }}
+                    onClick={() => { onChange(c.id, c.tipo_cliente, c.direccion ?? ''); setQ(c.nombre); setOpen(false) }}
                     style={{
                       width: '100%', textAlign: 'left', padding: '10px 14px',
                       background: 'none', border: 'none', cursor: 'pointer', display: 'block',
@@ -162,34 +243,40 @@ function SelectorCliente({
                     }}
                   >
                     <span style={{ fontWeight: 500, fontSize: 14 }}>{c.nombre}</span>
-                    <span style={{ color: '#4A5568', fontSize: 12, marginLeft: 8 }}>{c.tipo_cliente}</span>
+                    <span style={{
+                      marginLeft: 8, fontSize: 10, fontWeight: 700,
+                      background: c.tipo_cliente === 'mayorista' ? '#E8F4FF' : '#F4F6F8',
+                      color:      c.tipo_cliente === 'mayorista' ? '#1B9ED6'  : '#4A5568',
+                      padding: '1px 6px', borderRadius: 99,
+                    }}>
+                      {c.tipo_cliente.toUpperCase()}
+                    </span>
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Botón + mini-form inline */}
           <button type="button" onClick={() => { setMiniOpen(v => !v); setMiniErr('') }}
-            style={{ fontSize: 12, color: '#1B9ED6', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '2px 0', alignSelf: 'flex-start' }}>
-            {miniOpen ? '− Cerrar' : '+ Cliente nuevo'}
+            style={{ fontSize: 12, color: '#1B9ED6', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '4px 0', alignSelf: 'flex-start' }}>
+            {miniOpen ? '− Cerrar' : '+ Nuevo cliente'}
           </button>
 
-          <div style={{ overflow: 'hidden', maxHeight: miniOpen ? 500 : 0, transition: 'max-height 0.2s ease' }}>
+          <div style={{ overflow: 'hidden', maxHeight: miniOpen ? 600 : 0, transition: 'max-height 0.2s ease' }}>
             <div style={{
-              background: '#E8F6FC', borderRadius: 12, padding: 12,
-              border: '1px solid #D1D5DB', display: 'flex', flexDirection: 'column', gap: 10,
+              background: '#E8F6FC', borderRadius: 12, padding: 14,
+              border: '0.5px solid #D1D5DB', display: 'flex', flexDirection: 'column', gap: 10,
               marginTop: 4,
             }}>
               <FloatInput label="Nombre *"  value={miniNombre} onChange={e => setMiniNombre(e.target.value)} />
-              <FloatInput label="Teléfono"  value={miniTel}    onChange={e => setMiniTel(e.target.value)} />
+              <FloatInput label="Teléfono"  value={miniTel}    onChange={e => setMiniTel(e.target.value)}    type="tel" inputMode="tel" />
               <FloatInput label="Dirección" value={miniDir}    onChange={e => setMiniDir(e.target.value)} />
 
               <div style={{ display: 'flex', gap: 8 }}>
                 {(['minorista', 'mayorista'] as const).map(t => (
                   <button key={t} type="button" onClick={() => setMiniTipo(t)}
                     style={{
-                      flex: 1, padding: '8px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                      flex: 1, padding: '10px', borderRadius: 8, fontSize: 13, fontWeight: 600,
                       border: `1.5px solid ${miniTipo === t ? '#0D5C8A' : '#D1D5DB'}`,
                       background: miniTipo === t ? '#E8F4FF' : '#fff',
                       color: miniTipo === t ? '#0D5C8A' : '#4A5568',
@@ -208,7 +295,7 @@ function SelectorCliente({
                     flex: 1,
                     background: crearCliente.isPending ? 'rgba(13,92,138,0.5)' : '#0D5C8A',
                     color: '#fff', border: 'none', borderRadius: 10,
-                    padding: '10px', minHeight: 44, fontSize: 14, fontWeight: 600,
+                    height: 48, fontSize: 14, fontWeight: 600,
                     cursor: crearCliente.isPending ? 'not-allowed' : 'pointer',
                   }}>
                   {crearCliente.isPending ? 'Guardando…' : 'Guardar cliente'}
@@ -228,123 +315,332 @@ function SelectorCliente({
   )
 }
 
-// ─── Fila de ítem ─────────────────────────────────────────────────────────────
+// ─── Card compacta de ítem ya agregado ────────────────────────────────────────
 
-function FilaItem({
-  index, control, register, watch, setValue, onRemove, tipoPrecio, productos,
-}: {
-  index:     number
-  control:   ReturnType<typeof useForm<FormData>>['control']
-  register:  ReturnType<typeof useForm<FormData>>['register']
-  watch:     ReturnType<typeof useForm<FormData>>['watch']
-  setValue:  ReturnType<typeof useForm<FormData>>['setValue']
-  onRemove:  () => void
-  tipoPrecio: 'minorista' | 'mayorista'
-  productos:  (Producto & { categoriaNombre?: string })[]
+function ItemCard({ index, watch, onEdit, onRemove }: {
+  index:    number
+  watch:    ReturnType<typeof useForm<FormData>>['watch']
+  onEdit:   () => void
+  onRemove: () => void
 }) {
-  const productoId     = watch(`items.${index}.productoId`)
+  const nombre         = watch(`items.${index}.productoNombre`)
+  const presentacion   = watch(`items.${index}.presentacion`)
   const cantidad       = watch(`items.${index}.cantidad`)
   const precioUnitario = watch(`items.${index}.precioUnitario`)
   const bidonNuevo     = watch(`items.${index}.bidonNuevo`)
 
-  const producto = productos.find(p => p.id === productoId)
-
-  // Al cambiar producto: pre-cargar precio y datos
-  useEffect(() => {
-    if (!producto) return
-    const precio = tipoPrecio === 'mayorista' ? producto.precio_mayorista : producto.precio_minorista
-    setValue(`items.${index}.precioUnitario`,   String(precio))
-    setValue(`items.${index}.precioReferencia`, String(precio))
-    setValue(`items.${index}.productoNombre`,   producto.nombre)
-    setValue(`items.${index}.presentacion`,     String(producto.presentacion))
-  }, [productoId, tipoPrecio])
-
   const subtotal = (Number(cantidad) || 0) * (Number(precioUnitario) || 0)
 
-  // Alerta de precio desactualizado
-  const precioReferencia = watch(`items.${index}.precioReferencia`)
-  const precioActual     = tipoPrecio === 'mayorista' ? producto?.precio_mayorista : producto?.precio_minorista
-  const precioDesact     = producto && precioActual && precioReferencia &&
-    Number(precioActual) !== Number(precioReferencia)
+  return (
+    <div
+      style={{
+        background:   '#fff',
+        border:       '0.5px solid #D1D5DB',
+        borderRadius: 10,
+        padding:      '10px 14px',
+        cursor:       'pointer',
+        animation:    'fadeSlideIn 0.18s ease',
+      }}
+      onClick={onEdit}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEdit() } }}
+      aria-label={`Editar ${nombre || 'ítem'}`}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontWeight: 600, fontSize: 13, color: '#1A2B3C', flex: 1 }}>
+          {nombre || '—'}
+        </span>
+        {presentacion && (
+          <span style={{
+            fontSize: 9, fontWeight: 700, background: '#F4F6F8', color: '#4A5568',
+            padding: '1px 6px', borderRadius: 99, flexShrink: 0,
+          }}>
+            {presentacion}L
+          </span>
+        )}
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#0D5C8A', flexShrink: 0 }}>
+          ${subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+        </span>
+        <button
+          type="button"
+          onClick={e => { e.stopPropagation(); onRemove() }}
+          aria-label={`Eliminar ${nombre || 'ítem'}`}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: '#9CA3AF', padding: 4, flexShrink: 0, lineHeight: 0,
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#D32F2F' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#9CA3AF' }}
+        >
+          <X size={14} />
+        </button>
+      </div>
+      <div style={{ fontSize: 11, color: '#4A5568', marginTop: 2 }}>
+        x{cantidad} · ${Number(precioUnitario).toLocaleString('es-AR', { minimumFractionDigits: 2 })} c/u
+      </div>
+      {bidonNuevo && (
+        <div style={{ marginTop: 4 }}>
+          <span style={{
+            fontSize: 9, fontWeight: 700, background: '#FFF3E0', color: '#F57C00',
+            padding: '1px 6px', borderRadius: 99,
+          }}>
+            BIDÓN NUEVO
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Formulario inline de ítem (editar o agregar) ────────────────────────────
+
+interface ItemFormInlineProps {
+  // modo edición: index ≥ 0 + RHF props
+  index?:    number
+  control?:  ReturnType<typeof useForm<FormData>>['control']
+  register?: ReturnType<typeof useForm<FormData>>['register']
+  watch?:    ReturnType<typeof useForm<FormData>>['watch']
+  setValue?: ReturnType<typeof useForm<FormData>>['setValue']
+  // modo agregar: local state
+  productos:  (Producto & { categoriaNombre?: string })[]
+  tipoPrecio: 'minorista' | 'mayorista'
+  onConfirm:  (item?: {
+    productoId:       string
+    productoNombre:   string
+    presentacion:     string
+    cantidad:         string
+    precioUnitario:   string
+    precioReferencia: string
+    bidonNuevo:       boolean
+  }) => void
+  onCancel:   () => void
+  confirmLabel?: string
+}
+
+function ItemFormInline({
+  index, control, register, watch, setValue,
+  productos, tipoPrecio, onConfirm, onCancel, confirmLabel = 'Agregar ítem',
+}: ItemFormInlineProps) {
+  const isEdit = index !== undefined && index >= 0
+
+  // Estado local para modo "agregar nuevo"
+  const [lProdId,  setLProdId]  = useState('')
+  const [lCant,    setLCant]    = useState('1')
+  const [lPrecio,  setLPrecio]  = useState('')
+  const [lPrecRef, setLPrecRef] = useState('')
+  const [lBidon,   setLBidon]   = useState(false)
+  const [lErr,     setLErr]     = useState('')
+
+  // Valores para modo edición
+  const eProducId   = isEdit ? watch?.(`items.${index!}.productoId`)       : lProdId
+  const eCant       = isEdit ? watch?.(`items.${index!}.cantidad`)          : lCant
+  const ePrecio     = isEdit ? watch?.(`items.${index!}.precioUnitario`)    : lPrecio
+  const ePrecRef    = isEdit ? watch?.(`items.${index!}.precioReferencia`)  : lPrecRef
+  const eBidon      = isEdit ? watch?.(`items.${index!}.bidonNuevo`)        : lBidon
+
+  const productoSel = productos.find(p => p.id === eProducId)
+
+  // Cargar precio al seleccionar producto
+  useEffect(() => {
+    if (!productoSel) return
+    const precio = String(tipoPrecio === 'mayorista' ? productoSel.precio_mayorista : productoSel.precio_minorista)
+    if (isEdit && setValue && index !== undefined) {
+      setValue(`items.${index}.precioUnitario`,   precio)
+      setValue(`items.${index}.precioReferencia`, precio)
+      setValue(`items.${index}.productoNombre`,   productoSel.nombre)
+      setValue(`items.${index}.presentacion`,     String(productoSel.presentacion))
+    } else {
+      setLPrecio(precio)
+      setLPrecRef(precio)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eProducId, tipoPrecio])
+
+  const subtotal = (Number(eCant) || 0) * (Number(ePrecio) || 0)
+
+  const precioActual = productoSel
+    ? (tipoPrecio === 'mayorista' ? productoSel.precio_mayorista : productoSel.precio_minorista)
+    : null
+  const precioDesact = productoSel && precioActual !== null && ePrecRef !== undefined &&
+    Number(precioActual) !== Number(ePrecRef)
+
+  const handleConfirm = () => {
+    if (isEdit) {
+      onConfirm()
+      return
+    }
+    if (!lProdId) { setLErr('Seleccioná un producto'); return }
+    if (!lCant || !/^\d+(\.\d+)?$/.test(lCant)) { setLErr('Cantidad inválida'); return }
+    if (!lPrecio || !/^\d+(\.\d{0,2})?$/.test(lPrecio)) { setLErr('Precio inválido'); return }
+    setLErr('')
+    onConfirm({
+      productoId:       lProdId,
+      productoNombre:   productoSel?.nombre ?? '',
+      presentacion:     String(productoSel?.presentacion ?? ''),
+      cantidad:         lCant,
+      precioUnitario:   lPrecio,
+      precioReferencia: lPrecRef,
+      bidonNuevo:       lBidon,
+    })
+  }
+
+  const selectStyle: React.CSSProperties = {
+    width: '100%', height: 48, padding: '0 36px 0 14px',
+    border: '0.5px solid #D1D5DB', borderRadius: 10,
+    fontSize: 16, fontFamily: 'Inter, sans-serif',
+    background: '#fff', appearance: 'none', outline: 'none',
+    cursor: 'pointer', color: '#1A2B3C', boxSizing: 'border-box',
+  }
 
   return (
     <div style={{
-      background: '#F4F6F8', borderRadius: 12, padding: 12,
-      display: 'flex', flexDirection: 'column', gap: 8,
+      background:   '#F9FAFB',
+      borderRadius: 10,
+      padding:      14,
+      border:       '0.5px solid #D1D5DB',
+      display:      'flex',
+      flexDirection:'column',
+      gap:          10,
+      animation:    'fadeSlideIn 0.18s ease',
     }}>
       {/* Selector de producto */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-        <div style={{ flex: 1 }}>
-          <Controller
-            name={`items.${index}.productoId`}
-            control={control}
-            render={({ field, fieldState }) => (
-              <div>
-                <select
-                  {...field}
-                  style={{
-                    width: '100%', padding: '10px 12px',
-                    border: `1px solid ${fieldState.error ? '#D32F2F' : '#D1D5DB'}`,
-                    borderRadius: 10, fontSize: 13, background: '#fff', cursor: 'pointer',
-                  }}
-                >
-                  <option value="">Seleccioná producto…</option>
-                  {productos.filter(p => p.activo).map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.nombre}{p.fragancia ? ` (${p.fragancia})` : ''} — {p.presentacion}L
-                    </option>
-                  ))}
-                </select>
-                {fieldState.error && <p style={{ color: '#D32F2F', fontSize: 11, margin: '2px 0 0 2px' }}>{fieldState.error.message}</p>}
-              </div>
-            )}
-          />
-        </div>
-        <button type="button" onClick={onRemove}
-          style={{ background: '#FDECEA', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', color: '#D32F2F', flexShrink: 0 }}>
-          <Trash2 size={14} />
-        </button>
-      </div>
-
-      {/* Cantidad, precio, subtotal */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-        <FloatInput label="Cantidad" {...register(`items.${index}.cantidad`)} inputMode="decimal" />
-        <FloatInput label="Precio unit." {...register(`items.${index}.precioUnitario`)} inputMode="decimal" />
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: '#fff', borderRadius: 10, padding: '8px',
-          border: '1px solid #D1D5DB', fontSize: 13, fontWeight: 600, color: '#0D5C8A',
-        }}>
-          ${subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-        </div>
-      </div>
-
-      {/* Bidón nuevo + alerta precio */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-          <input
-            type="checkbox"
-            checked={bidonNuevo}
-            onChange={e => setValue(`items.${index}.bidonNuevo`, e.target.checked)}
-            style={{ width: 16, height: 16, accentColor: '#F57C00', cursor: 'pointer' }}
-          />
-          <span>Bidón nuevo</span>
+      <div>
+        <label style={{ fontSize: 10, fontWeight: 500, color: '#4A5568', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>
+          Producto
         </label>
+        <div style={{ position: 'relative' }}>
+          {isEdit && control && index !== undefined ? (
+            <Controller
+              name={`items.${index}.productoId`}
+              control={control}
+              render={({ field, fieldState }) => (
+                <>
+                  <select {...field} style={{ ...selectStyle, borderColor: fieldState.error ? '#D32F2F' : '#D1D5DB' }}>
+                    <option value="">Seleccioná producto…</option>
+                    {productos.filter(p => p.activo).map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombre}{p.fragancia ? ` (${p.fragancia})` : ''} — {p.presentacion}L
+                      </option>
+                    ))}
+                  </select>
+                  {fieldState.error && (
+                    <span style={{ color: '#D32F2F', fontSize: 11, marginTop: 4, display: 'block' }}>{fieldState.error.message}</span>
+                  )}
+                </>
+              )}
+            />
+          ) : (
+            <select
+              value={lProdId}
+              onChange={e => { setLProdId(e.target.value); setLErr('') }}
+              style={selectStyle}
+            >
+              <option value="">Seleccioná producto…</option>
+              {productos.filter(p => p.activo).map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre}{p.fragancia ? ` (${p.fragancia})` : ''} — {p.presentacion}L
+                </option>
+              ))}
+            </select>
+          )}
+          <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#4A5568', fontSize: 11 }}>▼</span>
+        </div>
+      </div>
 
-        {precioDesact && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 4, fontSize: 11,
-            color: '#F57C00', background: '#FFF3E0', padding: '3px 8px', borderRadius: 6,
-          }}>
-            <AlertTriangle size={11} />
-            Precio cambió a ${Number(precioActual).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-            <button type="button"
-              onClick={() => setValue(`items.${index}.precioUnitario`, String(precioActual ?? 0))}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#F57C00', fontWeight: 700, fontSize: 11, textDecoration: 'underline' }}>
-              Actualizar
-            </button>
-          </div>
+      {/* Grid cantidad + precio + subtotal */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {isEdit && register && index !== undefined ? (
+          <>
+            <FloatInput label="Cantidad" {...register(`items.${index}.cantidad`)} inputMode="decimal" />
+            <FloatInput
+              label="Precio unit."
+              {...register(`items.${index}.precioUnitario`)}
+              inputMode="decimal"
+              hint={
+                precioDesact
+                  ? `Precio actual: $${Number(precioActual).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+                  : undefined
+              }
+            />
+          </>
+        ) : (
+          <>
+            <FloatInput
+              label="Cantidad"
+              value={lCant}
+              onChange={e => setLCant(e.target.value)}
+              inputMode="decimal"
+            />
+            <FloatInput
+              label="Precio unit."
+              value={lPrecio}
+              onChange={e => setLPrecio(e.target.value)}
+              inputMode="decimal"
+            />
+          </>
         )}
+      </div>
+
+      {/* Alerta precio desactualizado (modo edición) */}
+      {isEdit && precioDesact && setValue && index !== undefined && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6, fontSize: 11,
+          color: '#F57C00', background: '#FFF3E0', padding: '6px 10px', borderRadius: 6,
+        }}>
+          <AlertTriangle size={11} />
+          Precio cambió a ${Number(precioActual).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+          <button type="button"
+            onClick={() => setValue(`items.${index}.precioUnitario`, String(precioActual ?? 0))}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#F57C00', fontWeight: 700, fontSize: 11, textDecoration: 'underline' }}>
+            Actualizar
+          </button>
+        </div>
+      )}
+
+      {/* Toggle bidón nuevo */}
+      {isEdit && setValue && index !== undefined ? (
+        <ToggleSwitch
+          label="Bidón nuevo"
+          value={eBidon ?? false}
+          onChange={v => setValue(`items.${index!}.bidonNuevo`, v)}
+        />
+      ) : (
+        <ToggleSwitch
+          label="Bidón nuevo"
+          value={lBidon}
+          onChange={setLBidon}
+        />
+      )}
+
+      {/* Subtotal */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 12, color: '#4A5568' }}>Subtotal</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#0D5C8A' }}>
+          ${subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+        </span>
+      </div>
+
+      {lErr && (
+        <span style={{ color: '#D32F2F', fontSize: 11 }}>{lErr}</span>
+      )}
+
+      {/* Acciones */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 2 }}>
+        <button type="button" onClick={handleConfirm}
+          style={{
+            flex: 1, background: '#0D5C8A', color: '#fff', border: 'none',
+            borderRadius: 10, height: 40, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          }}>
+          {confirmLabel}
+        </button>
+        <button type="button" onClick={onCancel}
+          style={{
+            background: 'none', border: 'none', color: '#4A5568',
+            fontSize: 13, cursor: 'pointer', padding: '8px 12px', whiteSpace: 'nowrap',
+          }}>
+          Cancelar
+        </button>
       </div>
     </div>
   )
@@ -358,68 +654,37 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
   const saving = crear.isPending || editar.isPending
 
   const { data: productos } = useProductos()
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const { register, control, handleSubmit, watch, setValue, reset, formState: { errors } } =
     useForm<FormData>({
       resolver: zodResolver(schema),
-      defaultValues: {
-        clienteId:        pedido?.cliente_id         ?? '',
-        tipoPrecio:       pedido?.tipo_precio         ?? 'minorista',
-        fechaProduccion:  pedido?.fecha_produccion    ?? '',
-        direccionEntrega: pedido?.direccion_entrega   ?? '',
-        notasProduccion:  pedido?.notas_produccion    ?? '',
-        notasInternas:    pedido?.notas_internas      ?? '',
-        costoEnvio:       String(pedido?.costo_envio  ?? 0),
-        totalManual:      pedido?.total_manual != null ? String(pedido.total_manual) : '',
-        items: pedido?.pedido_items?.map(i => ({
-          productoId:       i.producto_id,
-          productoNombre:   i.productos?.nombre ?? '',
-          presentacion:     String(i.productos?.presentacion ?? ''),
-          cantidad:         String(i.cantidad),
-          precioUnitario:   String(i.precio_unitario),
-          precioReferencia: String(i.precio_referencia),
-          bidonNuevo:       i.bidon_nuevo,
-        })) ?? [],
-      },
+      defaultValues: buildDefaults(pedido),
     })
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
 
-  // Resetear el form cada vez que se abre con datos distintos
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null)
+  const [addingNew,   setAddingNew]   = useState(false)
+
   useEffect(() => {
     if (!open) return
-    reset({
-      clienteId:        pedido?.cliente_id         ?? '',
-      tipoPrecio:       pedido?.tipo_precio         ?? 'minorista',
-      fechaProduccion:  pedido?.fecha_produccion    ?? '',
-      direccionEntrega: pedido?.direccion_entrega   ?? '',
-      notasProduccion:  pedido?.notas_produccion    ?? '',
-      notasInternas:    pedido?.notas_internas      ?? '',
-      costoEnvio:       String(pedido?.costo_envio  ?? 0),
-      totalManual:      pedido?.total_manual != null ? String(pedido.total_manual) : '',
-      items: pedido?.pedido_items?.map(i => ({
-        productoId:       i.producto_id,
-        productoNombre:   i.productos?.nombre ?? '',
-        presentacion:     String(i.productos?.presentacion ?? ''),
-        cantidad:         String(i.cantidad),
-        precioUnitario:   String(i.precio_unitario),
-        precioReferencia: String(i.precio_referencia),
-        bidonNuevo:       i.bidon_nuevo,
-      })) ?? [],
-    })
+    reset(buildDefaults(pedido))
+    setExpandedIdx(null)
+    setAddingNew(false)
   }, [open, pedido])
 
   const tipoPrecio  = watch('tipoPrecio')
   const costoEnvio  = watch('costoEnvio')
   const totalManual = watch('totalManual')
-  const items       = watch('items')
+  const itemsWatch  = watch('items')
 
-  const totalCalculado = items.reduce(
+  const subtotalProductos = (itemsWatch ?? []).reduce(
     (acc, i) => acc + (Number(i.cantidad) || 0) * (Number(i.precioUnitario) || 0), 0
-  ) + (Number(costoEnvio) || 0)
-
-  const totalMostrado = totalManual ? Number(totalManual) : totalCalculado
-  const totalEditado  = !!totalManual && Number(totalManual) !== totalCalculado
+  )
+  const totalCalculado = subtotalProductos + (Number(costoEnvio) || 0)
+  const totalMostrado  = totalManual ? Number(totalManual) : totalCalculado
+  const totalEditado   = !!totalManual && Number(totalManual) !== totalCalculado
 
   const handleClose = () => { reset(); onClose() }
 
@@ -459,66 +724,126 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
     }
   }
 
-  const agregarItem = () => append({
-    productoId: '', productoNombre: '', presentacion: '',
-    cantidad: '1', precioUnitario: '0', precioReferencia: '0', bidonNuevo: false,
-  })
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+    }, 80)
+  }, [])
+
+  const handleAgregarNuevo = () => {
+    setExpandedIdx(null)
+    setAddingNew(true)
+    scrollToBottom()
+  }
+
+  const handleItemAdded = (item: {
+    productoId: string; productoNombre: string; presentacion: string
+    cantidad: string; precioUnitario: string; precioReferencia: string; bidonNuevo: boolean
+  }) => {
+    append(item)
+    setAddingNew(false)
+    scrollToBottom()
+  }
+
+  const handleItemRemoved = (idx: number) => {
+    remove(idx)
+    if (expandedIdx === idx) setExpandedIdx(null)
+    else if (expandedIdx !== null && expandedIdx > idx) setExpandedIdx(expandedIdx - 1)
+  }
 
   const canEdit = !pedido || ['borrador', 'confirmado', 'en_produccion'].includes(pedido.estado)
 
+  const footer = canEdit ? (
+    <>
+      <button
+        type="button"
+        onClick={handleSubmit(d => submit(d, 'confirmar'))}
+        disabled={saving}
+        style={{
+          background:   saving ? 'rgba(13,92,138,0.5)' : '#0D5C8A',
+          color:        '#fff', border: 'none', borderRadius: 10,
+          height:       48, fontSize: 15, fontWeight: 700,
+          cursor:       saving ? 'not-allowed' : 'pointer', width: '100%',
+          display:      'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        }}
+      >
+        {saving
+          ? <><span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />Guardando…</>
+          : pedido ? 'Guardar cambios' : '✓ Confirmar pedido → Producción'
+        }
+      </button>
+      {!pedido && (
+        <button
+          type="button"
+          onClick={handleSubmit(d => submit(d, 'borrador'))}
+          disabled={saving}
+          style={{
+            background:   'transparent', color: '#0D5C8A',
+            border:       '0.5px solid #0D5C8A', borderRadius: 10,
+            height:       48, fontSize: 14, fontWeight: 600,
+            cursor:       saving ? 'not-allowed' : 'pointer', width: '100%',
+          }}
+        >
+          Guardar borrador
+        </button>
+      )}
+    </>
+  ) : undefined
+
   return (
-    <Sheet open={open} onOpenChange={v => { if (!v) handleClose() }}>
-      <SheetContent side="right" style={{ width: '100%', maxWidth: 560, overflowY: 'auto', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
-        <SheetHeader>
-          <SheetTitle>
-            {pedido
-              ? `Pedido P-${String(pedido.numero).padStart(5, '0')}`
-              : 'Nuevo pedido'}
-          </SheetTitle>
-        </SheetHeader>
+    <Drawer
+      open={open}
+      onClose={handleClose}
+      title={pedido ? `Pedido P-${String(pedido.numero).padStart(5, '0')}` : 'Nuevo pedido'}
+      footer={footer}
+      scrollRef={scrollRef}
+      panelStyle={{ width: '100%', maxWidth: 560 }}
+    >
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
 
-        {!canEdit && (
-          <div style={{
-            background: '#FFF3E0', border: '1px solid #F57C00', borderRadius: 10,
-            padding: '10px 14px', fontSize: 13, color: '#F57C00', marginTop: 16,
-          }}>
-            Este pedido está en estado <strong>{pedido?.estado}</strong> y no se puede editar.
-          </div>
-        )}
+      {!canEdit && (
+        <div style={{
+          background: '#FFF3E0', border: '1px solid #F57C00', borderRadius: 10,
+          padding: '10px 14px', fontSize: 13, color: '#F57C00', marginBottom: 20,
+        }}>
+          Este pedido está en estado <strong>{pedido?.estado}</strong> y no se puede editar.
+        </div>
+      )}
 
-        <form style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 20, paddingBottom: 80 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-          {/* Cliente */}
-          <Controller
-            name="clienteId"
-            control={control}
-            render={({ field, fieldState }) => (
-              <SelectorCliente
-                value={field.value}
-                error={fieldState.error?.message}
-                onChange={(id, tipo, dir) => {
-                  field.onChange(id)
-                  if (id) {
-                    setValue('tipoPrecio', tipo)
-                    setValue('direccionEntrega', dir)
-                  }
-                }}
-              />
-            )}
-          />
+        {/* ── SECCIÓN 1 — Cliente ─────────────────────────────────────────── */}
+        <Controller
+          name="clienteId"
+          control={control}
+          render={({ field, fieldState }) => (
+            <SelectorCliente
+              value={field.value}
+              error={fieldState.error?.message}
+              onChange={(id, tipo, dir) => {
+                field.onChange(id)
+                if (id) {
+                  setValue('tipoPrecio', tipo)
+                  setValue('direccionEntrega', dir)
+                }
+              }}
+            />
+          )}
+        />
 
-          {/* Tipo precio */}
-          <ButtonGroup
-            label="Tipo de precio"
-            value={tipoPrecio}
-            onChange={v => setValue('tipoPrecio', v as 'minorista' | 'mayorista')}
-            options={[
-              { value: 'minorista', label: 'Minorista' },
-              { value: 'mayorista', label: 'Mayorista', color: '#1B9ED6' },
-            ]}
-          />
+        <ButtonGroup
+          label="Tipo de precio"
+          value={tipoPrecio}
+          onChange={v => setValue('tipoPrecio', v as 'minorista' | 'mayorista')}
+          options={[
+            { value: 'minorista', label: 'Minorista' },
+            { value: 'mayorista', label: 'Mayorista', color: '#1B9ED6' },
+          ]}
+        />
 
-          {/* Fecha + dirección */}
+        {/* ── SECCIÓN 2 — Fecha y detalles ───────────────────────────────── */}
+        <div>
+          <SectionHeader num="2" title="Fecha y detalles" />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <FloatInput
               label="Fecha de producción *"
@@ -528,131 +853,212 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
             />
             <FloatInput label="Dirección entrega" {...register('direccionEntrega')} />
           </div>
+          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <FloatInput
+              label="Notas para producción"
+              as="textarea"
+              rows={2}
+              hint="Visible en el área de producción"
+              {...register('notasProduccion')}
+            />
+            <FloatInput
+              label="Notas internas (solo admin)"
+              as="textarea"
+              rows={2}
+              hint="Solo visible para administración"
+              {...register('notasInternas')}
+            />
+          </div>
+        </div>
 
-          {/* Ítems */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#4A5568' }}>
-                Productos *
-              </span>
-              <button type="button" onClick={agregarItem}
+        {/* ── SECCIÓN 3 — Productos ───────────────────────────────────────── */}
+        <div>
+          <SectionHeader
+            num="3"
+            title="Productos"
+            badge={fields.length > 0 ? `${fields.length} ítem${fields.length !== 1 ? 's' : ''}` : undefined}
+          />
+
+          {(errors.items?.root?.message || errors.items?.message) && (
+            <p style={{ color: '#D32F2F', fontSize: 12, marginBottom: 8 }}>
+              {errors.items?.root?.message ?? errors.items?.message}
+            </p>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {fields.length === 0 && !addingNew && (
+              <button type="button" onClick={handleAgregarNuevo}
                 style={{
-                  background: '#E8F4FF', color: '#1B9ED6', border: 'none', borderRadius: 8,
-                  padding: '6px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 4,
+                  background: '#F4F6F8', border: '2px dashed #D1D5DB', borderRadius: 10,
+                  padding: '24px', cursor: 'pointer', color: '#4A5568',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 14,
+                  width: '100%',
                 }}>
-                <Plus size={13} /> Producto
+                <Package size={18} /> Agregar primer producto
               </button>
-            </div>
-
-            {errors.items?.root && (
-              <p style={{ color: '#D32F2F', fontSize: 12, marginBottom: 8 }}>{errors.items.root.message}</p>
-            )}
-            {errors.items?.message && (
-              <p style={{ color: '#D32F2F', fontSize: 12, marginBottom: 8 }}>{errors.items.message}</p>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {fields.length === 0 ? (
-                <button type="button" onClick={agregarItem}
-                  style={{
-                    background: '#F4F6F8', border: '2px dashed #D1D5DB', borderRadius: 12,
-                    padding: '20px', cursor: 'pointer', color: '#4A5568',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 14,
+            {fields.map((field, i) => (
+              expandedIdx === i ? (
+                <div key={field.id} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                  {/* Header de item expandido */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '8px 14px',
+                    background: '#E8F4FF', borderRadius: '10px 10px 0 0',
+                    border: '0.5px solid #1B9ED6', borderBottom: 'none',
                   }}>
-                  <Package size={18} /> Agregar primer producto
-                </button>
+                    <ChevronUp size={14} color="#1B9ED6" />
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#1B9ED6', flex: 1 }}>
+                      {watch(`items.${i}.productoNombre`) || 'Ítem'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleItemRemoved(i)}
+                      aria-label={`Eliminar ${watch(`items.${i}.productoNombre`) || 'ítem'}`}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', lineHeight: 0, padding: 2 }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#D32F2F' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#9CA3AF' }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <div style={{ border: '0.5px solid #1B9ED6', borderTop: 'none', borderRadius: '0 0 10px 10px', overflow: 'hidden' }}>
+                    <ItemFormInline
+                      index={i}
+                      control={control}
+                      register={register}
+                      watch={watch}
+                      setValue={setValue}
+                      productos={productos ?? []}
+                      tipoPrecio={tipoPrecio}
+                      confirmLabel="Actualizar ítem"
+                      onConfirm={() => setExpandedIdx(null)}
+                      onCancel={() => setExpandedIdx(null)}
+                    />
+                  </div>
+                </div>
               ) : (
-                fields.map((field, i) => (
-                  <FilaItem
-                    key={field.id} index={i}
-                    control={control} register={register} watch={watch} setValue={setValue}
-                    onRemove={() => remove(i)}
-                    tipoPrecio={tipoPrecio}
-                    productos={productos ?? []}
-                  />
-                ))
-              )}
-            </div>
-          </div>
+                <ItemCard
+                  key={field.id}
+                  index={i}
+                  watch={watch}
+                  onEdit={() => { setAddingNew(false); setExpandedIdx(i) }}
+                  onRemove={() => handleItemRemoved(i)}
+                />
+              )
+            ))}
 
-          {/* Notas */}
-          <FloatInput label="Notas para producción" {...register('notasProduccion')} />
-          <FloatInput label="Notas internas (solo admin)" {...register('notasInternas')} />
-
-          {/* Costo envío + total */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <FloatInput label="Costo de envío" {...register('costoEnvio')} inputMode="decimal" />
-            <div>
-              <FloatInput
-                label="Total manual (opcional)"
-                {...register('totalManual')}
-                inputMode="decimal"
+            {/* Formulario inline de agregar (siempre al fondo) */}
+            {addingNew ? (
+              <ItemFormInline
+                productos={productos ?? []}
+                tipoPrecio={tipoPrecio}
+                confirmLabel="Agregar ítem"
+                onConfirm={item => { if (item) handleItemAdded(item) }}
+                onCancel={() => setAddingNew(false)}
               />
-              {totalEditado && (
-                <p style={{ fontSize: 11, color: '#F57C00', marginTop: 3 }}>Total editado manualmente</p>
-              )}
-            </div>
+            ) : fields.length > 0 && (
+              <button type="button" onClick={handleAgregarNuevo}
+                style={{
+                  background: '#F4F6F8', border: '1px dashed #1B9ED6', borderRadius: 10,
+                  padding: '10px', cursor: 'pointer', width: '100%',
+                  color: '#1B9ED6', fontSize: 13, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  marginTop: 2,
+                }}>
+                + Agregar producto
+              </button>
+            )}
           </div>
+        </div>
 
-          {/* Resumen total */}
-          <div style={{
-            background: '#fff', borderRadius: 12, padding: '14px 16px',
-            border: `2px solid ${totalEditado ? '#F57C00' : '#0D5C8A'}`,
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          }}>
-            <span style={{ fontSize: 14, color: '#4A5568' }}>
-              {totalEditado ? 'Total (manual)' : 'Total calculado'}
-            </span>
-            <span style={{ fontSize: 22, fontWeight: 900, color: totalEditado ? '#F57C00' : '#0D5C8A', letterSpacing: -1 }}>
-              ${totalMostrado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-            </span>
-          </div>
+        {/* ── SECCIÓN 4 — Totales ─────────────────────────────────────────── */}
+        <div>
+          <SectionHeader num="4" title="Totales" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <FloatInput
+              label="Costo de envío"
+              {...register('costoEnvio')}
+              inputMode="decimal"
+              style={{ textAlign: 'right' } as React.CSSProperties}
+            />
 
-          {/* Acciones — fijas al pie */}
-          {canEdit && (
+            {/* Desglose */}
             <div style={{
-              position: 'sticky', bottom: 0, background: '#F4F6F8',
-              paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10,
+              background: '#F9FAFB', borderRadius: 10,
+              padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6,
             }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#4A5568' }}>
+                <span>Subtotal productos</span>
+                <span>${subtotalProductos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+              </div>
+              {(Number(costoEnvio) || 0) > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#4A5568' }}>
+                  <span>+ Costo de envío</span>
+                  <span>${(Number(costoEnvio) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                </div>
+              )}
+              <div style={{ height: '0.5px', background: '#D1D5DB', margin: '2px 0' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#1A2B3C' }}>Total</span>
+                <span style={{ fontSize: 22, fontWeight: 900, color: totalEditado ? '#F57C00' : '#0D5C8A', letterSpacing: -1 }}>
+                  ${totalMostrado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
+            {/* Total manual */}
+            <FloatInput
+              label="Total manual (dejar vacío para usar calculado)"
+              {...register('totalManual')}
+              inputMode="decimal"
+              style={{ textAlign: 'right' } as React.CSSProperties}
+              hint={
+                totalEditado
+                  ? `Total modificado. Calculado: $${totalCalculado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+                  : undefined
+              }
+            />
+            {totalEditado && (
               <button
                 type="button"
-                onClick={handleSubmit(d => submit(d, 'confirmar'))}
-                disabled={saving}
+                onClick={() => setValue('totalManual', '')}
                 style={{
-                  background: saving ? 'rgba(13,92,138,0.5)' : '#0D5C8A',
-                  color: '#fff', border: 'none', borderRadius: 10,
-                  padding: '14px', minHeight: 48, fontSize: 15, fontWeight: 700,
-                  cursor: saving ? 'not-allowed' : 'pointer', width: '100%',
+                  alignSelf: 'flex-start', background: 'none', border: 'none',
+                  color: '#1B9ED6', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0,
                 }}
               >
-                {saving ? 'Guardando…' : pedido ? 'Guardar cambios' : '✓ Confirmar pedido → Producción'}
+                Restaurar calculado
               </button>
-              {!pedido && (
-                <button
-                  type="button"
-                  onClick={handleSubmit(d => submit(d, 'borrador'))}
-                  disabled={saving}
-                  style={{
-                    background: 'transparent', color: '#0D5C8A',
-                    border: '1.5px solid #0D5C8A', borderRadius: 10,
-                    padding: '12px', minHeight: 44, fontSize: 14, fontWeight: 600,
-                    cursor: 'pointer', width: '100%',
-                  }}
-                >
-                  Guardar borrador
-                </button>
-              )}
-              <button type="button" onClick={handleClose} style={{
-                background: 'transparent', color: '#4A5568', border: '1.5px solid #D1D5DB',
-                borderRadius: 10, padding: '10px', minHeight: 40, fontSize: 14, cursor: 'pointer',
-              }}>
-                Cancelar
-              </button>
-            </div>
-          )}
-        </form>
-      </SheetContent>
-    </Sheet>
+            )}
+          </div>
+        </div>
+      </div>
+    </Drawer>
   )
+}
+
+// ─── Helper defaults ──────────────────────────────────────────────────────────
+
+function buildDefaults(pedido: PedidoDetalle | null): FormData {
+  return {
+    clienteId:        pedido?.cliente_id         ?? '',
+    tipoPrecio:       pedido?.tipo_precio         ?? 'minorista',
+    fechaProduccion:  pedido?.fecha_produccion    ?? '',
+    direccionEntrega: pedido?.direccion_entrega   ?? '',
+    notasProduccion:  pedido?.notas_produccion    ?? '',
+    notasInternas:    pedido?.notas_internas      ?? '',
+    costoEnvio:       String(pedido?.costo_envio  ?? 0),
+    totalManual:      pedido?.total_manual != null ? String(pedido.total_manual) : '',
+    items: pedido?.pedido_items?.map(i => ({
+      productoId:       i.producto_id,
+      productoNombre:   i.productos?.nombre ?? '',
+      presentacion:     String(i.productos?.presentacion ?? ''),
+      cantidad:         String(i.cantidad),
+      precioUnitario:   String(i.precio_unitario),
+      precioReferencia: String(i.precio_referencia),
+      bidonNuevo:       i.bidon_nuevo,
+    })) ?? [],
+  }
 }

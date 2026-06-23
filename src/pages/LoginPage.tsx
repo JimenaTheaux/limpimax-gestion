@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import { FloatInput } from '@/components/common/FloatInput'
 import type { Rol } from '@/types'
 
 const RUTA_POR_ROL: Record<Rol, string> = {
@@ -136,120 +137,49 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Email */}
+          <FloatInput
+            id="email"
+            label="Email"
+            ref={emailRef}
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            autoFocus
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            disabled={loading}
+            aria-invalid={!!error}
+            aria-describedby={error ? 'login-error' : undefined}
+          />
+
           <div>
-            <label
-              htmlFor="email"
-              style={{
-                fontSize: 10,
-                fontWeight: 500,
-                color: '#4A5568',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                display: 'block',
-                marginBottom: 6,
-              }}
-            >
-              Email
-            </label>
-            <input
-              id="email"
-              ref={emailRef}
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              autoFocus
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+            <FloatInput
+              id="password"
+              label="Contraseña"
+              ref={passwordRef}
+              type={mostrarPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
               disabled={loading}
               aria-invalid={!!error}
               aria-describedby={error ? 'login-error' : undefined}
-              style={{
-                height: 48,
-                padding: '0 14px',
-                border: '0.5px solid #D1D5DB',
-                borderRadius: 10,
-                fontSize: 15,
-                fontFamily: 'Inter, sans-serif',
-                color: '#1A2B3C',
-                outline: 'none',
-                width: '100%',
-                boxSizing: 'border-box',
-              }}
-              onFocus={e => { e.currentTarget.style.borderColor = '#1B9ED6' }}
-              onBlur={e => { e.currentTarget.style.borderColor = '#D1D5DB' }}
+              rightSlot={
+                <button
+                  type="button"
+                  onClick={() => setMostrarPassword(prev => !prev)}
+                  aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  style={{
+                    background: 'transparent', border: 'none', cursor: 'pointer',
+                    color: '#9CA3AF', padding: 0, lineHeight: 0,
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#0D5C8A' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#9CA3AF' }}
+                >
+                  {mostrarPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              }
             />
-          </div>
-
-          {/* Contraseña */}
-          <div>
-            <label
-              htmlFor="password"
-              style={{
-                fontSize: 10,
-                fontWeight: 500,
-                color: '#4A5568',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                display: 'block',
-                marginBottom: 6,
-              }}
-            >
-              Contraseña
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input
-                id="password"
-                ref={passwordRef}
-                type={mostrarPassword ? 'text' : 'password'}
-                autoComplete="current-password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                disabled={loading}
-                aria-invalid={!!error}
-                aria-describedby={error ? 'login-error' : undefined}
-                style={{
-                  height: 48,
-                  padding: '0 48px 0 14px',
-                  border: '0.5px solid #D1D5DB',
-                  borderRadius: 10,
-                  fontSize: 16,
-                  fontFamily: 'Inter, sans-serif',
-                  color: '#1A2B3C',
-                  outline: 'none',
-                  width: '100%',
-                  boxSizing: 'border-box',
-                }}
-                onFocus={e => { e.currentTarget.style.borderColor = '#1B9ED6' }}
-                onBlur={e => { e.currentTarget.style.borderColor = '#D1D5DB' }}
-              />
-              <button
-                type="button"
-                onClick={() => setMostrarPassword(prev => !prev)}
-                aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                style={{
-                  position: 'absolute',
-                  right: 12,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: 32,
-                  height: 32,
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#9CA3AF',
-                  padding: 0,
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#0D5C8A' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#9CA3AF' }}
-              >
-                {mostrarPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-
             {error && (
               <p
                 id="login-error"
