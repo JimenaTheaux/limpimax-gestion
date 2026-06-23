@@ -1,5 +1,6 @@
 import { Outlet, useNavigate } from 'react-router-dom'
 import { Factory, List, LogOut } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { BottomNav }          from './BottomNav'
 import { useAuth }            from '@/hooks/useAuth'
 import { useScrollDirection } from '@/hooks/useScrollDirection'
@@ -7,9 +8,11 @@ import { useScrollDirection } from '@/hooks/useScrollDirection'
 export function ProduccionLayout() {
   const { usuario, cerrarSesion } = useAuth()
   const navigate     = useNavigate()
+  const queryClient  = useQueryClient()
   const scrollDir    = useScrollDirection()
 
   const handleLogout = async () => {
+    queryClient.clear()
     await cerrarSesion()
     navigate('/login', { replace: true })
   }
@@ -88,10 +91,13 @@ export function ProduccionLayout() {
       </main>
 
       {/* Bottom nav */}
-      <BottomNav items={[
-        { to: '/produccion',        icon: Factory, label: 'Producción', end: true },
-        { to: '/produccion/listos', icon: List,    label: 'Listos' },
-      ]} />
+      <BottomNav
+        items={[
+          { to: '/produccion',        icon: Factory, label: 'Producción', end: true },
+          { to: '/produccion/listos', icon: List,    label: 'Listos' },
+        ]}
+        logoutAction={handleLogout}
+      />
     </div>
   )
 }

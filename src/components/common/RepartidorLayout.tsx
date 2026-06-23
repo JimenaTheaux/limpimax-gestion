@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom'
 import {
   IconWifi, IconWifiOff, IconLogout, IconTruck, IconClockHour3, IconRefresh,
 } from '@tabler/icons-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { BottomNav }          from './BottomNav'
 import { useAuth }            from '@/hooks/useAuth'
 import { useOffline }         from '@/hooks/useOffline'
@@ -11,11 +12,13 @@ import { useScrollDirection } from '@/hooks/useScrollDirection'
 export function RepartidorLayout() {
   const { cerrarSesion }                            = useAuth()
   const navigate                                    = useNavigate()
+  const queryClient                                 = useQueryClient()
   const { isOnline, pendingCount, syncing, sync }   = useOffline()
   const [logoutHover, setLogoutHover]               = useState(false)
   const scrollDir                                   = useScrollDirection()
 
   const handleLogout = async () => {
+    queryClient.clear()
     await cerrarSesion()
     navigate('/login', { replace: true })
   }
@@ -194,10 +197,13 @@ export function RepartidorLayout() {
       </main>
 
       {/* Bottom nav */}
-      <BottomNav items={[
-        { to: '/repartidor',           icon: IconTruck,      label: 'Pedidos',   end: true },
-        { to: '/repartidor/historial', icon: IconClockHour3, label: 'Historial' },
-      ]} />
+      <BottomNav
+        items={[
+          { to: '/repartidor',           icon: IconTruck,      label: 'Pedidos',   end: true },
+          { to: '/repartidor/historial', icon: IconClockHour3, label: 'Historial' },
+        ]}
+        logoutAction={handleLogout}
+      />
     </div>
   )
 }

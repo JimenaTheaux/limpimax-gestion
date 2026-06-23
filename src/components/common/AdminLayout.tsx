@@ -1,10 +1,12 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, Users, Package,
 } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Sidebar }   from './Sidebar'
 import { BottomNav } from './BottomNav'
 import { useSidebar } from '@/hooks/useSidebar'
+import { useAuth }   from '@/hooks/useAuth'
 
 const BOTTOM_NAV_ITEMS = [
   { to: '/admin',           icon: LayoutDashboard, label: 'Dashboard', end: true },
@@ -14,7 +16,16 @@ const BOTTOM_NAV_ITEMS = [
 ]
 
 export function AdminLayout() {
-  const { isOpen } = useSidebar()
+  const { isOpen }     = useSidebar()
+  const { cerrarSesion } = useAuth()
+  const navigate       = useNavigate()
+  const queryClient    = useQueryClient()
+
+  const handleLogout = async () => {
+    queryClient.clear()
+    await cerrarSesion()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div style={{ minHeight: '100dvh', background: '#F4F6F8', overflowX: 'hidden' }}>
@@ -55,7 +66,7 @@ export function AdminLayout() {
 
       {/* Bottom nav — solo mobile */}
       <div className="block md:hidden">
-        <BottomNav items={BOTTOM_NAV_ITEMS} />
+        <BottomNav items={BOTTOM_NAV_ITEMS} logoutAction={handleLogout} />
       </div>
     </div>
   )
