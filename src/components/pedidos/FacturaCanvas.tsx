@@ -25,14 +25,14 @@ export function FacturaCanvas({ pedido }: { pedido: PedidoDetalle }) {
         width: 600,
         background: '#ffffff',
         fontFamily: 'Inter, Arial, sans-serif',
-        padding: 28,
+        padding: '32px 36px',
         boxSizing: 'border-box',
         color: '#1A2B3C',
       }}
     >
       {/* Header */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+      <div style={{ marginBottom: 20, width: '100%', boxSizing: 'border-box' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, width: '100%' }}>
           <div style={{
             width: 36, height: 36, borderRadius: 8,
             background: '#1B9ED6',
@@ -51,13 +51,15 @@ export function FacturaCanvas({ pedido }: { pedido: PedidoDetalle }) {
       </div>
 
       {/* Divisor */}
-      <div style={{ height: 1, background: '#E5E7EB', marginBottom: 20 }} />
+      <div style={{ height: 1, background: '#E5E7EB', marginBottom: 20, width: '100%' }} />
 
       {/* Datos del pedido */}
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ marginBottom: 20, width: '100%', boxSizing: 'border-box' }}>
         <div style={{
           display: 'grid', gridTemplateColumns: '1fr 1fr',
-          gap: '8px 24px',
+          gap: 16,
+          width: '100%',
+          boxSizing: 'border-box',
           fontSize: 13,
         }}>
           <div>
@@ -96,16 +98,22 @@ export function FacturaCanvas({ pedido }: { pedido: PedidoDetalle }) {
       </div>
 
       {/* Divisor */}
-      <div style={{ height: 1, background: '#E5E7EB', marginBottom: 16 }} />
+      <div style={{ height: 1, background: '#E5E7EB', marginBottom: 16, width: '100%' }} />
 
       {/* Tabla de ítems */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginBottom: 16 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginBottom: 0, tableLayout: 'fixed', boxSizing: 'border-box' }}>
+        <colgroup>
+          <col style={{ width: '50%' }} />
+          <col style={{ width: '15%' }} />
+          <col style={{ width: '17%' }} />
+          <col style={{ width: '18%' }} />
+        </colgroup>
         <thead>
           <tr style={{ borderBottom: '0.5px solid #D1D5DB' }}>
             <th style={{
               textAlign: 'left', padding: '4px 6px', fontWeight: 600,
               color: '#4A5568', fontSize: 9, textTransform: 'uppercase',
-              letterSpacing: '0.06em', width: '45%',
+              letterSpacing: '0.06em',
             }}>Producto</th>
             <th style={{
               textAlign: 'center', padding: '4px 6px', fontWeight: 600,
@@ -127,68 +135,89 @@ export function FacturaCanvas({ pedido }: { pedido: PedidoDetalle }) {
         <tbody>
           {(pedido.pedido_items ?? []).map((item) => (
             <Fragment key={item.id}>
+              {/* Fila del producto */}
               <tr>
-                <td style={{ padding: '5px 6px', verticalAlign: 'top', borderBottom: item.bidon_nuevo ? 'none' : '0.5px solid #F0F0F0' }}>
-                  <div style={{ fontSize: 11, fontWeight: 500, color: '#1A2B3C' }}>
+                <td style={{ padding: '8px 6px 2px 6px', verticalAlign: 'top' }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: '#1A2B3C', lineHeight: 1.3 }}>
                     {item.productos?.nombre ?? '—'}
                     {item.productos?.presentacion ? ` — ${item.productos.presentacion}L` : ''}
                   </div>
                 </td>
-                <td style={{ textAlign: 'center', padding: '5px 6px', verticalAlign: 'top', borderBottom: item.bidon_nuevo ? 'none' : '0.5px solid #F0F0F0' }}>
+                <td style={{ textAlign: 'center', padding: '8px 6px 2px', fontSize: 12, verticalAlign: 'top' }}>
                   {item.cantidad}
                 </td>
-                <td style={{ textAlign: 'right', padding: '5px 6px', verticalAlign: 'top', borderBottom: item.bidon_nuevo ? 'none' : '0.5px solid #F0F0F0' }}>
+                <td style={{ textAlign: 'right', padding: '8px 6px 2px', fontSize: 12, verticalAlign: 'top' }}>
                   {fmtMonto(item.precio_unitario)}
                 </td>
-                <td style={{ textAlign: 'right', padding: '5px 6px', fontWeight: 500, verticalAlign: 'top', borderBottom: item.bidon_nuevo ? 'none' : '0.5px solid #F0F0F0', color: '#0D5C8A' }}>
+                <td style={{ textAlign: 'right', padding: '8px 6px 2px', fontSize: 12, fontWeight: 500, color: '#0D5C8A', verticalAlign: 'top' }}>
                   {fmtMonto(item.cantidad * item.precio_unitario)}
                 </td>
               </tr>
+              {/* Fila del badge — solo si bidon_nuevo */}
               {item.bidon_nuevo && (
                 <tr>
-                  <td colSpan={4} style={{ padding: '0 6px 6px 14px', borderBottom: '0.5px solid #F0F0F0' }}>
+                  <td colSpan={4} style={{ padding: '0 6px 10px 6px' }}>
                     <span style={{
-                      fontSize: 9, fontWeight: 600,
-                      background: '#FFF3E0', color: '#E65100',
-                      padding: '1px 6px', borderRadius: 99,
                       display: 'inline-block',
+                      fontSize: 9,
+                      fontWeight: 600,
+                      color: '#E65100',
+                      background: '#FFF3E0',
+                      padding: '2px 8px',
+                      borderRadius: 99,
+                      marginTop: 2,
                     }}>
                       Bidón nuevo
                     </span>
                   </td>
                 </tr>
               )}
+              {/* Separador entre ítems */}
+              <tr>
+                <td colSpan={4} style={{ padding: 0 }}>
+                  <div style={{ height: 1, background: '#F4F6F8' }} />
+                </td>
+              </tr>
             </Fragment>
           ))}
         </tbody>
       </table>
 
       {/* Totales */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <div style={{ minWidth: 240 }}>
-          {pedido.costo_envio > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 13, color: '#4A5568', borderBottom: '1px solid #F0F0F0' }}>
-              <span>Costo de envío</span>
-              <span>{fmtMonto(pedido.costo_envio)}</span>
-            </div>
-          )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0 0', fontSize: 16, fontWeight: 600, color: '#0D5C8A' }}>
-            <span>Total</span>
-            <span>{fmtMonto(total)}</span>
+      <div style={{ marginTop: 16, borderTop: '0.5px solid #D1D5DB', paddingTop: 12, width: '100%', boxSizing: 'border-box' }}>
+        {pedido.costo_envio > 0 && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontSize: 12, color: '#4A5568',
+            marginBottom: 8, padding: '0 6px',
+          }}>
+            <span>Costo de envío</span>
+            <span>{fmtMonto(pedido.costo_envio)}</span>
           </div>
-          {pedido.total_manual && (
-            <p style={{ margin: '2px 0 0', fontSize: 10, color: '#F57C00', textAlign: 'right' }}>
-              Total modificado manualmente
-            </p>
-          )}
+        )}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '8px 6px 0',
+          borderTop: pedido.costo_envio > 0 ? '0.5px solid #F4F6F8' : 'none',
+        }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#1A2B3C' }}>Total</span>
+          <span style={{ fontSize: 18, fontWeight: 600, color: '#0D5C8A' }}>{fmtMonto(total)}</span>
         </div>
+        {pedido.total_manual && (
+          <p style={{ margin: '2px 6px 0', fontSize: 10, color: '#F57C00', textAlign: 'right' }}>
+            Total modificado manualmente
+          </p>
+        )}
       </div>
 
       {/* Footer de cobro (solo si está cerrado) */}
       {isCerrado && (
         <>
-          <div style={{ height: 1, background: '#E5E7EB', margin: '20px 0 16px' }} />
-          <div style={{ background: '#F4F6F8', borderRadius: 10, padding: '12px 16px', fontSize: 12 }}>
+          <div style={{ height: 1, background: '#E5E7EB', margin: '20px 0 16px', width: '100%' }} />
+          <div style={{ background: '#F4F6F8', borderRadius: 10, padding: '12px 16px', fontSize: 12, width: '100%', boxSizing: 'border-box' }}>
             <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#4A5568' }}>
               Información de cobro
             </p>
