@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Edit2, Settings, Mail } from 'lucide-react'
+import { Plus, Edit2, Settings, Mail, Eye, EyeOff, KeyRound, ChevronDown } from 'lucide-react'
 import { Drawer }           from '@/components/common/Drawer'
 import { Skeleton }         from '@/components/ui/skeleton'
 import { FloatInput }       from '@/components/common/FloatInput'
@@ -13,7 +13,7 @@ import { ToastContainer }   from '@/components/common/ToastContainer'
 import { useToast }         from '@/hooks/useToast'
 import { useAuth }          from '@/hooks/useAuth'
 import {
-  useUsuarios, useCrearUsuario, useEditarUsuario,
+  useUsuarios, useCrearUsuario, useEditarUsuario, useResetPasswordUsuario,
   type UsuarioConEmail,
 } from '@/services/usuarios'
 
@@ -139,6 +139,113 @@ function CrearUsuarioDrawer({ open, onClose, onSaved }: CrearDrawerProps) {
   )
 }
 
+// ─── ResetPasswordSection — colapsable dentro del drawer de editar ────────────
+
+const resetSchema = z.object({
+  passwordNuevo: z.string().min(6, 'Mínimo 6 caracteres'),
+})
+type ResetForm = z.infer<typeof resetSchema>
+
+function ResetPasswordSection({ userId, onSaved }: { userId: string; onSaved: (msg: string) => void }) {
+  const [open,    setOpen]    = useState(false)
+  const [showPw,  setShowPw]  = useState(false)
+  const resetPw = useResetPasswordUsuario()
+
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<ResetForm>({
+    resolver: zodResolver(resetSchema),
+    defaultValues: { passwordNuevo: '' },
+  })
+
+  const onSubmit = async (data: ResetForm) => {
+    try {
+      await resetPw.mutateAsync({ userId, passwordNuevo: data.passwordNuevo })
+      onSaved('Contraseña restablecida correctamente')
+      reset()
+      setOpen(false)
+    } catch (e) {
+      onSaved((e instanceof Error ? e.message : 'Error al restablecer contraseña') + '|error')
+    }
+  }
+
+  return (
+    <div style={{ border: '0.5px solid #D1D5DB', borderRadius: 10, overflow: 'hidden' }}>
+      {/* Header colapsable */}
+      <button
+        type="button"
+        onClick={() => { setOpen(v => !v); if (open) reset() }}
+        style={{
+          width: '100%', padding: '10px 14px', background: 'none', border: 'none',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+          justifyContent: 'space-between',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <KeyRound size={14} color="#4A5568" />
+          <span style={{ fontSize: 13, color: '#1A2B3C', fontWeight: 500 }}>Restablecer contraseña</span>
+        </div>
+        <ChevronDown
+          size={14}
+          color="#4A5568"
+          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+        />
+      </button>
+
+      {/* Form inline */}
+      <div style={{
+        display: 'grid',
+        gridTemplateRows: open ? '1fr' : '0fr',
+        transition: 'grid-template-rows 0.2s ease',
+      }}>
+        <div style={{ overflow: 'hidden' }}>
+          <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <p style={{ margin: '0 0 4px', fontSize: 12, color: '#4A5568', background: '#FFF3E0', borderRadius: 6, padding: '6px 10px' }}>
+              El usuario deberá usar esta contraseña en su próximo inicio de sesión.
+            </p>
+
+            <FloatInput
+              label="Nueva contraseña *"
+              type={showPw ? 'text' : 'password'}
+              error={errors.passwordNuevo?.message}
+              autoComplete="new-password"
+              rightSlot={
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowPw(v => !v)}
+                  aria-label={showPw ? 'Ocultar' : 'Mostrar'}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4A5568', padding: 0, display: 'flex' }}
+                >
+                  {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              }
+              {...register('passwordNuevo')}
+            />
+
+            <button
+              type="button"
+              onClick={handleSubmit(onSubmit)}
+              disabled={resetPw.isPending}
+              className="btn-press"
+              style={{
+                background:   resetPw.isPending ? 'rgba(13,92,138,0.5)' : '#0D5C8A',
+                color:        '#fff',
+                border:       'none',
+                borderRadius: 8,
+                height:       40,
+                fontSize:     13,
+                fontWeight:   600,
+                cursor:       resetPw.isPending ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {resetPw.isPending ? 'Guardando…' : 'Confirmar nueva contraseña'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Drawer editar ────────────────────────────────────────────────────────────
 
 interface EditarDrawerProps {
@@ -251,6 +358,11 @@ function EditarUsuarioDrawer({ open, onClose, usuario, onSaved, selfId }: Editar
               No podés cambiar tu propio rol.
             </p>
           )}
+
+          {/* Sección restablecer contraseña */}
+          <div style={{ paddingTop: 4 }}>
+            <ResetPasswordSection userId={usuario.user_id} onSaved={onSaved} />
+          </div>
         </form>
       )}
     </Drawer>

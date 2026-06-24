@@ -20,6 +20,8 @@ const ProduccionListos = lazy(() => import('@/pages/produccion/ListosPage'))
 const RepartidorHome      = lazy(() => import('@/pages/repartidor/RepartidorPage'))
 const RepartidorHistorial = lazy(() => import('@/pages/repartidor/HistorialPage'))
 
+const PerfilPage = lazy(() => import('@/pages/PerfilPage'))
+
 const PrintPedido  = lazy(() => import('@/pages/print/PrintPedidoPage'))
 const ListadoDia   = lazy(() => import('@/pages/print/ListadoDiaPage'))
 const FacturasA4   = lazy(() => import('@/pages/print/FacturasPage'))
@@ -62,6 +64,7 @@ export default function App() {
         <Route path="clientes"  element={<Suspense fallback={<PageLoader />}><AdminClientes /></Suspense>} />
         <Route path="productos" element={<Suspense fallback={<PageLoader />}><AdminProductos /></Suspense>} />
         <Route path="usuarios"  element={<Suspense fallback={<PageLoader />}><AdminUsuarios /></Suspense>} />
+        <Route path="perfil"    element={<Suspense fallback={<PageLoader />}><PerfilPage /></Suspense>} />
       </Route>
 
       {/* Producción */}
@@ -74,7 +77,8 @@ export default function App() {
         }
       >
         <Route index         element={<Suspense fallback={<PageLoader />}><ProduccionHome /></Suspense>} />
-        <Route path="listos" element={<Suspense fallback={<PageLoader />}><ProduccionListos /></Suspense>} />
+        <Route path="listos"  element={<Suspense fallback={<PageLoader />}><ProduccionListos /></Suspense>} />
+        <Route path="perfil"  element={<Suspense fallback={<PageLoader />}><PerfilPage /></Suspense>} />
       </Route>
 
       {/* Repartidor */}
@@ -88,6 +92,7 @@ export default function App() {
       >
         <Route index             element={<Suspense fallback={<PageLoader />}><RepartidorHome /></Suspense>} />
         <Route path="historial"  element={<Suspense fallback={<PageLoader />}><RepartidorHistorial /></Suspense>} />
+        <Route path="perfil"     element={<Suspense fallback={<PageLoader />}><PerfilPage /></Suspense>} />
       </Route>
 
       {/* Vistas de impresión — sin layout */}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import {
-  IconWifi, IconWifiOff, IconLogout, IconTruck, IconClockHour3, IconRefresh,
+  IconWifi, IconWifiOff, IconLogout, IconTruck, IconClockHour3, IconRefresh, IconUser,
 } from '@tabler/icons-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { BottomNav }          from './BottomNav'
@@ -203,6 +203,7 @@ export function RepartidorLayout() {
         items={[
           { to: '/repartidor',           icon: IconTruck,      label: 'Pedidos',   end: true },
           { to: '/repartidor/historial', icon: IconClockHour3, label: 'Historial' },
+          { to: '/repartidor/perfil',    icon: IconUser,       label: 'Perfil' },
         ]}
         logoutAction={handleLogout}
       />

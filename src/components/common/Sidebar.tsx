@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Package, Users, ShoppingCart,
-  ChevronRight, LogOut, Settings,
+  ChevronRight, LogOut, Settings, UserCircle,
 } from 'lucide-react'
 import { useSidebar } from '@/hooks/useSidebar'
 import { useAuth } from '@/hooks/useAuth'
@@ -18,6 +18,7 @@ const NAV_ADMIN: NavItem[] = [
   { to: '/admin/clientes',  icon: <Users           size={18} />, label: 'Clientes' },
   { to: '/admin/productos', icon: <Package         size={18} />, label: 'Productos' },
   { to: '/admin/usuarios',  icon: <Settings        size={18} />, label: 'Usuarios' },
+  { to: '/admin/perfil',    icon: <UserCircle      size={18} />, label: 'Mi perfil' },
 ]
 
 function getIniciales(nombre: string) {

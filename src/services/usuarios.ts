@@ -115,3 +115,44 @@ export const useEditarUsuario = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   })
 }
+
+// ─── Cambiar propia contraseña (cualquier rol autenticado) ────────────────────
+
+export const useCambiarPasswordPropio = () =>
+  useMutation({
+    mutationFn: async ({ passwordActual, passwordNuevo }: {
+      passwordActual: string
+      passwordNuevo:  string
+    }) => {
+      // Re-autenticar con contraseña actual para validar antes de cambiar
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user?.email) throw new Error('No se pudo obtener el usuario de sesión')
+
+      const { error: reAuthErr } = await supabase.auth.signInWithPassword({
+        email:    user.email,
+        password: passwordActual,
+      })
+      if (reAuthErr) throw new Error('La contraseña actual es incorrecta')
+
+      const { error } = await supabase.auth.updateUser({ password: passwordNuevo })
+      if (error) throw new Error(error.message)
+    },
+  })
+
+// ─── Admin resetea contraseña de otro usuario ─────────────────────────────────
+
+export const useResetPasswordUsuario = () =>
+  useMutation({
+    mutationFn: async ({ userId, passwordNuevo }: {
+      userId:        string
+      passwordNuevo: string
+    }) => {
+      if (!supabaseAdmin)
+        throw new Error('Service role key no configurada — verificá VITE_SUPABASE_SERVICE_ROLE_KEY')
+
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        password: passwordNuevo,
+      })
+      if (error) throw new Error(error.message)
+    },
+  })

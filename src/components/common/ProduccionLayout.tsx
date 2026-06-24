@@ -1,5 +1,5 @@
 import { Outlet, useNavigate } from 'react-router-dom'
-import { Factory, List, LogOut } from 'lucide-react'
+import { Factory, List, LogOut, UserCircle } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { BottomNav }          from './BottomNav'
 import { RefreshBar }         from './RefreshBar'
@@ -95,8 +95,9 @@ export function ProduccionLayout() {
       {/* Bottom nav */}
       <BottomNav
         items={[
-          { to: '/produccion',        icon: Factory, label: 'Producción', end: true },
-          { to: '/produccion/listos', icon: List,    label: 'Listos' },
+          { to: '/produccion',        icon: Factory,     label: 'Producción', end: true },
+          { to: '/produccion/listos', icon: List,        label: 'Listos' },
+          { to: '/produccion/perfil', icon: UserCircle,  label: 'Perfil' },
         ]}
         logoutAction={handleLogout}
       />

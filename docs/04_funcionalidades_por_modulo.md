@@ -252,6 +252,39 @@ Cards KPI:
 
 ---
 
+## MÓDULO 8B: Perfil y Cambio de Contraseña
+
+### F8B.1 — Mi perfil (todos los roles)
+
+Accesible desde:
+- **Admin:** ítem "Mi perfil" en el sidebar (`/admin/perfil`)
+- **Producción:** tab "Perfil" en el bottom nav (`/produccion/perfil`)
+- **Repartidor:** tab "Perfil" en el bottom nav (`/repartidor/perfil`)
+
+Contenido de la página:
+- Card de identidad: avatar con iniciales, nombre completo, rol (solo lectura)
+- Formulario "Cambiar contraseña":
+  - Contraseña actual (obligatorio — se re-autentica antes de cambiar)
+  - Nueva contraseña (mínimo 8 caracteres)
+  - Confirmar nueva contraseña (debe coincidir)
+  - Toggle de visibilidad en cada campo (ojo)
+- La sesión se mantiene activa después del cambio
+- Implementación: `supabase.auth.updateUser({ password })` previo re-auth con `signInWithPassword`
+
+### F8B.2 — Resetear contraseña de un usuario (solo Admin)
+
+Accesible desde: drawer de editar usuario en `/admin/usuarios`.
+
+- Sección colapsable "Restablecer contraseña" al final del formulario de editar
+- Campo: nueva contraseña (mínimo 6 caracteres, sin confirmar — el admin la define)
+- No requiere la contraseña actual del usuario
+- Implementación: `supabaseAdmin.auth.admin.updateUserById(userId, { password })`
+- Requiere `VITE_SUPABASE_SERVICE_ROLE_KEY` configurada (igual que crear usuarios)
+- Nota visible: "El usuario deberá usar esta contraseña en su próximo inicio de sesión"
+- El Admin no puede resetear su propia contraseña desde aquí — usa "Mi perfil"
+
+---
+
 ## MÓDULO 8: Gestión de Usuarios (Admin)
 
 ### F8.1 — Lista de usuarios
