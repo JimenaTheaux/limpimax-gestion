@@ -100,35 +100,29 @@ export function FacturaCanvas({ pedido }: { pedido: PedidoDetalle }) {
       {/* Divisor */}
       <div style={{ height: 1, background: '#E5E7EB', marginBottom: 16, width: '100%' }} />
 
-      {/* Tabla de ítems */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginBottom: 0, tableLayout: 'fixed', boxSizing: 'border-box' }}>
-        <colgroup>
-          <col style={{ width: '50%' }} />
-          <col style={{ width: '15%' }} />
-          <col style={{ width: '17%' }} />
-          <col style={{ width: '18%' }} />
-        </colgroup>
+      {/* Tabla de ítems — anchos en px explícitos para html2canvas */}
+      <table style={{ width: 528, borderCollapse: 'collapse', fontSize: 11, marginBottom: 0, tableLayout: 'fixed' }}>
         <thead>
           <tr style={{ borderBottom: '0.5px solid #D1D5DB' }}>
             <th style={{
               textAlign: 'left', padding: '4px 6px', fontWeight: 600,
               color: '#4A5568', fontSize: 9, textTransform: 'uppercase',
-              letterSpacing: '0.06em',
+              letterSpacing: '0.06em', width: 264,
             }}>Producto</th>
             <th style={{
               textAlign: 'center', padding: '4px 6px', fontWeight: 600,
               color: '#4A5568', fontSize: 9, textTransform: 'uppercase',
-              letterSpacing: '0.06em',
+              letterSpacing: '0.06em', width: 79,
             }}>Cant.</th>
             <th style={{
               textAlign: 'right', padding: '4px 6px', fontWeight: 600,
               color: '#4A5568', fontSize: 9, textTransform: 'uppercase',
-              letterSpacing: '0.06em',
+              letterSpacing: '0.06em', width: 90,
             }}>P. Unit.</th>
             <th style={{
               textAlign: 'right', padding: '4px 6px', fontWeight: 600,
               color: '#4A5568', fontSize: 9, textTransform: 'uppercase',
-              letterSpacing: '0.06em',
+              letterSpacing: '0.06em', width: 95,
             }}>Subtotal</th>
           </tr>
         </thead>
