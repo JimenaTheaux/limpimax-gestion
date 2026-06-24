@@ -17,7 +17,7 @@ export function useCompartirFactura() {
 
     // 1. Montar FacturaCanvas en div oculto
     const container = document.createElement('div')
-    container.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:600px;pointer-events:none'
+    container.style.cssText = 'position:absolute;left:-9999px;top:0;width:600px;pointer-events:none'
     document.body.appendChild(container)
 
     let canvas: HTMLCanvasElement | null = null
