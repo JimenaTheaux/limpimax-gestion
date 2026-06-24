@@ -7,7 +7,6 @@ import { Plus, Search, Edit2, Package, MoreHorizontal, Eye, EyeOff, Trash2, Penc
 import { Skeleton }       from '@/components/ui/skeleton'
 import { Drawer }         from '@/components/common/Drawer'
 import { FloatInput }     from '@/components/common/FloatInput'
-import { ButtonGroup }    from '@/components/common/ButtonGroup'
 import { ToastContainer } from '@/components/common/ToastContainer'
 import { useToast }       from '@/hooks/useToast'
 import {
