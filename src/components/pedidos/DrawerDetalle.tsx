@@ -175,12 +175,14 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
 
   const handleGuardarCobro = async () => {
     if (!pedido) return
+    const estadoPago: 'cobrado' | 'pendiente' = cobroForma === 'pendiente' ? 'pendiente' : 'cobrado'
     try {
       await editarCobro.mutateAsync({
-        id:          pedido.id,
-        forma_cobro: cobroForma,
+        id:            pedido.id,
+        forma_cobro:   cobroForma,
         monto_cobrado: cobroMonto || undefined,
-        fecha_cobro: cobroFechaCobro || undefined,
+        fecha_cobro:   cobroFechaCobro || undefined,
+        estado_pago:   estadoPago,
       })
       onSaved('Cobro actualizado')
       setEditandoCobro(false)

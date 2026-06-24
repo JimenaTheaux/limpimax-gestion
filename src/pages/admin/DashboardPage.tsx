@@ -472,7 +472,7 @@ function FilaPendiente({ p, onCobrado }: {
                     cursor: 'pointer', transition: 'all 0.12s', minHeight: 44,
                   }}
                 >
-                  {f === 'efectivo' ? '💵 Efectivo' : '🏦 Transferencia'}
+                  {f === 'efectivo' ? 'Efectivo' : 'Transferencia'}
                 </button>
               ))}
             </div>

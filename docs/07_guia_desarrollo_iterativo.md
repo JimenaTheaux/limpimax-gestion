@@ -245,3 +245,48 @@ Rol del usuario: [rol] con estas restricciones: [describir]
 - [ ] Lista de usuarios iniciales: nombre, email, rol
 - [ ] Catálogo inicial de productos para seed
 - [ ] Lista de clientes existentes para migrar
+
+---
+
+## PRÓXIMAS FUNCIONALIDADES (post-MVP v1)
+
+### Módulo de Egresos (prioridad alta)
+
+Registrar salidas de dinero de la empresa para tener un balance real de ingresos vs egresos en el dashboard.
+
+**Campos mínimos necesarios:**
+- `fecha_egreso DATE`
+- `concepto TEXT` (descripción del gasto)
+- `monto NUMERIC(10,2)`
+- `categoria TEXT` (ej: insumos, logística, sueldos, servicios)
+- `registrado_por UUID → perfiles`
+- `created_at TIMESTAMPTZ DEFAULT NOW()`
+
+**Impacto en dashboard:**
+- Nueva KPI: "Egresos del período"
+- Nueva KPI: "Balance" (cobrado - egresos)
+- Gráfico de evolución actualizado con línea de egresos
+- Nueva sección en dashboard: lista de egresos del período
+
+**SQL a preparar:**
+```sql
+CREATE TABLE egresos (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  fecha_egreso  DATE NOT NULL,
+  concepto      TEXT NOT NULL,
+  monto         NUMERIC(10,2) NOT NULL,
+  categoria     TEXT,
+  registrado_por UUID REFERENCES perfiles(id),
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Scope:**
+- Solo Admin puede ver y registrar egresos.
+- Form: drawer simple con fecha, concepto, monto, categoría.
+- No bloquea el MVP actual — se agrega como módulo nuevo.
+- El filtro de fecha en el dashboard (desde/hasta) aplica a egresos por `fecha_egreso`.
+
+### Limitación conocida a resolver: historial offline
+
+Los cambios de estado tomados sin conexión (modo offline del repartidor) no escriben en `pedido_historial`. La sincronización actualiza `pedidos.estado` directamente sin pasar por la RPC `cambiar_estado_pedido`. Para resolver: exponer un endpoint REST que reciba el batch de acciones offline y ejecute las RPCs correctas con los timestamps originales.

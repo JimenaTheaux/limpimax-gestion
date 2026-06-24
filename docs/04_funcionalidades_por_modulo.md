@@ -160,10 +160,14 @@ Se abre en un drawer/sheet lateral (50% desktop, 100% mobile) con fondo oscureci
 
 ### F4.6 — Modo offline
 - Pedidos del día se descargan al abrir la app con conexión
-- Acciones sin conexión se guardan localmente (IndexedDB)
-- Al reconectar: sincronización automática
+- Acciones sin conexión se guardan localmente (IndexedDB via `offlineQueue`)
+- Al reconectar: sincronización automática en orden cronológico
 - Indicador visible siempre: dot verde "En línea" / dot gris "Sin conexión"
 - Banner amarillo cuando hay cambios pendientes de sincronizar: "N cambios pendientes"
+- **Limitación conocida:** cambios de estado offline no escriben en `pedido_historial`.
+  La sincronización actualiza `pedidos.estado` directamente, sin pasar por la RPC `cambiar_estado_pedido`.
+  El historial queda incompleto para acciones tomadas sin conexión.
+- Acciones que se encolan offline: cambiarEstado, cerrarPedido, editarCobro
 
 ---
 

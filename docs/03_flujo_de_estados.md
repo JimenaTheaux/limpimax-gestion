@@ -58,9 +58,22 @@ Cada transición registra: estado anterior, estado nuevo, usuario, timestamp.
   - `forma_cobro`: efectivo / transferencia / pendiente
   - `monto_cobrado`: numérico (obligatorio si forma ≠ pendiente)
   - `estado_pago`: cobrado | pendiente (se deriva automáticamente de forma_cobro)
-- **Acciones disponibles:** Admin puede editar cobro (forma_cobro, monto_cobrado, estado_pago).
+- **Acciones disponibles:** Admin puede editar cobro (forma_cobro, monto_cobrado, estado_pago, fecha_cobro).
 - **No se puede anular ni retroceder.**
 - **Visible para:** Administración.
+
+#### Relación `fecha_cobro` / `estado_pago`
+
+| forma_cobro | estado_pago | fecha_cobro |
+|---|---|---|
+| efectivo / transferencia | cobrado | fecha seleccionada al cerrar |
+| pendiente | pendiente | null |
+
+- `fecha_cobro` = fecha en que ingresó el dinero (no la fecha del pedido ni la de producción).
+- Los KPIs de cobros en el dashboard filtran por `fecha_cobro`, no por `fecha_produccion`.
+  - Un pedido producido el 5/6 puede tener `fecha_cobro = 8/6` si cobró días después.
+  - Pedidos con `estado_pago = 'pendiente'` tienen `fecha_cobro = null` y no aparecen en los KPIs de cobros hasta que se registre el cobro.
+- Al editar cobro en un pedido cerrado, `estado_pago` se recalcula automáticamente desde `forma_cobro`.
 
 ### `ENTREGA FALLIDA`
 - **Quién lo establece:** Repartidor.

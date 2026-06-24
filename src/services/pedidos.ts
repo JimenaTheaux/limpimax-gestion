@@ -157,7 +157,7 @@ export const usePedidoDetalle = (id: string | null) =>
           .select(`
             id, numero, estado, tipo_precio, direccion_entrega, fecha_produccion,
             total_calculado, total_manual, costo_envio, forma_cobro, monto_cobrado, fecha_cobro,
-            notas_produccion, notas_internas, notas_entrega, motivo_falla,
+            estado_pago, notas_produccion, notas_internas, notas_entrega, motivo_falla,
             motivo_anulacion, created_at, updated_at, cliente_id,
             clientes!inner(nombre, direccion, tipo_cliente, telefono)
           `)
