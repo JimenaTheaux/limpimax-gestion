@@ -10,7 +10,7 @@ import { BtnWhatsapp } from '@/components/common/BtnWhatsapp'
 import { useEditarCobro, fetchPedidoDetalle } from '@/services/pedidos'
 import { useCompartirFactura } from '@/hooks/useCompartirFactura'
 import { useDashboard } from '@/services/produccion'
-import { ESTADO_CONFIG, formatNumero, type EstadoPedido } from '@/types'
+import { ESTADO_CONFIG, formatNumero, CATEGORIA_EGRESO_LABELS, type EstadoPedido, type CategoriaEgreso } from '@/types'
 import type { PedidoPendienteCobro } from '@/services/produccion'
 import { supabase } from '@/lib/supabase'
 
@@ -36,6 +36,12 @@ interface CobroRow {
   forma_cobro:   string | null
   monto_cobrado: string | null
   fecha_cobro:   string | null
+}
+
+type EgresoItem = {
+  monto:        number | string
+  categoria:    string
+  fecha_egreso: string
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -127,6 +133,22 @@ function useEvolucionRango(desde: string, hasta: string) {
     },
     refetchInterval: 30_000,
     staleTime:       0,
+  })
+}
+
+function useEgresosDashboard(desde: string, hasta: string) {
+  return useQuery({
+    queryKey:        ['dashboard-egresos', desde, hasta],
+    placeholderData: keepPreviousData,
+    queryFn:  async () => {
+      const { data } = await supabase
+        .from('egresos')
+        .select('monto, categoria, fecha_egreso')
+        .gte('fecha_egreso', desde)
+        .lte('fecha_egreso', hasta)
+      return (data ?? []) as EgresoItem[]
+    },
+    staleTime: 1000 * 60 * 3,
   })
 }
 
@@ -236,6 +258,18 @@ function pesos(n: number): string {
 function deltaCalc(cur: number, prev: number): number | null {
   if (!prev) return null
   return Math.round(((cur - prev) / prev) * 100)
+}
+
+function calcEgresos(egresos: EgresoItem[]) {
+  const total = egresos.reduce((s, e) => s + Number(e.monto), 0)
+  const byCateg: Record<string, number> = {}
+  for (const e of egresos) {
+    byCateg[e.categoria] = (byCateg[e.categoria] || 0) + Number(e.monto)
+  }
+  const top2 = Object.entries(byCateg)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+  return { total, top2 }
 }
 
 // ─── GraficoLinea ─────────────────────────────────────────────────────────────
@@ -649,6 +683,8 @@ export default function DashboardPage() {
   const { data: cobrosPrev }            = useCobrosperiodo(restarUnMes(desde), restarUnMes(hasta))
   const { data: dashData, refetch }     = useDashboard()
   const { data: evolData }              = useEvolucionRango(desde, hasta)
+  const { data: egresosData, isLoading: isLoadingEgresos } = useEgresosDashboard(desde, hasta)
+  const { data: egresosDataPrev }       = useEgresosDashboard(restarUnMes(desde), restarUnMes(hasta))
 
   const kpi        = pedidos    ? calcKPIs(pedidos)       : null
   const kpiCobros  = cobros     ? calcCobrosKPI(cobros)   : null
@@ -656,6 +692,15 @@ export default function DashboardPage() {
   const delta      = kpiCobros && kpiCobrosPrev ? deltaCalc(kpiCobros.totalCob, kpiCobrosPrev.totalCob) : null
   const evolucion  = evolData ? calcEvolucionRango(evolData, desde, hasta) : null
   const pendientes = dashData?.pendientes
+
+  const kpiEgresos     = egresosData     ? calcEgresos(egresosData)     : null
+  const kpiEgresosPrev = egresosDataPrev ? calcEgresos(egresosDataPrev) : null
+  const totalEgresos   = kpiEgresos?.total ?? 0
+  const gananciaNeta   = (kpiCobros?.totalCob ?? 0) - totalEgresos
+  const gananciaPrev   = kpiCobrosPrev && kpiEgresosPrev
+    ? (kpiCobrosPrev.totalCob - kpiEgresosPrev.total)
+    : null
+  const deltaGanancia  = gananciaPrev !== null ? deltaCalc(gananciaNeta, gananciaPrev) : null
 
   const todayStr = fmtDate(new Date())
 
@@ -771,8 +816,8 @@ export default function DashboardPage() {
         {fechaDisplay}
       </p>
 
-      {/* ── KPIs — 3 columnas ── */}
-      <div className="grid grid-cols-3 gap-3">
+      {/* ── KPIs — 5 columnas desktop / 2 columnas mobile ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
 
         {/* KPI 1 — Total cobrado (filtrado por fecha_cobro) */}
         <div style={card}>
@@ -835,6 +880,69 @@ export default function DashboardPage() {
             </button>
           ) : (
             <p style={subSt}>Sin pendientes</p>
+          )}
+        </div>
+
+        {/* KPI 4 — Egresos del período */}
+        <div style={card} aria-label={`KPI: Egresos del período, ${pesos(totalEgresos)}`}>
+          <span style={labelSt}>Egresos</span>
+          {isLoadingEgresos ? (
+            <Skeleton style={{ height: 28, width: 100, borderRadius: 4, marginBottom: 6 }} />
+          ) : (
+            <>
+              <span style={valorSt}>{kpiEgresos ? pesos(kpiEgresos.total) : '—'}</span>
+              <p style={subSt}>
+                {kpiEgresos && kpiEgresos.top2.length > 0
+                  ? kpiEgresos.top2
+                      .map(([cat, monto]) => `${CATEGORIA_EGRESO_LABELS[cat as CategoriaEgreso] ?? cat} ${pesos(monto)}`)
+                      .join(' · ')
+                  : 'Sin egresos en el período'
+                }
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* KPI 5 — Ganancia neta */}
+        <div
+          className="col-span-2 lg:col-span-1"
+          style={{
+            ...card,
+            ...(gananciaNeta < 0 ? { background: '#FFF8F8', border: '0.5px solid rgba(211,47,47,0.25)' } : {}),
+          }}
+          aria-label={`KPI: Ganancia neta del período, ${pesos(gananciaNeta)}`}
+        >
+          <span style={labelSt}>Ganancia neta</span>
+          {isLoadingEgresos ? (
+            <Skeleton style={{ height: 28, width: 100, borderRadius: 4, marginBottom: 6 }} />
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, lineHeight: 1 }}>
+                <span style={{
+                  ...valorSt,
+                  color: gananciaNeta > 0 ? '#145A32' : gananciaNeta < 0 ? '#D32F2F' : '#1A2B3C',
+                }}>
+                  {pesos(gananciaNeta)}
+                </span>
+                {deltaGanancia !== null && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 500, borderRadius: 99, padding: '1px 6px',
+                    background: deltaGanancia >= 0 ? '#E8F8F0' : '#FDECEA',
+                    color:      deltaGanancia >= 0 ? '#145A32' : '#D32F2F',
+                    flexShrink: 0,
+                  }}>
+                    {deltaGanancia >= 0 ? '↑' : '↓'} {Math.abs(deltaGanancia)}%
+                  </span>
+                )}
+              </div>
+              {gananciaNeta < 0 ? (
+                <p style={{ ...subSt, color: '#D32F2F', fontSize: 10 }}>
+                  Egresos superan los ingresos en este período
+                </p>
+              ) : (
+                <p style={subSt}>Cobrado − Egresos</p>
+              )}
+            </>
           )}
         </div>
       </div>
