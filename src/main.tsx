@@ -14,7 +14,6 @@ const queryClient = new QueryClient({
       retryDelay:           800,
       refetchOnWindowFocus: false,           // no re-fetch al volver a la ventana
       refetchOnReconnect:   true,            // sí re-fetch al reconectar (repartidor)
-      refetchOnMount:       'stale',         // re-fetch solo si los datos son viejos
     },
   },
 })
