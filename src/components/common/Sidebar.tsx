@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Package, Users, ShoppingCart,
-  ChevronRight, LogOut, Settings, UserCircle,
+  ChevronRight, LogOut, Settings, UserCircle, Receipt,
 } from 'lucide-react'
 import { useSidebar } from '@/hooks/useSidebar'
 import { useAuth } from '@/hooks/useAuth'
@@ -17,6 +17,7 @@ const NAV_ADMIN: NavItem[] = [
   { to: '/admin/pedidos',   icon: <ShoppingCart    size={18} />, label: 'Pedidos' },
   { to: '/admin/clientes',  icon: <Users           size={18} />, label: 'Clientes' },
   { to: '/admin/productos', icon: <Package         size={18} />, label: 'Productos' },
+  { to: '/admin/egresos',  icon: <Receipt         size={18} />, label: 'Egresos' },
   { to: '/admin/usuarios',  icon: <Settings        size={18} />, label: 'Usuarios' },
   { to: '/admin/perfil',    icon: <UserCircle      size={18} />, label: 'Mi perfil' },
 ]

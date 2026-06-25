@@ -129,6 +129,40 @@ export interface Pedido {
   pedido_historial?: PedidoHistorial[]
 }
 
+// ─── Egresos ─────────────────────────────────────────────────────────────────
+
+export type CategoriaEgreso =
+  | 'sueldos'
+  | 'alquiler'
+  | 'drogueria'
+  | 'grafica'
+  | 'packaging'
+  | 'luz'
+  | 'otros'
+
+export const CATEGORIA_EGRESO_LABELS: Record<CategoriaEgreso, string> = {
+  sueldos:   'Sueldos',
+  alquiler:  'Alquiler',
+  drogueria: 'Droguería',
+  grafica:   'Gráfica',
+  packaging: 'Packaging',
+  luz:       'Luz',
+  otros:     'Otros',
+}
+
+export interface Egreso {
+  id:             string
+  fecha_egreso:   string
+  categoria:      CategoriaEgreso
+  concepto:       string
+  monto:          number
+  registrado_por: string | null
+  created_at:     string
+  updated_at:     string
+  // Join opcional
+  perfiles?: { nombre: string } | null
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 export const formatNumero = (n: number): string => `P-${String(n).padStart(5, '0')}`

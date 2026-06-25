@@ -13,6 +13,7 @@ const AdminPedidos    = lazy(() => import('@/pages/admin/PedidosPage'))
 const AdminClientes   = lazy(() => import('@/pages/admin/ClientesPage'))
 const AdminProductos  = lazy(() => import('@/pages/admin/ProductosPage'))
 const AdminUsuarios   = lazy(() => import('@/pages/admin/UsuariosPage'))
+const AdminEgresos    = lazy(() => import('@/pages/admin/EgresosPage'))
 
 const ProduccionHome   = lazy(() => import('@/pages/produccion/ProduccionPage'))
 const ProduccionListos = lazy(() => import('@/pages/produccion/ListosPage'))
@@ -63,6 +64,7 @@ export default function App() {
         <Route path="pedidos"   element={<Suspense fallback={<PageLoader />}><AdminPedidos /></Suspense>} />
         <Route path="clientes"  element={<Suspense fallback={<PageLoader />}><AdminClientes /></Suspense>} />
         <Route path="productos" element={<Suspense fallback={<PageLoader />}><AdminProductos /></Suspense>} />
+        <Route path="egresos"   element={<Suspense fallback={<PageLoader />}><AdminEgresos /></Suspense>} />
         <Route path="usuarios"  element={<Suspense fallback={<PageLoader />}><AdminUsuarios /></Suspense>} />
         <Route path="perfil"    element={<Suspense fallback={<PageLoader />}><PerfilPage /></Suspense>} />
       </Route>

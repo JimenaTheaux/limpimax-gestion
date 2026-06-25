@@ -331,3 +331,48 @@ Post-MVP. Web Push API cuando:
 - Pedido modificado en EN PRODUCCIÓN → notifica a Producción
 - Pedido pasa a LISTO PARA REPARTO → notifica a Repartidor
 - Entrega fallida → notifica a Admin
+
+---
+
+## MÓDULO 11: Egresos (Admin)
+
+### F11.1 — Listado de egresos
+
+- Solo accesible para rol Admin
+- Tabla con columnas: Fecha · Categoría · Concepto · Registrado por · Monto · Acciones
+- Filtro por mes/año: selector mes + año, default mes actual
+- Filtro por categoría: select con todas las categorías + "Todas"
+- Total del período: suma del monto filtrado, visible arriba de la tabla
+  formato: "$X.XXX,00 en [mes año]"
+- Botón "+ Agregar egreso" abre drawer lateral
+- Acciones por fila: editar (lápiz) · eliminar (papelera con confirmación)
+- Estado vacío: "Sin egresos para este período"
+
+### F11.2 — Registrar egreso (drawer)
+
+Campos:
+- Fecha (DATE, obligatorio, default hoy)
+- Categoría (select obligatorio):
+    sueldos | alquiler | droguería | gráfica | packaging | luz | otros
+- Concepto (texto libre, obligatorio)
+- Monto (numérico, obligatorio, inputMode decimal)
+- Registrado por (select de usuarios activos, default usuario actual)
+
+### F11.3 — Editar egreso
+
+Mismos campos que registrar.
+Se abre en el mismo drawer con datos precargados.
+
+### F11.4 — Eliminar egreso
+
+Confirmación inline antes de eliminar:
+"¿Eliminar este egreso? Esta acción no se puede deshacer."
+Botones: [Sí, eliminar] (error) · [Cancelar]
+
+### Categorías disponibles (enum fijo en DB):
+  sueldos · alquiler · droguería · gráfica · packaging · luz · otros
+
+### Reglas:
+- Solo Admin puede ver, crear, editar y eliminar egresos
+- No hay soft delete — se borra definitivamente
+- El campo registrado_por guarda quién cargó el egreso

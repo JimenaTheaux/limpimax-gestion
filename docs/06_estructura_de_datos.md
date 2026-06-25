@@ -545,6 +545,57 @@ const formatNumero = (n: number): string => `P-${String(n).padStart(5, '0')}`
 
 ---
 
+## Tabla: egresos
+
+```sql
+CREATE TABLE egresos (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  fecha_egreso   DATE NOT NULL,
+  categoria      TEXT NOT NULL CHECK (categoria IN (
+                   'sueldos','alquiler','drogueria',
+                   'grafica','packaging','luz','otros')),
+  concepto       TEXT NOT NULL,
+  monto          NUMERIC(10,2) NOT NULL,
+  registrado_por UUID REFERENCES perfiles(id),
+  created_at     TIMESTAMPTZ DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+Tipo TypeScript:
+```typescript
+export type CategoriaEgreso =
+  | 'sueldos' | 'alquiler' | 'drogueria'
+  | 'grafica' | 'packaging' | 'luz' | 'otros'
+
+export type Egreso = {
+  id: string
+  fecha_egreso: string
+  categoria: CategoriaEgreso
+  concepto: string
+  monto: number
+  registrado_por: string | null
+  created_at: string
+  updated_at: string
+  perfiles?: { nombre: string }
+}
+```
+
+Labels de categorías para la UI:
+```typescript
+export const CATEGORIA_EGRESO_LABELS: Record<CategoriaEgreso, string> = {
+  sueldos:    'Sueldos',
+  alquiler:   'Alquiler',
+  drogueria:  'Droguería',
+  grafica:    'Gráfica',
+  packaging:  'Packaging',
+  luz:        'Luz',
+  otros:      'Otros',
+}
+```
+
+---
+
 ## ESTADO_CONFIG — objeto global para la UI
 
 ```typescript
