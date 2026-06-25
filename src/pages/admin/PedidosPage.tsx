@@ -815,9 +815,12 @@ export default function PedidosPage() {
   const anular = useAnularPedido()
 
   const { data: pedidos, isLoading } = usePedidos({
-    estado: estadoFiltro || undefined,
-    q:      q || undefined,
+    q: q || undefined,
   })
+
+  const pedidosFiltrados = estadoFiltro
+    ? (pedidos ?? []).filter(p => p.estado === estadoFiltro)
+    : pedidos
 
   const handleNuevo     = () => { setPedidoEdit(null); setDrawerForm(true) }
   const handleVerDetalle = (id: string) => { setSelId(id); setDrawerDet(true) }
@@ -990,7 +993,7 @@ export default function PedidosPage() {
             <tbody>
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => <ShimmerRow key={i} />)
-              ) : !pedidos?.length ? (
+              ) : !pedidosFiltrados?.length ? (
                 <tr>
                   <td colSpan={6}>
                     <div style={{ padding: '48px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
@@ -1012,7 +1015,7 @@ export default function PedidosPage() {
                   </td>
                 </tr>
               ) : (
-                pedidos.map(p => (
+                pedidosFiltrados.map(p => (
                   <FilaPedido
                     key={p.id}
                     pedido={p}
@@ -1028,10 +1031,10 @@ export default function PedidosPage() {
             </tbody>
           </table>
 
-          {!isLoading && !!pedidos?.length && (
+          {!isLoading && !!pedidosFiltrados?.length && (
             <div style={{ padding: '10px 12px', borderTop: '0.5px solid #F4F6F8' }}>
               <span style={{ fontSize: 12, color: '#4A5568' }}>
-                {pedidos.length} {pedidos.length === 1 ? 'pedido' : 'pedidos'}
+                {pedidosFiltrados.length} {pedidosFiltrados.length === 1 ? 'pedido' : 'pedidos'}
               </span>
             </div>
           )}
@@ -1063,7 +1066,7 @@ export default function PedidosPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {Array.from({ length: 3 }).map((_, i) => <ShimmerCard key={i} />)}
           </div>
-        ) : !pedidos?.length ? (
+        ) : !pedidosFiltrados?.length ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', gap: 12, textAlign: 'center' }}>
             <ShoppingCart size={40} strokeWidth={1.2} color="#D1D5DB" />
             <p style={{ fontSize: 14, fontWeight: 500, color: '#1A2B3C', margin: 0 }}>Sin pedidos</p>
@@ -1082,7 +1085,7 @@ export default function PedidosPage() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {pedidos.map(p => (
+            {pedidosFiltrados.map(p => (
               <CardMobile
                 key={p.id}
                 pedido={p}
@@ -1099,7 +1102,7 @@ export default function PedidosPage() {
               />
             ))}
             <p style={{ fontSize: 12, color: '#4A5568', textAlign: 'center', marginTop: 4 }}>
-              {pedidos.length} {pedidos.length === 1 ? 'pedido' : 'pedidos'}
+              {pedidosFiltrados.length} {pedidosFiltrados.length === 1 ? 'pedido' : 'pedidos'}
             </p>
           </div>
         )}
