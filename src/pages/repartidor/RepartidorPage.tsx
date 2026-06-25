@@ -579,7 +579,7 @@ export default function RepartidorPage() {
   const { isOnline, addAction }   = useOffline()
   const cambiar                   = useCambiarEstado()
 
-  const { data: pedidos = [], isLoading, refetch } = usePedidos({
+  const { data: pedidos = [], isLoading } = usePedidos({
     fechaProduccion: HOY,
     estados: ['en_produccion', 'listo_reparto', 'en_reparto'],
   })
@@ -604,7 +604,6 @@ export default function RepartidorPage() {
         cambiar.mutateAsync({ id: p.id, estadoActual: 'listo_reparto', estado: 'en_reparto' })
       ))
       show(`${listos.length} pedido${listos.length !== 1 ? 's' : ''} en camino`, 'success')
-      refetch()
     } catch (e) {
       show(e instanceof Error ? e.message : 'Error', 'error')
     }
@@ -612,7 +611,7 @@ export default function RepartidorPage() {
 
   const handleSaved = (msg: string) => {
     if (msg.endsWith('|error')) show(msg.replace('|error', ''), 'error')
-    else { show(msg, 'success'); refetch() }
+    else show(msg, 'success')
   }
 
   return (

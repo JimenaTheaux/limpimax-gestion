@@ -349,7 +349,7 @@ export default function ProduccionPage() {
   const cambiarEstado                             = useCambiarEstado()
   const esHoy                                     = fechaSeleccionada === HOY
 
-  const { data: pedidosProd, isLoading, refetch } = usePedidosProduccion(fechaSeleccionada)
+  const { data: pedidosProd, isLoading, refetch, isFetching } = usePedidosProduccion(fechaSeleccionada)
 
   const grupos = useMemo(() => {
     const map = new Map<string, PedidoProduccion[]>()
@@ -364,7 +364,6 @@ export default function ProduccionPage() {
   const handleMarcarListo = async (id: string) => {
     await cambiarEstado.mutateAsync({ id, estadoActual: 'en_produccion', estado: 'listo_reparto' })
     show('Pedido marcado como listo para reparto', 'success')
-    refetch()
   }
 
   const totalPedidos = pedidosProd?.length ?? 0
@@ -378,12 +377,15 @@ export default function ProduccionPage() {
           <SelectorFecha fecha={fechaSeleccionada} onChange={setFechaSeleccionada} />
           <button
             onClick={() => refetch()}
+            disabled={isFetching}
             style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: '#4A5568', display: 'flex', alignItems: 'center', gap: 4, fontSize: 13,
+              background: 'none', border: 'none', cursor: isFetching ? 'default' : 'pointer',
+              color: isFetching ? '#9A9A9A' : '#4A5568',
+              display: 'flex', alignItems: 'center', gap: 4, fontSize: 13,
             }}
           >
-            <RefreshCw size={14} /> Actualizar
+            <RefreshCw size={14} style={{ animation: isFetching ? 'spin 0.8s linear infinite' : 'none' }} />
+            {isFetching ? 'Actualizando…' : 'Actualizar'}
           </button>
         </div>
       </div>

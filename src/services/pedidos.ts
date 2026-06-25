@@ -396,7 +396,10 @@ export const useCambiarEstado = () => {
     onError: (_, __, ctx) => {
       ctx?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data))
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: KEY })
+      qc.invalidateQueries({ queryKey: ['produccion'] })
+    },
   })
 }
 
@@ -441,7 +444,10 @@ export const useAnularPedido = () => {
     onError: (_, __, ctx) => {
       ctx?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data))
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: KEY })
+      qc.invalidateQueries({ queryKey: ['produccion'] })
+    },
   })
 }
 
