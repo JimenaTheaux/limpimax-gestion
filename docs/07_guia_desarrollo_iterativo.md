@@ -15,18 +15,17 @@ cd limpimax-app
 
 1. Instalar y configurar Tailwind CSS + shadcn/ui
 2. Instalar dependencias principales (ver 05_stack_tecnico.md)
-3. Crear proyecto en Neon, obtener `DATABASE_URL`
-4. Configurar `db/schema.ts` con el schema de `06_estructura_de_datos.md`
-5. Ejecutar `npx drizzle-kit push` — verificar que las tablas se crean sin errores
-6. Configurar `api/index.ts` con Hono + rutas básicas
-7. Configurar better-auth para email+password
-8. Configurar `vite-plugin-pwa` con manifest básico
-9. **Commit:** `feat: project setup`
+3. Crear proyecto en Supabase, obtener `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`
+4. Crear las tablas de `06_estructura_de_datos.md` desde el SQL Editor de Supabase
+5. Ejecutar `supabase/rpcs_and_indexes.sql` — verificar que las RPC e índices se crean sin errores
+6. Configurar RLS por tabla y por rol
+7. Configurar `vite-plugin-pwa` con manifest básico
+8. **Commit:** `feat: project setup`
 
 ### FASE 2 — Autenticación y routing
 1. Pantalla de login (email + contraseña, float labels, estilo referencia)
-2. Hook `useAuth` que consume la API de better-auth
-3. Routing protegido por rol (React Router v6 + guard components)
+2. Hook `useAuth` que consume Supabase Auth (`signInWithPassword`) + tabla `perfiles`
+3. Routing protegido por rol (React Router v6 + `ProtectedRoute`)
 4. Layout base con sidebar colapsable (Admin) y topbar (Producción/Repartidor)
 5. Bottom nav para mobile
 6. Probar login con 3 usuarios de prueba antes de avanzar
@@ -163,7 +162,7 @@ dist/
 ### Nueva funcionalidad
 ```
 Proyecto: Limpimax App — PWA gestión de pedidos (empresa limpieza argentina).
-Stack: React 18 + TypeScript + Vite + Tailwind + shadcn/ui + Hono + Drizzle + Neon.
+Stack: React 19 + TypeScript + Vite + Tailwind + shadcn/ui + Supabase (DB + Auth + RLS + RPC).
 Archivos de contexto: [adjuntar los .md relevantes]
 
 Necesito implementar: [FUNCIONALIDAD]
@@ -188,7 +187,7 @@ Comportamiento esperado: [citar requisito de 04_funcionalidades_por_modulo.md]
 
 ### Query de base de datos
 ```
-Necesito la query Drizzle para: [caso de uso]
+Necesito la query Supabase (supabase-js) para: [caso de uso]
 Schema en 06_estructura_de_datos.md.
 Rol del usuario: [rol] con estas restricciones: [describir]
 ```
@@ -204,15 +203,15 @@ Rol del usuario: [rol] con estas restricciones: [describir]
 - Borrar código muerto — Git lo recuerda
 - Un componente por archivo
 
-### API (Hono)
-- Validar el body de cada request con Zod antes de tocar la base de datos
-- Nunca devolver más datos de los que el rol necesita
-- Manejar errores con respuestas JSON consistentes: `{ error: string, code: string }`
+### Acceso a datos (Supabase)
+- Validar el formulario con Zod antes de llamar a `supabase.from(...)`
+- Nunca pedir (`select`) más columnas de las que el rol necesita
+- No confiar en el filtrado del frontend como mecanismo de seguridad — la barrera real es RLS
 
-### Base de datos (Drizzle + Neon)
-- No hacer múltiples queries donde alcanza un join
-- Usar transacciones cuando se actualizan múltiples tablas en un mismo request (ej: cambio de estado + insertar historial)
-- Correr `npx drizzle-kit studio` para explorar los datos durante desarrollo
+### Base de datos (Supabase / PostgreSQL)
+- No hacer múltiples queries donde alcanza un join (`select` anidado de Supabase)
+- Usar una RPC (PL/pgSQL) cuando una acción debe actualizar varias tablas de forma atómica (ej: cambio de estado + insertar historial → `cambiar_estado_pedido`)
+- Usar el SQL Editor o el Table Editor de Supabase para explorar los datos durante desarrollo
 
 ### UI/UX
 - Mobile-first: diseñar para pantalla chica, escalar a desktop
@@ -241,7 +240,7 @@ Rol del usuario: [rol] con estas restricciones: [describir]
 ## Checklist de pendientes para arrancar
 
 - [ ] Logo en PNG (mínimo 512×512px) para íconos PWA
-- [ ] URL definitiva de deploy (para configurar better-auth redirect)
+- [ ] URL definitiva de deploy (para configurar redirect/allowlist en Supabase Auth)
 - [ ] Lista de usuarios iniciales: nombre, email, rol
 - [ ] Catálogo inicial de productos para seed
 - [ ] Lista de clientes existentes para migrar
@@ -250,42 +249,9 @@ Rol del usuario: [rol] con estas restricciones: [describir]
 
 ## PRÓXIMAS FUNCIONALIDADES (post-MVP v1)
 
-### Módulo de Egresos (prioridad alta)
+### Módulo de Egresos — implementado ✅
 
-Registrar salidas de dinero de la empresa para tener un balance real de ingresos vs egresos en el dashboard.
-
-**Campos mínimos necesarios:**
-- `fecha_egreso DATE`
-- `concepto TEXT` (descripción del gasto)
-- `monto NUMERIC(10,2)`
-- `categoria TEXT` (ej: insumos, logística, sueldos, servicios)
-- `registrado_por UUID → perfiles`
-- `created_at TIMESTAMPTZ DEFAULT NOW()`
-
-**Impacto en dashboard:**
-- Nueva KPI: "Egresos del período"
-- Nueva KPI: "Balance" (cobrado - egresos)
-- Gráfico de evolución actualizado con línea de egresos
-- Nueva sección en dashboard: lista de egresos del período
-
-**SQL a preparar:**
-```sql
-CREATE TABLE egresos (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  fecha_egreso  DATE NOT NULL,
-  concepto      TEXT NOT NULL,
-  monto         NUMERIC(10,2) NOT NULL,
-  categoria     TEXT,
-  registrado_por UUID REFERENCES perfiles(id),
-  created_at    TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-**Scope:**
-- Solo Admin puede ver y registrar egresos.
-- Form: drawer simple con fecha, concepto, monto, categoría.
-- No bloquea el MVP actual — se agrega como módulo nuevo.
-- El filtro de fecha en el dashboard (desde/hasta) aplica a egresos por `fecha_egreso`.
+El módulo de Egresos (lista, crear, editar, eliminar, KPI de "Egresos del período" y "Ganancia neta" en el dashboard) ya está implementado. Schema final, tipos y queries en `06_estructura_de_datos.md` (tabla `egresos`, `CategoriaEgreso`, `CATEGORIA_EGRESO_LABELS`). Servicio en `src/services/egresos.ts`, UI en `src/pages/admin/EgresosPage.tsx`.
 
 ### Limitación conocida a resolver: historial offline
 
