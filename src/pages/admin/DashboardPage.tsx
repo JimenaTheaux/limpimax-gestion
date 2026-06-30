@@ -21,7 +21,12 @@ Chart.register(...registerables)
 interface PedidoItemRow {
   cantidad:    number
   producto_id: string
-  productos?:  { nombre: string; presentacion: number } | null
+  productos?:  {
+    nombre:               string
+    presentacion:         number
+    fragancia:            string | null
+    categorias_producto?: { nombre: string } | null
+  } | null
 }
 
 interface PedidoRow {
@@ -78,7 +83,7 @@ function usePedidosPeriodo(inicio: string, fin: string) {
     queryFn:  async () => {
       const { data, error } = await supabase
         .from('pedidos')
-        .select('id, estado, fecha_produccion, pedido_items(cantidad, producto_id, productos(nombre, presentacion))')
+        .select('id, estado, fecha_produccion, pedido_items(cantidad, producto_id, productos(nombre, presentacion, fragancia, categorias_producto(nombre)))')
         .gte('created_at', inicio)
         .lte('created_at', fin + 'T23:59:59')
       if (error) throw new Error(error.message)
@@ -237,7 +242,7 @@ function fmtRango(desde: string, hasta: string): string {
 }
 
 function calcTopProductos(pedidos: PedidoRow[]) {
-  const acc: Record<string, { nombre: string; presentacion: number; total: number }> = {}
+  const acc: Record<string, { nombre: string; presentacion: number; fragancia: string | null; total: number }> = {}
   for (const p of pedidos) {
     if (p.estado !== 'cerrado') continue
     for (const item of p.pedido_items ?? []) {
@@ -245,12 +250,28 @@ function calcTopProductos(pedidos: PedidoRow[]) {
       if (!acc[key]) acc[key] = {
         nombre:       item.productos?.nombre       ?? '—',
         presentacion: item.productos?.presentacion ?? 0,
+        fragancia:    item.productos?.fragancia    ?? null,
         total:        0,
       }
       acc[key].total += Number(item.cantidad)
     }
   }
   return Object.values(acc).sort((a, b) => b.total - a.total).slice(0, 5)
+}
+
+function calcTopCategorias(pedidos: PedidoRow[]): { nombre: string; total: number }[] {
+  const acc: Record<string, number> = {}
+  for (const p of pedidos) {
+    if (p.estado !== 'cerrado') continue
+    for (const item of p.pedido_items ?? []) {
+      const cat = item.productos?.categorias_producto?.nombre ?? 'Sin categoría'
+      acc[cat] = (acc[cat] ?? 0) + Number(item.cantidad)
+    }
+  }
+  return Object.entries(acc)
+    .map(([nombre, total]) => ({ nombre, total }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5)
 }
 
 function pesos(n: number): string {
@@ -680,6 +701,7 @@ export default function DashboardPage() {
   const [desde,     setDesde]    = useState<string>(primerDiaMes())
   const [hasta,     setHasta]    = useState<string>(fmtDate(new Date()))
   const [sheetPend, setSheetPend] = useState(false)
+  const [topVer,    setTopVer]   = useState<'producto' | 'categoria'>('producto')
 
   // Pedidos por fecha_produccion (conteos, estados)
   const { data: pedidos,    isLoading } = usePedidosPeriodo(desde, hasta)
@@ -1012,54 +1034,99 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Top 5 productos más vendidos ── */}
+      {/* ── Top 5 más vendidos ── */}
       {(() => {
-        const top5 = pedidos ? calcTopProductos(pedidos) : []
-        const maxU  = top5[0]?.total ?? 1
+        const topProds = pedidos ? calcTopProductos(pedidos)  : []
+        const topCats  = pedidos ? calcTopCategorias(pedidos) : []
+        const lista    = topVer === 'producto' ? topProds : topCats
+        const maxU     = lista[0]?.total ?? 1
+        const vacia    = lista.length === 0
+
+        const btnToggle = (ver: 'producto' | 'categoria', label: string) => (
+          <button
+            key={ver}
+            onClick={() => setTopVer(ver)}
+            style={{
+              padding: '3px 9px', borderRadius: 4, border: 'none', cursor: 'pointer',
+              fontSize: 10, fontWeight: 500, fontFamily: 'Inter, sans-serif',
+              background: topVer === ver ? '#fff' : 'transparent',
+              color:      topVer === ver ? '#1A2B3C' : '#9CA3AF',
+              boxShadow:  topVer === ver ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              transition: 'all 0.12s',
+            }}
+          >
+            {label}
+          </button>
+        )
 
         return (
           <div style={{ background: '#fff', border: '0.5px solid #D1D5DB', borderRadius: 10, overflow: 'hidden' }}>
-            <div style={{ padding: '10px 16px', borderBottom: '0.5px solid #F4F6F8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: '#1A2B3C' }}>Productos más vendidos</span>
-              <span style={{ fontSize: 10, color: '#4A5568' }}>{fmtRango(desde, hasta)}</span>
+            {/* Header */}
+            <div style={{ padding: '10px 16px', borderBottom: '0.5px solid #F4F6F8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: '#1A2B3C' }}>Más vendidos</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {/* Toggle */}
+                <div style={{ display: 'flex', background: '#F4F6F8', borderRadius: 6, padding: 2, gap: 2 }}>
+                  {btnToggle('producto',  'Productos')}
+                  {btnToggle('categoria', 'Categorías')}
+                </div>
+                <span style={{ fontSize: 10, color: '#9CA3AF' }}>{fmtRango(desde, hasta)}</span>
+              </div>
             </div>
-            {top5.length === 0 ? (
+
+            {/* Filas */}
+            {vacia ? (
               <p style={{ fontSize: 12, color: '#4A5568', textAlign: 'center', padding: 16, margin: 0 }}>
                 Sin ventas en el período seleccionado
               </p>
-            ) : top5.map((prod, i) => (
+            ) : lista.map((item, i) => (
               <div
-                key={prod.nombre + prod.presentacion}
+                key={item.nombre + i}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '8px 16px',
-                  borderBottom: i < top5.length - 1 ? '0.5px solid #F4F6F8' : 'none',
+                  borderBottom: i < lista.length - 1 ? '0.5px solid #F4F6F8' : 'none',
                 }}
               >
-                <span style={{ fontSize: 11, fontWeight: 500, color: '#4A5568', minWidth: 16 }}>
+                <span style={{ fontSize: 11, fontWeight: 500, color: '#9CA3AF', minWidth: 16 }}>
                   {i + 1}
                 </span>
-                <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
+
+                {/* Nombre + badges */}
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden' }}>
                   <span style={{ fontSize: 12, fontWeight: 500, color: '#1A2B3C', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {prod.nombre}
+                    {item.nombre}
                   </span>
-                  {prod.presentacion > 0 && (
-                    <span style={{
-                      marginLeft: 6, fontSize: 9, color: '#4A5568',
-                      background: '#F4F6F8', padding: '1px 5px', borderRadius: 4,
-                      flexShrink: 0,
-                    }}>
-                      {prod.presentacion} L
-                    </span>
-                  )}
+                  {topVer === 'producto' && (() => {
+                    const p = item as typeof topProds[0]
+                    return (
+                      <>
+                        {p.fragancia && (
+                          <span style={{ fontSize: 9, color: '#0D5C8A', background: '#E8F4FF', padding: '1px 5px', borderRadius: 4, flexShrink: 0 }}>
+                            {p.fragancia}
+                          </span>
+                        )}
+                        {p.presentacion > 0 && (
+                          <span style={{ fontSize: 9, color: '#4A5568', background: '#F4F6F8', padding: '1px 5px', borderRadius: 4, flexShrink: 0 }}>
+                            {p.presentacion} L
+                          </span>
+                        )}
+                      </>
+                    )
+                  })()}
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 500, color: '#0D5C8A', minWidth: 60, textAlign: 'right' }}>
-                  {prod.total} u.
+
+                {/* Total */}
+                <span style={{ fontSize: 12, fontWeight: 500, color: '#0D5C8A', minWidth: 52, textAlign: 'right', flexShrink: 0 }}>
+                  {item.total} u.
                 </span>
+
+                {/* Barra */}
                 <div style={{ width: 80, height: 3, borderRadius: 99, background: '#F4F6F8', flexShrink: 0 }}>
                   <div style={{
-                    width: `${(prod.total / maxU) * 100}%`,
+                    width: `${(item.total / maxU) * 100}%`,
                     height: '100%', borderRadius: 99, background: '#0D5C8A',
+                    transition: 'width 0.3s ease',
                   }} />
                 </div>
               </div>
