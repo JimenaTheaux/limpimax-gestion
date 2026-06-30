@@ -12,7 +12,7 @@ export function BadgeEstado({ estado }: Props) {
       backgroundColor: cfg.bg,
       color:           cfg.color,
       fontSize:        9,
-      fontWeight:      700,
+      fontWeight:      600,
       padding:         '2px 7px',
       borderRadius:    99,
       display:         'inline-block',

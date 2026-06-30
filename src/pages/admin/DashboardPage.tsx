@@ -778,14 +778,14 @@ export default function DashboardPage() {
     display: 'flex', alignItems: 'center', gap: '5px', marginBottom: 10,
   }
   const kpiLabelSt = {
-    fontSize: 9, fontWeight: 700 as const, color: '#4A5568',
+    fontSize: 9, fontWeight: 500 as const, color: '#4A5568',
     textTransform: 'uppercase' as const, letterSpacing: '0.08em',
   }
   const kpiValueSt = {
-    fontSize: 28, fontWeight: 800 as const, color: '#1A2B3C', letterSpacing: '-1px', lineHeight: 1,
+    fontSize: 28, fontWeight: 500 as const, color: '#1A2B3C', letterSpacing: '-0.5px', lineHeight: 1,
   }
   const kpiSubSt = {
-    margin: '4px 0 0', fontSize: 12, fontWeight: 400 as const, color: '#4A5568',
+    margin: '6px 0 0', fontSize: 12, fontWeight: 400 as const, color: '#4A5568',
   }
 
   return (
@@ -844,7 +844,7 @@ export default function DashboardPage() {
       </p>
 
       {/* ── KPIs ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
         {/* Fila 1: Pedidos · Cobrado · Pend. cobro */}
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
@@ -868,12 +868,12 @@ export default function DashboardPage() {
             <div style={kpiValueSt}>{pesos(kpiCobros?.totalCob ?? 0)}</div>
             <div style={{ display: 'flex', gap: '6px', marginTop: 8 }}>
               <div style={{ flex: 1, background: '#F5F7F9', borderRadius: 8, padding: '7px 10px' }}>
-                <div style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#4A5568', marginBottom: 2 }}>Efectivo</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#1A2B3C' }}>{pesos(kpiCobros?.totalEf ?? 0)}</div>
+                <div style={{ fontSize: 8, fontWeight: 500, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#4A5568', marginBottom: 2 }}>Efectivo</div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: '#1A2B3C' }}>{pesos(kpiCobros?.totalEf ?? 0)}</div>
               </div>
               <div style={{ flex: 1, background: '#F5F7F9', borderRadius: 8, padding: '7px 10px' }}>
-                <div style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#4A5568', marginBottom: 2 }}>Transf.</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#1A2B3C' }}>{pesos(kpiCobros?.totalTr ?? 0)}</div>
+                <div style={{ fontSize: 8, fontWeight: 500, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#4A5568', marginBottom: 2 }}>Transf.</div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: '#1A2B3C' }}>{pesos(kpiCobros?.totalTr ?? 0)}</div>
               </div>
             </div>
           </div>
