@@ -37,10 +37,13 @@ interface PedidoRow {
 
 interface CobroRow {
   id:            string
-  forma_cobro:   string | null
-  monto_cobrado: string | null
-  fecha_cobro:   string | null
   pedido_items?: { cantidad: number; costo_snapshot: number }[]
+}
+
+interface PagoRow {
+  forma_pago: string
+  monto:      number | string
+  fecha_pago: string
 }
 
 type EgresoItem = {
@@ -93,7 +96,7 @@ function usePedidosPeriodo(inicio: string, fin: string) {
   })
 }
 
-// Cobros por fecha_cobro — para KPIs de dinero
+// Pedidos cerrados por fecha_cobro — sólo para costo de producción (costo_snapshot)
 function useCobrosperiodo(inicio: string, fin: string) {
   return useQuery({
     queryKey:        ['pedidos', 'dash-cobros', inicio, fin],
@@ -101,9 +104,8 @@ function useCobrosperiodo(inicio: string, fin: string) {
     queryFn:  async () => {
       const { data, error } = await supabase
         .from('pedidos')
-        .select('id, forma_cobro, monto_cobrado, fecha_cobro, pedido_items(cantidad, costo_snapshot)')
+        .select('id, pedido_items(cantidad, costo_snapshot)')
         .eq('estado', 'cerrado')
-        .eq('estado_pago', 'cobrado')
         .gte('fecha_cobro', inicio)
         .lte('fecha_cobro', fin)
       if (error) throw new Error(error.message)
@@ -114,28 +116,39 @@ function useCobrosperiodo(inicio: string, fin: string) {
   })
 }
 
-type EvolItem = {
-  monto_cobrado: string | null
-  fecha_cobro:   string | null
-  estado_pago:   string | null
-  forma_cobro:   string | null
-}
-
-// Chart: cubre período actual + mes anterior, filtrado por fecha_cobro
-function useEvolucionRango(desde: string, hasta: string) {
-  const mesAnteriorDesde = restarUnMes(desde)
+// Pagos reales por fecha_pago — fuente de verdad para KPIs de dinero cobrado
+function usePagosPeriodo(inicio: string, fin: string) {
   return useQuery({
-    queryKey:        ['pedidos', 'dash-evolucion-rango', desde, hasta],
+    queryKey:        ['pedido_pagos', 'dash', inicio, fin],
     placeholderData: keepPreviousData,
     queryFn:  async () => {
       const { data, error } = await supabase
-        .from('pedidos')
-        .select('monto_cobrado, fecha_cobro, estado_pago, forma_cobro')
-        .eq('estado', 'cerrado')
-        .gte('fecha_cobro', mesAnteriorDesde)
-        .lte('fecha_cobro', hasta)
+        .from('pedido_pagos')
+        .select('forma_pago, monto, fecha_pago')
+        .gte('fecha_pago', inicio)
+        .lte('fecha_pago', fin)
       if (error) throw new Error(error.message)
-      return (data ?? []) as EvolItem[]
+      return (data ?? []) as PagoRow[]
+    },
+    refetchInterval: 30_000,
+    staleTime:       0,
+  })
+}
+
+// Chart: cubre período actual + mes anterior, agrupado por fecha_pago de pedido_pagos
+function useEvolucionRango(desde: string, hasta: string) {
+  const mesAnteriorDesde = restarUnMes(desde)
+  return useQuery({
+    queryKey:        ['pedido_pagos', 'dash-evolucion', desde, hasta],
+    placeholderData: keepPreviousData,
+    queryFn:  async () => {
+      const { data, error } = await supabase
+        .from('pedido_pagos')
+        .select('monto, fecha_pago')
+        .gte('fecha_pago', mesAnteriorDesde)
+        .lte('fecha_pago', hasta)
+      if (error) throw new Error(error.message)
+      return (data ?? []) as PagoRow[]
     },
     refetchInterval: 30_000,
     staleTime:       0,
@@ -160,12 +173,6 @@ function useEgresosDashboard(desde: string, hasta: string) {
 
 // ─── Calculation helpers ──────────────────────────────────────────────────────
 
-function esCobrado(p: { estado: string; estado_pago: string | null; forma_cobro: string | null }): boolean {
-  if (p.estado !== 'cerrado') return false
-  if (p.estado_pago === 'cobrado') return true
-  return p.estado_pago == null && !!p.forma_cobro && p.forma_cobro !== 'pendiente'
-}
-
 // Pedidos por fecha_produccion: conteos y distribución de estados
 function calcKPIs(pedidos: PedidoRow[]) {
   const pendCierre = pedidos.filter(p => !['cerrado', 'anulado'].includes(p.estado)).length
@@ -174,17 +181,17 @@ function calcKPIs(pedidos: PedidoRow[]) {
   return { pendCierre, porEstado, count: pedidos.length }
 }
 
-// Cobros por fecha_cobro: totales de dinero
-function calcCobrosKPI(cobros: CobroRow[]) {
-  const totalCob = cobros.reduce((a, p) => a + (Number(p.monto_cobrado) || 0), 0)
-  const totalEf  = cobros.filter(p => p.forma_cobro === 'efectivo')
-                         .reduce((a, p) => a + (Number(p.monto_cobrado) || 0), 0)
-  const totalTr  = cobros.filter(p => p.forma_cobro === 'transferencia')
-                         .reduce((a, p) => a + (Number(p.monto_cobrado) || 0), 0)
+// Pagos reales: totales de dinero cobrado por forma_pago
+function calcCobrosKPI(pagos: PagoRow[]) {
+  const totalCob = pagos.reduce((a, p) => a + Number(p.monto), 0)
+  const totalEf  = pagos.filter(p => p.forma_pago === 'efectivo')
+                        .reduce((a, p) => a + Number(p.monto), 0)
+  const totalTr  = pagos.filter(p => p.forma_pago === 'transferencia')
+                        .reduce((a, p) => a + Number(p.monto), 0)
   return { totalCob, totalEf, totalTr }
 }
 
-function calcEvolucionRango(pedidosTodos: EvolItem[], desde: string, hasta: string) {
+function calcEvolucionRango(pagos: PagoRow[], desde: string, hasta: string) {
   const mesAnteriorDesde = restarUnMes(desde)
 
   const dDesde    = new Date(desde + 'T12:00:00')
@@ -193,10 +200,9 @@ function calcEvolucionRango(pedidosTodos: EvolItem[], desde: string, hasta: stri
   const porDia    = totalDays <= 31
 
   const byDia: Record<string, number> = {}
-  for (const p of pedidosTodos) {
-    if (!p.fecha_cobro || !p.monto_cobrado) continue
-    if (!esCobrado({ estado: 'cerrado', estado_pago: p.estado_pago, forma_cobro: p.forma_cobro })) continue
-    byDia[p.fecha_cobro] = (byDia[p.fecha_cobro] || 0) + Number(p.monto_cobrado)
+  for (const p of pagos) {
+    if (!p.fecha_pago) continue
+    byDia[p.fecha_pago] = (byDia[p.fecha_pago] || 0) + Number(p.monto)
   }
 
   const labels:   string[] = []
@@ -581,15 +587,17 @@ export default function DashboardPage() {
 
   // Pedidos por fecha_produccion (conteos, estados)
   const { data: pedidos,    isLoading } = usePedidosPeriodo(desde, hasta)
-  // Cobros por fecha_cobro (totales de dinero + costo_snapshot para costo producción)
+  // Pedidos cerrados por fecha_cobro — sólo para costo de producción
   const { data: cobros }                = useCobrosperiodo(desde, hasta)
+  // Pagos reales por fecha_pago — fuente de verdad para KPIs de dinero
+  const { data: pagos }                 = usePagosPeriodo(desde, hasta)
   // Clientes con saldo_pendiente > 0 (para KPI y drawer)
   const { data: clientesDeuda = [] }    = useClientesConDeuda()
   const { data: evolData }              = useEvolucionRango(desde, hasta)
   const { data: egresosData, isLoading: isLoadingEgresos } = useEgresosDashboard(desde, hasta)
 
-  const kpi       = pedidos  ? calcKPIs(pedidos)     : null
-  const kpiCobros = cobros   ? calcCobrosKPI(cobros) : null
+  const kpi       = pedidos ? calcKPIs(pedidos)    : null
+  const kpiCobros = pagos   ? calcCobrosKPI(pagos) : null
   const evolucion = evolData ? calcEvolucionRango(evolData, desde, hasta) : null
 
   const totalPendienteClientes = clientesDeuda.reduce((s, c) => s + c.saldo_pendiente, 0)
