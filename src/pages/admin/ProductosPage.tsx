@@ -317,7 +317,15 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
           <FloatInput label="Precio mayorista *" error={errors.precioMayorista?.message} {...register('precioMayorista')} inputMode="decimal" />
         </div>
 
-        <FloatInput label="Costo de producción" {...register('costoProduccion')} inputMode="decimal" />
+        <div style={{ borderLeft: '3px solid #F57C00', paddingLeft: 10, borderRadius: '0 8px 8px 0', background: '#FFF9F0', padding: '10px 10px 10px 12px' }}>
+          <FloatInput
+            label="Costo de producción"
+            hint="Solo uso interno — no se muestra al cliente"
+            {...register('costoProduccion')}
+            inputMode="decimal"
+            style={{ background: '#FFF9F0' }}
+          />
+        </div>
 
         <FloatInput label="Código (opcional)" {...register('codigo')} />
 
