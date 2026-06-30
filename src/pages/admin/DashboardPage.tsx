@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Chart, registerables, type TooltipItem } from 'chart.js'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import { Clock } from 'lucide-react'
+import { Clock, Package, Banknote, FlaskConical, BarChart2 } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { BadgeEstado } from '@/components/common/BadgeEstado'
@@ -10,7 +10,7 @@ import { BtnWhatsapp } from '@/components/common/BtnWhatsapp'
 import { useEditarCobro, fetchPedidoDetalle } from '@/services/pedidos'
 import { useCompartirFactura } from '@/hooks/useCompartirFactura'
 import { useDashboard } from '@/services/produccion'
-import { ESTADO_CONFIG, formatNumero, CATEGORIA_EGRESO_LABELS, type EstadoPedido, type CategoriaEgreso } from '@/types'
+import { ESTADO_CONFIG, formatNumero, type EstadoPedido } from '@/types'
 import type { PedidoPendienteCobro } from '@/services/produccion'
 import { supabase } from '@/lib/supabase'
 
@@ -36,6 +36,7 @@ interface CobroRow {
   forma_cobro:   string | null
   monto_cobrado: string | null
   fecha_cobro:   string | null
+  pedido_items?: { cantidad: number; costo_snapshot: number }[]
 }
 
 type EgresoItem = {
@@ -96,12 +97,13 @@ function useCobrosperiodo(inicio: string, fin: string) {
     queryFn:  async () => {
       const { data, error } = await supabase
         .from('pedidos')
-        .select('id, forma_cobro, monto_cobrado, fecha_cobro')
+        .select('id, forma_cobro, monto_cobrado, fecha_cobro, pedido_items(cantidad, costo_snapshot)')
         .eq('estado', 'cerrado')
+        .eq('estado_pago', 'cobrado')
         .gte('fecha_cobro', inicio)
         .lte('fecha_cobro', fin)
       if (error) throw new Error(error.message)
-      return (data ?? []) as CobroRow[]
+      return (data ?? []) as unknown as CobroRow[]
     },
     refetchInterval: 30_000,
     staleTime:       0,
@@ -255,11 +257,6 @@ function pesos(n: number): string {
   return `$${n.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 }
 
-function deltaCalc(cur: number, prev: number): number | null {
-  if (!prev) return null
-  return Math.round(((cur - prev) / prev) * 100)
-}
-
 function calcEgresos(egresos: EgresoItem[]) {
   const total = egresos.reduce((s, e) => s + Number(e.monto), 0)
   const byCateg: Record<string, number> = {}
@@ -270,6 +267,14 @@ function calcEgresos(egresos: EgresoItem[]) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 2)
   return { total, top2 }
+}
+
+function calcTotalCostoProduccion(cobros: CobroRow[]): number {
+  return cobros.reduce((sum, pedido) =>
+    sum + (pedido.pedido_items ?? []).reduce((s, item) =>
+      s + item.cantidad * item.costo_snapshot, 0
+    ), 0
+  )
 }
 
 // ─── GraficoLinea ─────────────────────────────────────────────────────────────
@@ -678,29 +683,21 @@ export default function DashboardPage() {
 
   // Pedidos por fecha_produccion (conteos, estados)
   const { data: pedidos,    isLoading } = usePedidosPeriodo(desde, hasta)
-  // Cobros por fecha_cobro (totales de dinero)
+  // Cobros por fecha_cobro (totales de dinero + costo_snapshot para costo producción)
   const { data: cobros }                = useCobrosperiodo(desde, hasta)
-  const { data: cobrosPrev }            = useCobrosperiodo(restarUnMes(desde), restarUnMes(hasta))
   const { data: dashData, refetch }     = useDashboard()
   const { data: evolData }              = useEvolucionRango(desde, hasta)
   const { data: egresosData, isLoading: isLoadingEgresos } = useEgresosDashboard(desde, hasta)
-  const { data: egresosDataPrev }       = useEgresosDashboard(restarUnMes(desde), restarUnMes(hasta))
 
-  const kpi        = pedidos    ? calcKPIs(pedidos)       : null
-  const kpiCobros  = cobros     ? calcCobrosKPI(cobros)   : null
-  const kpiCobrosPrev = cobrosPrev ? calcCobrosKPI(cobrosPrev) : null
-  const delta      = kpiCobros && kpiCobrosPrev ? deltaCalc(kpiCobros.totalCob, kpiCobrosPrev.totalCob) : null
-  const evolucion  = evolData ? calcEvolucionRango(evolData, desde, hasta) : null
-  const pendientes = dashData?.pendientes
+  const kpi            = pedidos  ? calcKPIs(pedidos)     : null
+  const kpiCobros      = cobros   ? calcCobrosKPI(cobros) : null
+  const evolucion      = evolData ? calcEvolucionRango(evolData, desde, hasta) : null
+  const pendientes     = dashData?.pendientes
 
-  const kpiEgresos     = egresosData     ? calcEgresos(egresosData)     : null
-  const kpiEgresosPrev = egresosDataPrev ? calcEgresos(egresosDataPrev) : null
-  const totalEgresos   = kpiEgresos?.total ?? 0
-  const gananciaNeta   = (kpiCobros?.totalCob ?? 0) - totalEgresos
-  const gananciaPrev   = kpiCobrosPrev && kpiEgresosPrev
-    ? (kpiCobrosPrev.totalCob - kpiEgresosPrev.total)
-    : null
-  const deltaGanancia  = gananciaPrev !== null ? deltaCalc(gananciaNeta, gananciaPrev) : null
+  const kpiEgresos             = egresosData ? calcEgresos(egresosData) : null
+  const totalEgresos           = kpiEgresos?.total ?? 0
+  const totalCostoProduccion   = cobros ? calcTotalCostoProduccion(cobros) : 0
+  const gananciaNeta           = (kpiCobros?.totalCob ?? 0) - totalCostoProduccion - totalEgresos
 
   const todayStr = fmtDate(new Date())
 
@@ -735,8 +732,13 @@ export default function DashboardPage() {
           </div>
         </div>
         <Skeleton style={{ height: 14, width: 200, borderRadius: 4 }} />
-        <div className="grid grid-cols-3 gap-3">
-          {[1,2,3].map(i => <Skeleton key={i} style={{ height: 88, borderRadius: 10 }} />)}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            {[1,2,3].map(i => <Skeleton key={i} style={{ height: 104, borderRadius: 20 }} />)}
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:w-2/3 lg:mx-auto">
+            {[4,5].map(i => <Skeleton key={i} style={{ height: 104, borderRadius: 20 }} />)}
+          </div>
         </div>
         <div className="grid md:grid-cols-2 grid-cols-1 gap-3">
           <Skeleton style={{ height: 240, borderRadius: 10 }} />
@@ -746,19 +748,22 @@ export default function DashboardPage() {
     )
   }
 
-  const card = {
-    background: '#fff', border: '0.5px solid #D1D5DB', borderRadius: 10, padding: '14px 16px',
+  const kpiCard = {
+    background: '#fff', borderRadius: 20, padding: '16px 18px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
   }
-  const labelSt = {
-    fontSize: 10, fontWeight: 500, color: '#4A5568',
-    textTransform: 'uppercase' as const, letterSpacing: '0.06em',
-    marginBottom: 10, display: 'block',
+  const kpiHeaderRow = {
+    display: 'flex', alignItems: 'center', gap: '5px', marginBottom: 10,
   }
-  const valorSt = {
-    fontSize: 22, fontWeight: 500, color: '#1A2B3C', letterSpacing: '-0.5px', lineHeight: 1,
+  const kpiLabelSt = {
+    fontSize: 9, fontWeight: 700 as const, color: '#4A5568',
+    textTransform: 'uppercase' as const, letterSpacing: '0.08em',
   }
-  const subSt = {
-    fontSize: 11, fontWeight: 400, color: '#4A5568', marginTop: 4,
+  const kpiValueSt = {
+    fontSize: 28, fontWeight: 800 as const, color: '#1A2B3C', letterSpacing: '-1px', lineHeight: 1,
+  }
+  const kpiSubSt = {
+    margin: '4px 0 0', fontSize: 12, fontWeight: 400 as const, color: '#4A5568',
   }
 
   return (
@@ -816,134 +821,91 @@ export default function DashboardPage() {
         {fechaDisplay}
       </p>
 
-      {/* ── KPIs — 5 columnas desktop / 2 columnas mobile ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      {/* ── KPIs ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-        {/* KPI 1 — Total cobrado (filtrado por fecha_cobro) */}
-        <div style={card}>
-          <span style={labelSt}>Total cobrado</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, lineHeight: 1 }}>
-            <span style={valorSt}>{pesos(kpiCobros?.totalCob ?? 0)}</span>
-            {delta !== null && (
-              <span style={{
-                fontSize: 10, fontWeight: 500, borderRadius: 99, padding: '1px 6px',
-                background: delta >= 0 ? '#E8F8F0' : '#FDECEA',
-                color:      delta >= 0 ? '#145A32' : '#B71C1C',
-                flexShrink: 0,
-              }}>
-                {delta >= 0 ? '↑' : '↓'} {Math.abs(delta)}%
-              </span>
+        {/* Fila 1: Pedidos · Cobrado · Pend. cobro */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+
+          {/* Card 1 — Pedidos */}
+          <div style={kpiCard}>
+            <div style={kpiHeaderRow}>
+              <Package size={13} style={{ color: '#3DD6B5', flexShrink: 0 }} />
+              <span style={kpiLabelSt}>Pedidos</span>
+            </div>
+            <div style={kpiValueSt}>{kpi?.count ?? 0}</div>
+            <p style={kpiSubSt}>{kpi?.pendCierre ?? 0} pendiente(s) de cierre</p>
+          </div>
+
+          {/* Card 2 — Total cobrado */}
+          <div style={kpiCard}>
+            <div style={kpiHeaderRow}>
+              <Banknote size={13} style={{ color: '#7EB8E8', flexShrink: 0 }} />
+              <span style={kpiLabelSt}>Total cobrado</span>
+            </div>
+            <div style={kpiValueSt}>{pesos(kpiCobros?.totalCob ?? 0)}</div>
+            <div style={{ display: 'flex', gap: '6px', marginTop: 8 }}>
+              <div style={{ flex: 1, background: '#F5F7F9', borderRadius: 8, padding: '7px 10px' }}>
+                <div style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#4A5568', marginBottom: 2 }}>Efectivo</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#1A2B3C' }}>{pesos(kpiCobros?.totalEf ?? 0)}</div>
+              </div>
+              <div style={{ flex: 1, background: '#F5F7F9', borderRadius: 8, padding: '7px 10px' }}>
+                <div style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#4A5568', marginBottom: 2 }}>Transf.</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#1A2B3C' }}>{pesos(kpiCobros?.totalTr ?? 0)}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3 — Pendiente de cobro */}
+          <button
+            onClick={() => { if (pendientes) setSheetPend(true) }}
+            style={{
+              ...kpiCard,
+              display: 'block', width: '100%', border: 'none',
+              cursor: 'pointer', textAlign: 'left', fontFamily: 'Inter, sans-serif',
+            }}
+          >
+            <div style={kpiHeaderRow}>
+              <Clock size={13} style={{ color: '#C47B00', flexShrink: 0 }} />
+              <span style={kpiLabelSt}>Pend. de cobro</span>
+            </div>
+            <div style={{ ...kpiValueSt, color: '#C47B00' }}>{pesos(pendientes?.total ?? 0)}</div>
+            <p style={{ ...kpiSubSt, color: '#3DD6B5', fontWeight: 600 }}>Ver detalle →</p>
+          </button>
+
+        </div>
+
+        {/* Fila 2: Costo producción · Ganancia neta — centradas en desktop */}
+        <div className="grid grid-cols-2 gap-3 lg:w-2/3 lg:mx-auto">
+
+          {/* Card 4 — Costo de producción */}
+          <div style={kpiCard}>
+            <div style={kpiHeaderRow}>
+              <FlaskConical size={13} style={{ color: '#7EB8E8', flexShrink: 0 }} />
+              <span style={kpiLabelSt}>Costo prod.</span>
+            </div>
+            <div style={{ ...kpiValueSt, color: '#7EB8E8' }}>{pesos(totalCostoProduccion)}</div>
+            <p style={kpiSubSt}>ventas cobradas</p>
+          </div>
+
+          {/* Card 5 — Ganancia neta */}
+          <div style={kpiCard} aria-label={`KPI: Ganancia neta del período, ${pesos(gananciaNeta)}`}>
+            <div style={kpiHeaderRow}>
+              <BarChart2 size={13} style={{ color: '#1A2B3C', flexShrink: 0 }} />
+              <span style={kpiLabelSt}>Ganancia neta</span>
+            </div>
+            {isLoadingEgresos ? (
+              <Skeleton style={{ height: 28, width: 100, borderRadius: 4, marginBottom: 6 }} />
+            ) : (
+              <>
+                <div style={{ ...kpiValueSt, color: gananciaNeta >= 0 ? '#28B99A' : '#F05252' }}>
+                  {pesos(gananciaNeta)}
+                </div>
+                <p style={kpiSubSt}>Egresos {pesos(totalEgresos)}</p>
+              </>
             )}
           </div>
-          <p style={subSt}>
-            Ef. {pesos(kpiCobros?.totalEf ?? 0)} · Tr. {pesos(kpiCobros?.totalTr ?? 0)}
-          </p>
-        </div>
 
-        {/* KPI 2 — Pedidos (filtrado por fecha_produccion) */}
-        <div style={card}>
-          <span style={labelSt}>Pedidos</span>
-          <span style={valorSt}>{kpi?.count ?? 0}</span>
-          <p style={subSt}>{kpi?.pendCierre ?? 0} pendientes de cierre</p>
-        </div>
-
-        {/* KPI 3 — Pendiente de cobro */}
-        <div style={{
-          ...card,
-          ...(pendientes && pendientes.total > 0
-            ? { background: '#FFF8F8', border: '0.5px solid rgba(211,47,47,0.3)' }
-            : {}
-          ),
-        }}>
-          <span style={{
-            ...labelSt,
-            color: pendientes && pendientes.total > 0 ? '#D32F2F' : '#4A5568',
-          }}>
-            Pendiente de cobro
-          </span>
-          <span style={{
-            ...valorSt,
-            color: pendientes && pendientes.total > 0 ? '#D32F2F' : '#1A2B3C',
-          }}>
-            {pesos(pendientes?.total ?? 0)}
-          </span>
-          {pendientes && pendientes.total > 0 ? (
-            <button
-              onClick={() => setSheetPend(true)}
-              style={{
-                ...subSt, display: 'inline-block', marginTop: 4,
-                color: '#D32F2F', background: 'none', border: 'none',
-                cursor: 'pointer', padding: 0, fontFamily: 'Inter, sans-serif',
-              }}
-            >
-              Ver detalle →
-            </button>
-          ) : (
-            <p style={subSt}>Sin pendientes</p>
-          )}
-        </div>
-
-        {/* KPI 4 — Egresos del período */}
-        <div style={card} aria-label={`KPI: Egresos del período, ${pesos(totalEgresos)}`}>
-          <span style={labelSt}>Egresos</span>
-          {isLoadingEgresos ? (
-            <Skeleton style={{ height: 28, width: 100, borderRadius: 4, marginBottom: 6 }} />
-          ) : (
-            <>
-              <span style={valorSt}>{kpiEgresos ? pesos(kpiEgresos.total) : '—'}</span>
-              <p style={subSt}>
-                {kpiEgresos && kpiEgresos.top2.length > 0
-                  ? kpiEgresos.top2
-                      .map(([cat, monto]) => `${CATEGORIA_EGRESO_LABELS[cat as CategoriaEgreso] ?? cat} ${pesos(monto)}`)
-                      .join(' · ')
-                  : 'Sin egresos en el período'
-                }
-              </p>
-            </>
-          )}
-        </div>
-
-        {/* KPI 5 — Ganancia neta */}
-        <div
-          className="col-span-2 lg:col-span-1"
-          style={{
-            ...card,
-            ...(gananciaNeta < 0 ? { background: '#FFF8F8', border: '0.5px solid rgba(211,47,47,0.25)' } : {}),
-          }}
-          aria-label={`KPI: Ganancia neta del período, ${pesos(gananciaNeta)}`}
-        >
-          <span style={labelSt}>Ganancia neta</span>
-          {isLoadingEgresos ? (
-            <Skeleton style={{ height: 28, width: 100, borderRadius: 4, marginBottom: 6 }} />
-          ) : (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, lineHeight: 1 }}>
-                <span style={{
-                  ...valorSt,
-                  color: gananciaNeta > 0 ? '#145A32' : gananciaNeta < 0 ? '#D32F2F' : '#1A2B3C',
-                }}>
-                  {pesos(gananciaNeta)}
-                </span>
-                {deltaGanancia !== null && (
-                  <span style={{
-                    fontSize: 10, fontWeight: 500, borderRadius: 99, padding: '1px 6px',
-                    background: deltaGanancia >= 0 ? '#E8F8F0' : '#FDECEA',
-                    color:      deltaGanancia >= 0 ? '#145A32' : '#D32F2F',
-                    flexShrink: 0,
-                  }}>
-                    {deltaGanancia >= 0 ? '↑' : '↓'} {Math.abs(deltaGanancia)}%
-                  </span>
-                )}
-              </div>
-              {gananciaNeta < 0 ? (
-                <p style={{ ...subSt, color: '#D32F2F', fontSize: 10 }}>
-                  Egresos superan los ingresos en este período
-                </p>
-              ) : (
-                <p style={subSt}>Cobrado − Egresos</p>
-              )}
-            </>
-          )}
         </div>
       </div>
 
