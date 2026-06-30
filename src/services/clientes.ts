@@ -20,7 +20,7 @@ export const useClientes = (q?: string, activo: boolean | null = true) =>
         .order('nombre', { ascending: true })
 
       if (activo !== null) query = query.eq('activo', activo)
-      if (q)               query = query.ilike('nombre', `%${q}%`)
+      if (q)               query = query.or(`nombre.ilike.%${q}%,direccion.ilike.%${q}%`)
 
       const { data, error } = await query
       if (error) throw new Error(error.message)

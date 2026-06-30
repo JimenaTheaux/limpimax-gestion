@@ -132,7 +132,8 @@ export const usePedidos = (filtros?: {
         const lower = filtros.q.toLowerCase()
         pedidos = pedidos.filter(p =>
           String(p.numero).includes(filtros.q!) ||
-          (p.clientes?.nombre ?? '').toLowerCase().includes(lower)
+          (p.clientes?.nombre ?? '').toLowerCase().includes(lower) ||
+          (p.clientes?.direccion ?? '').toLowerCase().includes(lower)
         )
       }
       return pedidos
