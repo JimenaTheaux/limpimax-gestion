@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Receipt } from 'lucide-react'
+import { Plus, Pencil, Trash2, Receipt, Settings2 } from 'lucide-react'
 import { Skeleton }       from '@/components/ui/skeleton'
 import { Drawer }         from '@/components/common/Drawer'
 import { FloatInput }     from '@/components/common/FloatInput'
@@ -14,20 +14,11 @@ import { useQuery }       from '@tanstack/react-query'
 import {
   useEgresos, useCrearEgreso, useEditarEgreso, useEliminarEgreso,
 } from '@/services/egresos'
+import {
+  useCategoriaEgresos, useCrearCategoriaEgreso,
+  useEditarCategoriaEgreso, useBorrarCategoriaEgreso,
+} from '@/services/categoriasEgreso'
 import type { Egreso, CategoriaEgreso } from '@/types'
-import { CATEGORIA_EGRESO_LABELS } from '@/types'
-
-// ─── Colores por categoría ────────────────────────────────────────────────────
-
-const CATEGORIA_COLORS: Record<CategoriaEgreso, { bg: string; color: string }> = {
-  sueldos:   { bg: '#E8F4FF', color: '#0D5C8A' },
-  alquiler:  { bg: '#FFF3E0', color: '#E65100' },
-  drogueria: { bg: '#E8F8F0', color: '#145A32' },
-  grafica:   { bg: '#F3E8FF', color: '#6B21A8' },
-  packaging: { bg: '#FFF9E6', color: '#B45309' },
-  luz:       { bg: '#FFFDE7', color: '#F57F17' },
-  otros:     { bg: '#F4F6F8', color: '#4A5568' },
-}
 
 // ─── Helpers de fecha ─────────────────────────────────────────────────────────
 
@@ -63,7 +54,7 @@ function aniosDisponibles(): number[] {
 
 const schema = z.object({
   fecha_egreso:   z.string().min(1, 'La fecha es obligatoria'),
-  categoria:      z.enum(['sueldos','alquiler','drogueria','grafica','packaging','luz','otros']),
+  categoria_id:   z.string().min(1, 'La categoría es obligatoria'),
   concepto:       z.string().min(3, 'Mínimo 3 caracteres'),
   monto:          z.string().refine(v => parseFloat(v) > 0, 'El monto debe ser mayor a 0'),
   registrado_por: z.string().optional(),
@@ -91,16 +82,16 @@ function useUsuariosActivos() {
 
 // ─── Badge categoría ──────────────────────────────────────────────────────────
 
-function BadgeCategoria({ categoria }: { categoria: CategoriaEgreso }) {
-  const { bg, color } = CATEGORIA_COLORS[categoria]
+function BadgeCategoria({ cat }: { cat: CategoriaEgreso | null | undefined }) {
+  if (!cat) return <span style={{ fontSize: 9, color: '#9CA3AF' }}>—</span>
   return (
     <span style={{
-      backgroundColor: bg, color,
+      backgroundColor: cat.color_bg, color: cat.color_texto,
       fontSize: 9, fontWeight: 600,
       padding: '2px 8px', borderRadius: 99,
       display: 'inline-block', whiteSpace: 'nowrap',
     }}>
-      {CATEGORIA_EGRESO_LABELS[categoria].toUpperCase()}
+      {cat.nombre.toUpperCase()}
     </span>
   )
 }
@@ -144,6 +135,235 @@ const SELECT_STYLE: React.CSSProperties = {
   cursor: 'pointer', fontFamily: 'Inter, sans-serif',
 }
 
+// ─── Gestión de categorías ────────────────────────────────────────────────────
+
+interface CatDrawerProps {
+  open:    boolean
+  onClose: () => void
+  onMsg:   (msg: string) => void
+}
+
+function CategoriasEgresoDrawer({ open, onClose, onMsg }: CatDrawerProps) {
+  const { data: categorias, isLoading } = useCategoriaEgresos()
+  const crear  = useCrearCategoriaEgreso()
+  const editar = useEditarCategoriaEgreso()
+  const borrar = useBorrarCategoriaEgreso()
+
+  const [editId,     setEditId]     = useState<string | null>(null)
+  const [editNombre, setEditNombre] = useState('')
+  const [deleteId,   setDeleteId]   = useState<string | null>(null)
+  const [newNombre,  setNewNombre]  = useState('')
+  const [showNew,    setShowNew]    = useState(false)
+
+  const resetAll = () => { setEditId(null); setDeleteId(null); setShowNew(false); setNewNombre('') }
+
+  useEffect(() => { if (!open) resetAll() }, [open])
+
+  const handleSaveEdit = async () => {
+    if (!editId || !editNombre.trim()) return
+    try {
+      await editar.mutateAsync({ id: editId, nombre: editNombre.trim() })
+      setEditId(null)
+      onMsg('Categoría actualizada')
+    } catch {
+      onMsg('Error al actualizar la categoría|error')
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await borrar.mutateAsync(id)
+      setDeleteId(null)
+      onMsg('Categoría eliminada')
+    } catch (e) {
+      setDeleteId(null)
+      if (e instanceof Error && e.message === 'HAS_EGRESOS')
+        onMsg('No se puede borrar. Tiene egresos asociados.|error')
+      else
+        onMsg('Error al borrar la categoría|error')
+    }
+  }
+
+  const handleCrear = async () => {
+    if (!newNombre.trim()) return
+    try {
+      await crear.mutateAsync(newNombre.trim())
+      setNewNombre(''); setShowNew(false)
+      onMsg('Categoría creada')
+    } catch {
+      onMsg('Error al crear la categoría|error')
+    }
+  }
+
+  const footer = (
+    <button
+      type="button"
+      onClick={onClose}
+      className="btn-press"
+      style={{ background: 'transparent', color: '#4A5568', border: 'none', height: 40, width: '100%', fontSize: 14, cursor: 'pointer' }}
+    >
+      Cerrar
+    </button>
+  )
+
+  const inputStyle: React.CSSProperties = {
+    flex: 1, height: 32, padding: '0 10px',
+    border: '1.5px solid #1B9ED6', borderRadius: 6,
+    fontSize: 13, outline: 0, fontFamily: 'Inter, sans-serif', boxSizing: 'border-box',
+  }
+  const btnIconStyle: React.CSSProperties = {
+    width: 32, height: 32, background: 'transparent', border: 'none',
+    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6,
+  }
+
+  return (
+    <Drawer open={open} onClose={onClose} title="Gestionar categorías" footer={footer}>
+      {showNew ? (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+          <input
+            autoFocus
+            value={newNombre}
+            onChange={e => setNewNombre(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleCrear()
+              if (e.key === 'Escape') { setShowNew(false); setNewNombre('') }
+            }}
+            placeholder="Nombre de categoría"
+            style={{ ...inputStyle, height: 36 }}
+          />
+          <button
+            onClick={handleCrear}
+            disabled={crear.isPending || !newNombre.trim()}
+            style={{
+              height: 36, padding: '0 14px', background: '#0D5C8A', color: '#fff',
+              border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
+              cursor: crear.isPending ? 'not-allowed' : 'pointer', flexShrink: 0,
+            }}
+          >
+            {crear.isPending ? '…' : 'Crear'}
+          </button>
+          <button
+            onClick={() => { setShowNew(false); setNewNombre('') }}
+            style={{ ...btnIconStyle, border: '0.5px solid #D1D5DB', width: 36, height: 36, flexShrink: 0 }}
+          >
+            ✗
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setShowNew(true)}
+          className="btn-press"
+          style={{
+            width: '100%', height: 40, background: '#F4F6F8',
+            border: '0.5px dashed #1B9ED6', borderRadius: 10,
+            color: '#1B9ED6', fontSize: 13, fontWeight: 600,
+            cursor: 'pointer', marginBottom: 12,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}
+        >
+          <Plus size={14} /> Nueva categoría
+        </button>
+      )}
+
+      {isLoading ? (
+        <div style={{ padding: 24, textAlign: 'center', color: '#4A5568', fontSize: 13 }}>Cargando…</div>
+      ) : !categorias?.length ? (
+        <div style={{ padding: 24, textAlign: 'center', color: '#4A5568', fontSize: 13 }}>No hay categorías aún</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {categorias.map(cat => (
+            <div key={cat.id} style={{ background: '#fff', borderRadius: 10, border: '0.5px solid #D1D5DB', overflow: 'hidden' }}>
+              {editId === cat.id ? (
+                <div style={{ display: 'flex', gap: 8, padding: '8px 12px', alignItems: 'center' }}>
+                  <input
+                    autoFocus
+                    value={editNombre}
+                    onChange={e => setEditNombre(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleSaveEdit()
+                      if (e.key === 'Escape') setEditId(null)
+                    }}
+                    style={inputStyle}
+                  />
+                  <button
+                    onClick={handleSaveEdit}
+                    disabled={editar.isPending || !editNombre.trim()}
+                    style={{
+                      height: 32, padding: '0 10px', background: '#0D5C8A', color: '#fff',
+                      border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                      cursor: editar.isPending ? 'not-allowed' : 'pointer', flexShrink: 0,
+                    }}
+                  >
+                    ✓
+                  </button>
+                  <button
+                    onClick={() => setEditId(null)}
+                    style={{ ...btnIconStyle, border: '0.5px solid #D1D5DB', flexShrink: 0 }}
+                  >
+                    ✗
+                  </button>
+                </div>
+              ) : deleteId === cat.id ? (
+                <div style={{ padding: '10px 14px' }}>
+                  <p style={{ margin: '0 0 10px', fontSize: 13, color: '#1A2B3C' }}>
+                    ¿Borrar <strong>{cat.nombre}</strong>?{' '}
+                    <span style={{ color: '#D32F2F', fontSize: 12 }}>Solo se puede borrar si no tiene egresos asociados.</span>
+                  </p>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={() => handleDelete(cat.id)}
+                      disabled={borrar.isPending}
+                      style={{
+                        flex: 1, height: 36, background: '#D32F2F', color: '#fff',
+                        border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                        cursor: borrar.isPending ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {borrar.isPending ? 'Borrando…' : 'Sí, borrar'}
+                    </button>
+                    <button
+                      onClick={() => setDeleteId(null)}
+                      style={{
+                        flex: 1, height: 36, background: 'transparent', color: '#4A5568',
+                        border: '0.5px solid #D1D5DB', borderRadius: 8, fontSize: 13, cursor: 'pointer',
+                      }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', padding: '0 8px 0 14px', height: 48 }}>
+                  <BadgeCategoria cat={cat} />
+                  <span style={{ flex: 1, fontSize: 13, color: '#1A2B3C', marginLeft: 10 }}>{cat.nombre}</span>
+                  <button
+                    onClick={() => { setEditId(cat.id); setEditNombre(cat.nombre); setDeleteId(null) }}
+                    aria-label={`Editar ${cat.nombre}`}
+                    style={{ ...btnIconStyle, color: '#4A5568' }}
+                    onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = '#F4F6F8')}
+                    onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    onClick={() => { setDeleteId(cat.id); setEditId(null) }}
+                    aria-label={`Borrar ${cat.nombre}`}
+                    style={{ ...btnIconStyle, color: '#9A9A9A' }}
+                    onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = '#FDECEA')}
+                    onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Drawer>
+  )
+}
+
 // ─── Drawer de crear/editar ───────────────────────────────────────────────────
 
 interface EgresoDrawerProps {
@@ -157,26 +377,37 @@ function EgresoDrawer({ open, onClose, egreso, onSaved }: EgresoDrawerProps) {
   const crear    = useCrearEgreso()
   const editar   = useEditarEgreso()
   const usuario  = useAuthStore(s => s.usuario)
-  const { data: usuarios } = useUsuariosActivos()
+  const { data: usuarios }   = useUsuariosActivos()
+  const { data: categorias } = useCategoriaEgresos()
   const saving   = crear.isPending || editar.isPending
 
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       fecha_egreso:   egreso?.fecha_egreso   ?? hoy(),
-      categoria:      egreso?.categoria      ?? undefined,
+      categoria_id:   egreso?.categoria_id   ?? '',
       concepto:       egreso?.concepto       ?? '',
       monto:          egreso ? String(egreso.monto) : '',
       registrado_por: egreso?.registrado_por ?? usuario?.id ?? '',
     },
   })
 
-  // Reset al abrir con datos nuevos
+  useEffect(() => {
+    if (!open) return
+    reset({
+      fecha_egreso:   egreso?.fecha_egreso   ?? hoy(),
+      categoria_id:   egreso?.categoria_id   ?? '',
+      concepto:       egreso?.concepto       ?? '',
+      monto:          egreso ? String(egreso.monto) : '',
+      registrado_por: egreso?.registrado_por ?? usuario?.id ?? '',
+    })
+  }, [open, egreso, usuario?.id, reset])
+
   const onSubmit = async (data: FormData) => {
     try {
       const payload = {
         fecha_egreso:   data.fecha_egreso,
-        categoria:      data.categoria,
+        categoria_id:   data.categoria_id,
         concepto:       data.concepto,
         monto:          parseFloat(data.monto),
         registrado_por: data.registrado_por || undefined,
@@ -252,7 +483,7 @@ function EgresoDrawer({ open, onClose, egreso, onSaved }: EgresoDrawerProps) {
         onSubmit={handleSubmit(onSubmit)}
         style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
       >
-        {/* Fecha + Categoría en grid 2 col desktop */}
+        {/* Fecha + Categoría en grid 2 col */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
           {/* Fecha */}
           <div>
@@ -278,7 +509,7 @@ function EgresoDrawer({ open, onClose, egreso, onSaved }: EgresoDrawerProps) {
             <div style={{ position: 'relative' }}>
               <Controller
                 control={control}
-                name="categoria"
+                name="categoria_id"
                 render={({ field }) => (
                   <select
                     id="egreso-cat"
@@ -288,17 +519,17 @@ function EgresoDrawer({ open, onClose, egreso, onSaved }: EgresoDrawerProps) {
                     style={{ ...inputBase, padding: '0 28px 0 12px', height: 40, appearance: 'none', cursor: 'pointer' }}
                   >
                     <option value="">Seleccioná una categoría</option>
-                    {(Object.keys(CATEGORIA_EGRESO_LABELS) as CategoriaEgreso[]).map(k => (
-                      <option key={k} value={k}>{CATEGORIA_EGRESO_LABELS[k]}</option>
+                    {(categorias ?? []).map(c => (
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
                     ))}
                   </select>
                 )}
               />
               <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#4A5568', fontSize: 10 }}>▼</span>
             </div>
-            {errors.categoria && (
+            {errors.categoria_id && (
               <span style={{ color: '#D32F2F', fontSize: 11, marginTop: 4, display: 'block' }}>
-                {errors.categoria.message}
+                {errors.categoria_id.message}
               </span>
             )}
           </div>
@@ -312,7 +543,7 @@ function EgresoDrawer({ open, onClose, egreso, onSaved }: EgresoDrawerProps) {
           {...register('concepto')}
         />
 
-        {/* Monto + Registrado por en grid 2 col desktop */}
+        {/* Monto + Registrado por en grid 2 col */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
           {/* Monto con prefijo $ */}
           <div>
@@ -377,14 +608,16 @@ export default function EgresosPage() {
   const hoyDate  = new Date()
   const [mes,  setMes]  = useState(hoyDate.getMonth() + 1)
   const [anio, setAnio] = useState(hoyDate.getFullYear())
-  const [categoriaFiltro, setCategoriaFiltro] = useState<CategoriaEgreso | ''>('')
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string>('')
 
-  const [drawerOpen, setDrawer]   = useState(false)
-  const [selected, setSelected]   = useState<Egreso | null>(null)
-  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [drawerOpen,  setDrawer]      = useState(false)
+  const [catDrawer,   setCatDrawer]   = useState(false)
+  const [selected,    setSelected]    = useState<Egreso | null>(null)
+  const [confirmId,   setConfirmId]   = useState<string | null>(null)
 
   const { toasts, show, dismiss } = useToast()
 
+  const { data: categorias }    = useCategoriaEgresos()
   const { data: egresos, isLoading } = useEgresos(mes, anio, categoriaFiltro || undefined)
   const eliminar = useEliminarEgreso()
 
@@ -412,8 +645,8 @@ export default function EgresosPage() {
     }
   }
 
-  const mesLabel = MESES[mes - 1]
-  const categoriaActiva = categoriaFiltro as CategoriaEgreso | ''
+  const mesLabel        = MESES[mes - 1]
+  const categoriaActiva = categorias?.find(c => c.id === categoriaFiltro)
 
   return (
     <div style={{ animation: 'fadeSlideIn 0.18s ease' }}>
@@ -432,18 +665,32 @@ export default function EgresosPage() {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
         <h1 className="section-title">Egresos</h1>
-        <button
-          onClick={handleNew}
-          className="btn-press"
-          style={{
-            background: '#0D5C8A', color: '#fff', border: 'none',
-            borderRadius: 10, height: 36, padding: '0 14px',
-            fontSize: 13, fontWeight: 600, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}
-        >
-          <Plus size={14} /> Agregar egreso
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => setCatDrawer(true)}
+            className="btn-press"
+            style={{
+              background: 'transparent', color: '#4A5568',
+              border: '0.5px solid #D1D5DB', borderRadius: 10,
+              height: 36, padding: '0 12px', fontSize: 13,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <Settings2 size={14} /> Categorías
+          </button>
+          <button
+            onClick={handleNew}
+            className="btn-press"
+            style={{
+              background: '#0D5C8A', color: '#fff', border: 'none',
+              borderRadius: 10, height: 36, padding: '0 14px',
+              fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <Plus size={14} /> Agregar egreso
+          </button>
+        </div>
       </div>
 
       {/* ── Filtros ─────────────────────────────────────────────────────────── */}
@@ -478,12 +725,12 @@ export default function EgresosPage() {
         <div className="eg-sel">
           <select
             value={categoriaFiltro}
-            onChange={e => setCategoriaFiltro(e.target.value as CategoriaEgreso | '')}
+            onChange={e => setCategoriaFiltro(e.target.value)}
             style={{ ...SELECT_STYLE, minWidth: 160 }}
           >
             <option value="">Todas las categorías</option>
-            {(Object.keys(CATEGORIA_EGRESO_LABELS) as CategoriaEgreso[]).map(k => (
-              <option key={k} value={k}>{CATEGORIA_EGRESO_LABELS[k]}</option>
+            {(categorias ?? []).map(c => (
+              <option key={c.id} value={c.id}>{c.nombre}</option>
             ))}
           </select>
         </div>
@@ -497,7 +744,7 @@ export default function EgresosPage() {
       }}>
         <span style={{ fontSize: 12, color: '#4A5568' }}>
           Total en {mesLabel} {anio}
-          {categoriaActiva && ` · ${CATEGORIA_EGRESO_LABELS[categoriaActiva]}`}
+          {categoriaActiva && ` · ${categoriaActiva.nombre}`}
         </span>
         <span style={{ fontSize: 18, fontWeight: 500, color: '#1A2B3C', letterSpacing: '-0.3px' }}>
           {formatMonto(totalPeriodo)}
@@ -564,7 +811,7 @@ export default function EgresosPage() {
 
                     {/* Categoría */}
                     <td style={{ padding: '0 14px', height: 48, borderBottom: '0.5px solid #F4F6F8', whiteSpace: 'nowrap' }}>
-                      <BadgeCategoria categoria={e.categoria} />
+                      <BadgeCategoria cat={e.categorias_egreso} />
                     </td>
 
                     {/* Concepto */}
@@ -709,19 +956,18 @@ export default function EgresosPage() {
 
                 {/* Línea 2: badge + concepto */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, overflow: 'hidden' }}>
-                  <BadgeCategoria categoria={e.categoria} />
+                  <BadgeCategoria cat={e.categorias_egreso} />
                   <span style={{ fontSize: 13, color: '#1A2B3C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {e.concepto}
                   </span>
                 </div>
 
-                {/* Línea 3: registrado por */}
+                {/* Línea 3: registrado por + acciones */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 11, color: '#9CA3AF' }}>
                     {e.perfiles?.nombre ?? '—'}
                   </span>
 
-                  {/* Acciones o confirmación */}
                   {confirmId === e.id ? (
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <span style={{ fontSize: 11, color: '#4A5568' }}>¿Eliminar?</span>
@@ -774,6 +1020,12 @@ export default function EgresosPage() {
           </>
         )}
       </div>
+
+      <CategoriasEgresoDrawer
+        open={catDrawer}
+        onClose={() => setCatDrawer(false)}
+        onMsg={handleSaved}
+      />
 
       <EgresoDrawer
         open={drawerOpen}

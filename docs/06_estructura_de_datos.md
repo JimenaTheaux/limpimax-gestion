@@ -545,54 +545,85 @@ const formatNumero = (n: number): string => `P-${String(n).padStart(5, '0')}`
 
 ---
 
+## Tabla: categorias_egreso
+
+Las categorías de egresos son configurables desde la UI (crear, editar, borrar con guard de dependencias).
+
+```sql
+CREATE TABLE categorias_egreso (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre      TEXT NOT NULL UNIQUE,
+  color_bg    TEXT NOT NULL DEFAULT '#F4F6F8',
+  color_texto TEXT NOT NULL DEFAULT '#4A5568',
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+Categorías iniciales (cargadas en la migración):
+Sueldos, Alquiler, Droguería, Gráfica, Packaging, Luz, Otros.
+
+RLS:
+- `SELECT`: todos los autenticados
+- `INSERT / UPDATE / DELETE`: solo `admin` y `superadmin`
+
+Tipo TypeScript:
+```typescript
+export interface CategoriaEgreso {
+  id:          string
+  nombre:      string
+  color_bg:    string
+  color_texto: string
+}
+```
+
+---
+
 ## Tabla: egresos
 
 ```sql
 CREATE TABLE egresos (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   fecha_egreso   DATE NOT NULL,
-  categoria      TEXT NOT NULL CHECK (categoria IN (
-                   'sueldos','alquiler','drogueria',
-                   'grafica','packaging','luz','otros')),
+  categoria_id   UUID NOT NULL REFERENCES categorias_egreso(id),
   concepto       TEXT NOT NULL,
   monto          NUMERIC(10,2) NOT NULL,
   registrado_por UUID REFERENCES perfiles(id),
   created_at     TIMESTAMPTZ DEFAULT NOW(),
   updated_at     TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX idx_egresos_categoria ON egresos(categoria_id);
 ```
 
 Tipo TypeScript:
 ```typescript
-export type CategoriaEgreso =
-  | 'sueldos' | 'alquiler' | 'drogueria'
-  | 'grafica' | 'packaging' | 'luz' | 'otros'
-
-export type Egreso = {
-  id: string
-  fecha_egreso: string
-  categoria: CategoriaEgreso
-  concepto: string
-  monto: number
+export interface Egreso {
+  id:             string
+  fecha_egreso:   string
+  categoria_id:   string
+  concepto:       string
+  monto:          number
   registrado_por: string | null
-  created_at: string
-  updated_at: string
-  perfiles?: { nombre: string }
+  created_at:     string
+  updated_at:     string
+  // Joins opcionales
+  categorias_egreso?: CategoriaEgreso | null
+  perfiles?:          { nombre: string } | null
 }
 ```
 
-Labels de categorías para la UI:
+Query estándar:
 ```typescript
-export const CATEGORIA_EGRESO_LABELS: Record<CategoriaEgreso, string> = {
-  sueldos:    'Sueldos',
-  alquiler:   'Alquiler',
-  drogueria:  'Droguería',
-  grafica:    'Gráfica',
-  packaging:  'Packaging',
-  luz:        'Luz',
-  otros:      'Otros',
-}
+supabase
+  .from('egresos')
+  .select('*, perfiles(nombre), categorias_egreso(id, nombre, color_bg, color_texto)')
+  .gte('fecha_egreso', primerDiaMes)
+  .lte('fecha_egreso', ultimoDiaMes)
 ```
+
+Guard de borrado de categoría (en `useBorrarCategoriaEgreso`):
+- Verificar `COUNT(*) FROM egresos WHERE categoria_id = id`
+- Si `count > 0` → lanzar `'HAS_EGRESOS'` → la UI muestra "No se puede borrar. Tiene egresos asociados."
 
 ---
 
