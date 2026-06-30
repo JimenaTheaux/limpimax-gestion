@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Chart, registerables, type TooltipItem } from 'chart.js'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import { Clock, Package, Banknote, FlaskConical, BarChart2, ChevronDown } from 'lucide-react'
+import { Clock, Package, Banknote, FlaskConical, BarChart2, ChevronDown, Loader2 } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { BadgeEstado } from '@/components/common/BadgeEstado'
@@ -10,6 +10,7 @@ import { useClientesConDeuda, useClientePendientes } from '@/services/produccion
 import type { ClienteConSaldo } from '@/services/produccion'
 import { ESTADO_CONFIG, type EstadoPedido } from '@/types'
 import { supabase } from '@/lib/supabase'
+import { useCompartirSaldoPendiente } from '@/hooks/useCompartirSaldoPendiente'
 
 Chart.register(...registerables)
 
@@ -396,14 +397,7 @@ const WA_SVG = (
 function CardClienteDeudor({ cliente }: { cliente: ClienteConSaldo }) {
   const [expanded, setExpanded] = useState(false)
   const { data: pedidos = [], isLoading } = useClientePendientes(expanded ? cliente.id : null)
-
-  const telefono = cliente.telefono?.replace(/\D/g, '') ?? ''
-  const msg      = encodeURIComponent(
-    `Hola ${cliente.nombre}, te recordamos que tenés un saldo pendiente de ${pesos(cliente.saldo_pendiente)}. Muchas gracias.`
-  )
-  const waUrl = telefono
-    ? `https://wa.me/54${telefono}?text=${msg}`
-    : `https://wa.me/?text=${msg}`
+  const { compartir, loading: sharingWA } = useCompartirSaldoPendiente()
 
   return (
     <div style={{
@@ -424,24 +418,25 @@ function CardClienteDeudor({ cliente }: { cliente: ClienteConSaldo }) {
           <span style={{ fontWeight: 700, fontSize: 16, color: '#F57C00', letterSpacing: -0.5 }}>
             {pesos(cliente.saldo_pendiente)}
           </span>
-          <a
-            href={waUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={`Recordatorio por WhatsApp a ${cliente.nombre}`}
-            onClick={e => e.stopPropagation()}
+          <button
+            onClick={e => { e.stopPropagation(); compartir(cliente) }}
+            disabled={sharingWA}
+            aria-label={`Compartir saldo pendiente de ${cliente.nombre} por WhatsApp`}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: 28, height: 28, borderRadius: 6,
               border: '0.5px solid #D1D5DB', color: '#25D366',
-              textDecoration: 'none', flexShrink: 0,
-              transition: 'background 0.15s',
+              background: 'transparent', cursor: sharingWA ? 'default' : 'pointer',
+              flexShrink: 0, transition: 'background 0.15s', padding: 0,
             }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#F0FDF4')}
+            onMouseEnter={e => { if (!sharingWA) e.currentTarget.style.background = '#F0FDF4' }}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
-            {WA_SVG}
-          </a>
+            {sharingWA
+              ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+              : WA_SVG
+            }
+          </button>
           <button
             onClick={() => setExpanded(v => !v)}
             aria-expanded={expanded}
