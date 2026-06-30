@@ -270,33 +270,36 @@ export const useClientesConDeuda = () =>
     refetchInterval: 60_000,
   })
 
+export async function fetchClientePendientes(clienteId: string): Promise<PedidoPendienteDetalle[]> {
+  const { data, error } = await supabase
+    .from('pedidos')
+    .select('id, numero, fecha_produccion, total_calculado, total_manual, pedido_pagos(monto)')
+    .eq('cliente_id', clienteId)
+    .eq('estado', 'cerrado')
+    .eq('estado_pago', 'pendiente')
+    .order('fecha_produccion', { ascending: false })
+  if (error) throw new Error(error.message)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((p: any): PedidoPendienteDetalle => {
+    const total     = parseFloat(p.total_manual ?? p.total_calculado ?? '0') || 0
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sumaPagos = (p.pedido_pagos ?? []).reduce((s: number, pg: any) => s + Number(pg.monto), 0)
+    return {
+      id:              p.id,
+      numero:          p.numero,
+      fechaProduccion: p.fecha_produccion,
+      totalPedido:     total,
+      sumaPagos,
+      pendiente:       Math.max(0, total - sumaPagos),
+    }
+  })
+}
+
 export const useClientePendientes = (clienteId: string | null) =>
   useQuery({
-    queryKey:        ['cliente-pendientes', clienteId],
-    enabled:         !!clienteId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('pedidos')
-        .select('id, numero, fecha_produccion, total_calculado, total_manual, pedido_pagos(monto)')
-        .eq('cliente_id', clienteId!)
-        .eq('estado', 'cerrado')
-        .eq('estado_pago', 'pendiente')
-        .order('fecha_produccion', { ascending: false })
-      if (error) throw new Error(error.message)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (data ?? []).map((p: any): PedidoPendienteDetalle => {
-        const total     = parseFloat(p.total_manual ?? p.total_calculado ?? '0') || 0
-        const sumaPagos = (p.pedido_pagos ?? []).reduce((s: number, pg: any) => s + Number(pg.monto), 0)
-        return {
-          id:              p.id,
-          numero:          p.numero,
-          fechaProduccion: p.fecha_produccion,
-          totalPedido:     total,
-          sumaPagos,
-          pendiente:       Math.max(0, total - sumaPagos),
-        }
-      })
-    },
+    queryKey: ['cliente-pendientes', clienteId],
+    enabled:  !!clienteId,
+    queryFn:  () => fetchClientePendientes(clienteId!),
   })
 
 export const useDashboard = () => {

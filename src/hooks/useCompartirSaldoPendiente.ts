@@ -1,53 +1,16 @@
-import { useState } from 'react'
+import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import html2canvas from 'html2canvas'
-import { createElement } from 'react'
 import { SaldoPendienteCanvas } from '@/components/pedidos/SaldoPendienteCanvas'
 import type { ClienteConSaldo, PedidoPendienteDetalle } from '@/services/produccion'
-import { supabase } from '@/lib/supabase'
 
 export function useCompartirSaldoPendiente() {
-  const [loading, setLoading] = useState(false)
-
   const compartir = async (
     cliente: ClienteConSaldo,
+    pedidos: PedidoPendienteDetalle[],
     onError?: (msg: string) => void,
   ) => {
-    setLoading(true)
-
-    // 1. Fetch pedidos pendientes del cliente
-    let pedidos: PedidoPendienteDetalle[] = []
-    try {
-      const { data, error } = await supabase
-        .from('pedidos')
-        .select('id, numero, fecha_produccion, total_calculado, total_manual, pedido_pagos(monto)')
-        .eq('cliente_id', cliente.id)
-        .eq('estado', 'cerrado')
-        .eq('estado_pago', 'pendiente')
-        .order('fecha_produccion', { ascending: false })
-      if (error) throw new Error(error.message)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      pedidos = (data ?? []).map((p: any): PedidoPendienteDetalle => {
-        const total     = parseFloat(p.total_manual ?? p.total_calculado ?? '0') || 0
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const sumaPagos = (p.pedido_pagos ?? []).reduce((s: number, pg: any) => s + Number(pg.monto), 0)
-        return {
-          id:              p.id,
-          numero:          p.numero,
-          fechaProduccion: p.fecha_produccion,
-          totalPedido:     total,
-          sumaPagos,
-          pendiente:       Math.max(0, total - sumaPagos),
-        }
-      })
-    } catch (err) {
-      console.error('useCompartirSaldoPendiente: error al cargar pedidos', err)
-      onError?.('No se pudieron cargar los pedidos. Intentá de nuevo.')
-      setLoading(false)
-      return
-    }
-
-    // 2. Montar SaldoPendienteCanvas en div oculto
+    // 1. Montar SaldoPendienteCanvas en div oculto
     const container = document.createElement('div')
     container.style.cssText = 'position:absolute;left:-9999px;top:0;width:600px;pointer-events:none'
     document.body.appendChild(container)
@@ -55,12 +18,14 @@ export function useCompartirSaldoPendiente() {
     let canvas: HTMLCanvasElement | null = null
 
     try {
+      // 2. Renderizar el componente React en el container
       await new Promise<void>(resolve => {
         const root = createRoot(container)
         root.render(createElement(SaldoPendienteCanvas, { cliente, pedidos }))
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
       })
 
+      // 3. Capturar con html2canvas
       canvas = await html2canvas(container, {
         scale:           2,
         useCORS:         true,
@@ -72,7 +37,6 @@ export function useCompartirSaldoPendiente() {
       console.error('useCompartirSaldoPendiente: error al generar imagen', err)
       onError?.('No se pudo generar la imagen. Intentá de nuevo.')
       document.body.removeChild(container)
-      setLoading(false)
       return
     } finally {
       if (document.body.contains(container)) {
@@ -82,11 +46,10 @@ export function useCompartirSaldoPendiente() {
 
     if (!canvas) {
       onError?.('No se pudo generar la imagen. Intentá de nuevo.')
-      setLoading(false)
       return
     }
 
-    // 3. Convertir canvas a Blob JPG
+    // 4. Convertir canvas a Blob JPG
     let blob: Blob
     try {
       blob = await new Promise<Blob>((resolve, reject) =>
@@ -94,7 +57,6 @@ export function useCompartirSaldoPendiente() {
       )
     } catch {
       onError?.('No se pudo generar la imagen. Intentá de nuevo.')
-      setLoading(false)
       return
     }
 
@@ -125,13 +87,11 @@ export function useCompartirSaldoPendiente() {
             files: [file],
             title: `Saldo pendiente — ${cliente.nombre}`,
           })
-          setLoading(false)
           return
         } catch (err) {
           if ((err as Error)?.name !== 'AbortError') {
             console.warn('useCompartirSaldoPendiente: share nativo falló, usando fallback', err)
           } else {
-            setLoading(false)
             return
           }
         }
@@ -142,7 +102,9 @@ export function useCompartirSaldoPendiente() {
       const a         = document.createElement('a')
       a.href          = objectUrl
       a.download      = fileName
+      document.body.appendChild(a)
       a.click()
+      document.body.removeChild(a)
       URL.revokeObjectURL(objectUrl)
 
       const waUrl = telefono
@@ -155,7 +117,9 @@ export function useCompartirSaldoPendiente() {
       const a         = document.createElement('a')
       a.href          = objectUrl
       a.download      = fileName
+      document.body.appendChild(a)
       a.click()
+      document.body.removeChild(a)
       URL.revokeObjectURL(objectUrl)
 
       const waUrl = telefono
@@ -163,9 +127,7 @@ export function useCompartirSaldoPendiente() {
         : `https://web.whatsapp.com/send?text=${mensaje}`
       window.open(waUrl, '_blank')
     }
-
-    setLoading(false)
   }
 
-  return { compartir, loading }
+  return { compartir }
 }

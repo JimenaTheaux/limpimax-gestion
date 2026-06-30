@@ -6,7 +6,7 @@ import { Clock, Package, Banknote, FlaskConical, BarChart2, ChevronDown, Loader2
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { BadgeEstado } from '@/components/common/BadgeEstado'
-import { useClientesConDeuda, useClientePendientes } from '@/services/produccion'
+import { useClientesConDeuda, useClientePendientes, fetchClientePendientes } from '@/services/produccion'
 import type { ClienteConSaldo } from '@/services/produccion'
 import { ESTADO_CONFIG, type EstadoPedido } from '@/types'
 import { supabase } from '@/lib/supabase'
@@ -395,9 +395,24 @@ const WA_SVG = (
 // ─── CardClienteDeudor ────────────────────────────────────────────────────────
 
 function CardClienteDeudor({ cliente }: { cliente: ClienteConSaldo }) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded,     setExpanded]    = useState(false)
+  const [sharing,      setSharing]     = useState(false)
+  const [shareError,   setShareError]  = useState<string | null>(null)
   const { data: pedidos = [], isLoading } = useClientePendientes(expanded ? cliente.id : null)
-  const { compartir, loading: sharingWA } = useCompartirSaldoPendiente()
+  const { compartir } = useCompartirSaldoPendiente()
+
+  const handleWhatsapp = async () => {
+    setSharing(true)
+    setShareError(null)
+    try {
+      const pendientes = await fetchClientePendientes(cliente.id)
+      await compartir(cliente, pendientes, msg => setShareError(msg))
+    } catch {
+      setShareError('No se pudo generar la imagen. Intentá de nuevo.')
+    } finally {
+      setSharing(false)
+    }
+  }
 
   return (
     <div style={{
@@ -419,20 +434,20 @@ function CardClienteDeudor({ cliente }: { cliente: ClienteConSaldo }) {
             {pesos(cliente.saldo_pendiente)}
           </span>
           <button
-            onClick={e => { e.stopPropagation(); compartir(cliente) }}
-            disabled={sharingWA}
+            onClick={e => { e.stopPropagation(); void handleWhatsapp() }}
+            disabled={sharing}
             aria-label={`Compartir saldo pendiente de ${cliente.nombre} por WhatsApp`}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: 28, height: 28, borderRadius: 6,
               border: '0.5px solid #D1D5DB', color: '#25D366',
-              background: 'transparent', cursor: sharingWA ? 'default' : 'pointer',
+              background: 'transparent', cursor: sharing ? 'default' : 'pointer',
               flexShrink: 0, transition: 'background 0.15s', padding: 0,
             }}
-            onMouseEnter={e => { if (!sharingWA) e.currentTarget.style.background = '#F0FDF4' }}
+            onMouseEnter={e => { if (!sharing) e.currentTarget.style.background = '#F0FDF4' }}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
-            {sharingWA
+            {sharing
               ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
               : WA_SVG
             }
@@ -454,6 +469,13 @@ function CardClienteDeudor({ cliente }: { cliente: ClienteConSaldo }) {
           </button>
         </div>
       </div>
+
+      {/* Error al compartir */}
+      {shareError && (
+        <div style={{ padding: '0 16px 10px', fontSize: 11, color: '#D32F2F' }}>
+          {shareError}
+        </div>
+      )}
 
       {/* Expandable pedidos detail */}
       {expanded && (
