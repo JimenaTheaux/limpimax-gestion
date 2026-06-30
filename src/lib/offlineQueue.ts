@@ -1,6 +1,11 @@
 import { openDB } from 'idb'
 import type { EstadoPedido } from '@/types'
 
+export interface PagoOffline {
+  forma_pago: 'efectivo' | 'transferencia'
+  monto:      string
+}
+
 export interface OfflineAction {
   id:           string
   type:         'cambiarEstado' | 'editarCobro' | 'cerrarPedido'
@@ -8,13 +13,16 @@ export interface OfflineAction {
   // cambiarEstado
   estadoNuevo?: EstadoPedido
   notas?:       string
-  // editarCobro
+  // editarCobro (deprecated path)
   formaCobro?:  string
   montoCobrado?: string
-  // cerrarPedido
+  // cerrarPedido — multi-pago
+  clienteId?:    string
+  pagos?:        PagoOffline[]
+  totalPedido?:  number
   estadoPago?:   'cobrado' | 'pendiente'
   notasEntrega?: string
-  fechaCobro?:   string
+  fechaPago?:    string
   timestamp:    number
 }
 

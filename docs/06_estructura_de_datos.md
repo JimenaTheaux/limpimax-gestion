@@ -548,6 +548,53 @@ const formatNumero = (n: number): string => `P-${String(n).padStart(5, '0')}`
 
 ---
 
+## Tabla: pedido_pagos
+
+Registra los pagos recibidos al cerrar un pedido. Un pedido puede tener N filas (pago combinado efectivo + transferencia, pago parcial, etc.).
+
+```sql
+CREATE TABLE pedido_pagos (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pedido_id  UUID NOT NULL REFERENCES pedidos(id) ON DELETE CASCADE,
+  forma_pago TEXT NOT NULL CHECK (forma_pago IN ('efectivo', 'transferencia')),
+  monto      NUMERIC(10,2) NOT NULL,
+  fecha_pago DATE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_pedido_pagos_pedido ON pedido_pagos(pedido_id);
+```
+
+Tipo TypeScript:
+```typescript
+export interface PedidoPago {
+  id:         string
+  pedido_id:  string
+  forma_pago: 'efectivo' | 'transferencia'
+  monto:      number
+  fecha_pago: string | null
+  created_at: string
+}
+```
+
+**Regla de actualización de saldo del cliente:**
+Al cerrar un pedido se calcula:
+```
+diferencia = total_pedido - SUM(pedido_pagos.monto)
+clientes.saldo_pendiente = diferencia
+```
+- `diferencia > 0` → cliente quedó debiendo (saldo_pendiente positivo)
+- `diferencia = 0` → saldo saldado
+- `diferencia < 0` → cliente pagó de más (saldo_pendiente negativo = crédito a favor)
+
+Este valor **reemplaza** (no suma) el `saldo_pendiente` anterior, porque `pedidos.saldo_anterior_aplicado` ya capturó el saldo anterior al momento de crear el pedido y lo incluyó en el `total_pedido`.
+
+**Campos deprecated en `pedidos`** (se mantienen para compatibilidad con datos históricos; no usar en lógica nueva):
+- `pedidos.forma_cobro` — reemplazado por las filas de `pedido_pagos`
+- `pedidos.monto_cobrado` — reemplazado por `SUM(pedido_pagos.monto)`
+
+---
+
 ## Tabla: categorias_egreso
 
 Las categorías de egresos son configurables desde la UI (crear, editar, borrar con guard de dependencias).

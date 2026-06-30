@@ -131,6 +131,17 @@ export interface Pedido {
   pedido_historial?: PedidoHistorial[]
 }
 
+// ─── Pagos de pedido ─────────────────────────────────────────────────────────
+
+export interface PedidoPago {
+  id:         string
+  pedido_id:  string
+  forma_pago: 'efectivo' | 'transferencia'
+  monto:      number
+  fecha_pago: string | null
+  created_at: string
+}
+
 // ─── Egresos ─────────────────────────────────────────────────────────────────
 
 export interface CategoriaEgreso {

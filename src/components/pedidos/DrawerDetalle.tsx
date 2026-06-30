@@ -3,10 +3,11 @@ import { Clock, Edit2, XCircle, ChevronRight, Printer } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { BadgeEstado }   from '@/components/common/BadgeEstado'
 import { BtnWhatsapp }  from '@/components/common/BtnWhatsapp'
+import { FormPagos }    from '@/components/pedidos/FormPagos'
 import { Skeleton }     from '@/components/ui/skeleton'
 import {
   usePedidoDetalle, useCambiarEstado, useAnularPedido, useEditarCobro, useCerrarPedido,
-  totalPedido, type PedidoDetalle,
+  totalPedido, type PedidoDetalle, type PagoInput,
 } from '@/services/pedidos'
 import { ESTADO_CONFIG, formatNumero, type EstadoPedido } from '@/types'
 import { useAuthStore }      from '@/store/authStore'
@@ -123,24 +124,18 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
   const [cobroMonto,       setCobroMonto]       = useState('')
   const [cobroFechaCobro,  setCobroFechaCobro]  = useState('')
 
-  // Flujo "Cerrar venta" con form de cobro inline
+  // Flujo "Cerrar venta" con form de pagos múltiples
   const [cerrando,         setCerrando]         = useState(false)
-  const [cerrarForma,      setCerrarForma]      = useState<'efectivo' | 'transferencia' | 'pendiente'>('efectivo')
-  const [cerrarMonto,      setCerrarMonto]      = useState('')
-  const [cerrarFechaCobro, setCerrarFechaCobro] = useState(() => new Date().toISOString().split('T')[0])
+  const [cerrarPagos,      setCerrarPagos]      = useState<PagoInput[]>([{ forma_pago: 'efectivo', monto: '' }])
+  const [cerrarFechaPago,  setCerrarFechaPago]  = useState(() => new Date().toISOString().split('T')[0])
   const [cerrarError,      setCerrarError]      = useState<string | null>(null)
   const cerrarBtnRef = useRef<HTMLButtonElement>(null)
 
-  // Pre-llenar cobro al abrir el form de cierre
+  // Pre-llenar al abrir el form de cierre
   useEffect(() => {
     if (cerrando && p) {
-      setCerrarForma((p.forma_cobro ?? 'efectivo') as typeof cerrarForma)
-      setCerrarMonto(
-        p.monto_cobrado != null
-          ? String(p.monto_cobrado)
-          : String(Math.round(Number(totalPedido(p))))
-      )
-      setCerrarFechaCobro(new Date().toISOString().split('T')[0])
+      setCerrarPagos([{ forma_pago: 'efectivo', monto: String(Math.round(Number(totalPedido(p)))) }])
+      setCerrarFechaPago(new Date().toISOString().split('T')[0])
       setCerrarError(null)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -193,20 +188,15 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
 
   const handleCerrarVenta = async () => {
     if (!pedido) return
-    if (cerrarForma !== 'pendiente' && !cerrarMonto.trim()) {
-      setCerrarError('El monto cobrado es obligatorio')
-      return
-    }
     setCerrarError(null)
-    const estadoPago: 'cobrado' | 'pendiente' = cerrarForma === 'pendiente' ? 'pendiente' : 'cobrado'
     try {
       await cerrarPedido.mutateAsync({
-        id:            pedido.id,
-        estadoActual:  pedido.estado,
-        forma_cobro:   cerrarForma,
-        monto_cobrado: cerrarMonto.trim() || undefined,
-        estado_pago:   estadoPago,
-        fecha_cobro:   cerrarForma !== 'pendiente' ? cerrarFechaCobro : undefined,
+        id:           pedido.id,
+        clienteId:    pedido.cliente_id,
+        estadoActual: pedido.estado,
+        pagos:        cerrarPagos,
+        totalPedido:  Number(totalPedido(pedido)),
+        fecha_pago:   cerrarFechaPago,
       })
       onSaved('Pedido cerrado correctamente')
       setCerrando(false)
@@ -312,84 +302,113 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
               {/* Cobro */}
               {showCobro && (
                 <div style={{ background: '#fff', borderRadius: 16, padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <p style={{ margin: 0, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#4A5568' }}>Cobro</p>
-                    {!editandoCobro && (
-                      <button type="button"
-                        onClick={() => {
-                          setCobroForma(p.forma_cobro ?? 'pendiente')
-                          setCobroMonto(p.monto_cobrado != null ? String(p.monto_cobrado) : '')
-                          setCobroFechaCobro(p.fecha_cobro ?? new Date().toISOString().split('T')[0])
-                          setEditandoCobro(true)
-                        }}
-                        style={{ fontSize: 12, color: '#0D5C8A', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
-                        Editar
-                      </button>
-                    )}
-                  </div>
+                  <p style={{ margin: '0 0 12px', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#4A5568' }}>Cobro</p>
 
-                  {!editandoCobro ? (
+                  {/* Pagos multi-entrada (pedidos nuevos) */}
+                  {(p.pedido_pagos?.length ?? 0) > 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 13, color: '#4A5568' }}>Forma de cobro</span>
-                        <span style={{ fontSize: 13, fontWeight: 600, textTransform: 'capitalize' }}>{p.forma_cobro ?? '—'}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 13, color: '#4A5568' }}>Monto cobrado</span>
-                        <span style={{ fontSize: 13, fontWeight: 600 }}>
-                          {p.monto_cobrado != null
-                            ? `$${p.monto_cobrado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
-                            : '—'}
+                      {p.pedido_pagos!.map((pg, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: 13, color: '#4A5568', textTransform: 'capitalize' }}>{pg.forma_pago}</span>
+                          <span style={{ fontSize: 13, fontWeight: 600 }}>
+                            ${pg.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      ))}
+                      {p.fecha_cobro && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, paddingTop: 6, borderTop: '0.5px solid #F4F6F8' }}>
+                          <span style={{ fontSize: 12, color: '#4A5568' }}>Fecha de cobro</span>
+                          <span style={{ fontSize: 12, fontWeight: 600 }}>
+                            {new Date(p.fecha_cobro + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </span>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2, paddingTop: 6, borderTop: '0.5px solid #F4F6F8' }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: p.estado_pago === 'cobrado' ? '#145A32' : '#F57C00' }}>
+                          {p.estado_pago === 'cobrado' ? '✓ Cobrado' : 'Pendiente de cobro'}
                         </span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 13, color: '#4A5568' }}>Fecha de cobro</span>
-                        <span style={{ fontSize: 13, fontWeight: 600 }}>
-                          {p.fecha_cobro
-                            ? new Date(p.fecha_cobro + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })
-                            : '—'}
+                        <span style={{ fontSize: 13, fontWeight: 700, color: p.estado_pago === 'cobrado' ? '#145A32' : '#F57C00' }}>
+                          ${p.pedido_pagos!.reduce((s, pg) => s + pg.monto, 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <div>
-                        <label style={labelUpperStyle}>Forma de cobro</label>
-                        <select value={cobroForma} onChange={e => setCobroForma(e.target.value)}
-                          style={{ width: '100%', padding: '10px 12px', border: '1px solid #D1D5DB', borderRadius: 10, fontSize: 14, fontFamily: 'Inter, sans-serif', outline: 'none' }}>
-                          <option value="efectivo">Efectivo</option>
-                          <option value="transferencia">Transferencia</option>
-                          <option value="pendiente">Pendiente</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label style={labelUpperStyle}>Monto cobrado</label>
-                        <input type="number" value={cobroMonto} onChange={e => setCobroMonto(e.target.value)} placeholder="0.00"
-                          style={{ width: '100%', padding: '10px 12px', border: '1px solid #D1D5DB', borderRadius: 10, fontSize: 14, fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box' }} />
-                      </div>
-                      {cobroForma !== 'pendiente' && (
-                        <div>
-                          <label style={labelUpperStyle}>Fecha de cobro</label>
-                          <input
-                            type="date"
-                            value={cobroFechaCobro}
-                            onChange={e => setCobroFechaCobro(e.target.value)}
-                            style={inputFechaStyle}
-                            onFocus={e => (e.target.style.borderColor = '#1B9ED6')}
-                            onBlur={e  => (e.target.style.borderColor = 'rgba(105,105,105,0.4)')}
-                          />
+                    /* Fallback: datos legacy (forma_cobro / monto_cobrado) */
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {!editandoCobro ? (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: 13, color: '#4A5568' }}>Forma de cobro</span>
+                            <span style={{ fontSize: 13, fontWeight: 600, textTransform: 'capitalize' }}>{p.forma_cobro ?? '—'}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: 13, color: '#4A5568' }}>Monto cobrado</span>
+                            <span style={{ fontSize: 13, fontWeight: 600 }}>
+                              {p.monto_cobrado != null
+                                ? `$${p.monto_cobrado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+                                : '—'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: 13, color: '#4A5568' }}>Fecha de cobro</span>
+                            <span style={{ fontSize: 13, fontWeight: 600 }}>
+                              {p.fecha_cobro
+                                ? new Date(p.fecha_cobro + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })
+                                : '—'}
+                            </span>
+                          </div>
+                          <button type="button"
+                            onClick={() => {
+                              setCobroForma(p.forma_cobro ?? 'pendiente')
+                              setCobroMonto(p.monto_cobrado != null ? String(p.monto_cobrado) : '')
+                              setCobroFechaCobro(p.fecha_cobro ?? new Date().toISOString().split('T')[0])
+                              setEditandoCobro(true)
+                            }}
+                            style={{ alignSelf: 'flex-end', fontSize: 12, color: '#0D5C8A', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0 }}>
+                            Editar
+                          </button>
+                        </>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          <div>
+                            <label style={labelUpperStyle}>Forma de cobro</label>
+                            <select value={cobroForma} onChange={e => setCobroForma(e.target.value)}
+                              style={{ width: '100%', padding: '10px 12px', border: '1px solid #D1D5DB', borderRadius: 10, fontSize: 14, fontFamily: 'Inter, sans-serif', outline: 'none' }}>
+                              <option value="efectivo">Efectivo</option>
+                              <option value="transferencia">Transferencia</option>
+                              <option value="pendiente">Pendiente</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label style={labelUpperStyle}>Monto cobrado</label>
+                            <input type="number" value={cobroMonto} onChange={e => setCobroMonto(e.target.value)} placeholder="0.00"
+                              style={{ width: '100%', padding: '10px 12px', border: '1px solid #D1D5DB', borderRadius: 10, fontSize: 14, fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box' }} />
+                          </div>
+                          {cobroForma !== 'pendiente' && (
+                            <div>
+                              <label style={labelUpperStyle}>Fecha de cobro</label>
+                              <input
+                                type="date"
+                                value={cobroFechaCobro}
+                                onChange={e => setCobroFechaCobro(e.target.value)}
+                                style={inputFechaStyle}
+                                onFocus={e => (e.target.style.borderColor = '#1B9ED6')}
+                                onBlur={e  => (e.target.style.borderColor = 'rgba(105,105,105,0.4)')}
+                              />
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button type="button" onClick={handleGuardarCobro} disabled={editarCobro.isPending}
+                              style={{ flex: 1, background: '#0D5C8A', color: '#fff', border: 'none', borderRadius: 10, padding: '10px', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 40, opacity: editarCobro.isPending ? 0.6 : 1 }}>
+                              {editarCobro.isPending ? 'Guardando…' : 'Guardar'}
+                            </button>
+                            <button type="button" onClick={() => setEditandoCobro(false)}
+                              style={{ flex: 1, background: 'transparent', color: '#4A5568', border: '1.5px solid #D1D5DB', borderRadius: 10, padding: '10px', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 40 }}>
+                              Cancelar
+                            </button>
+                          </div>
                         </div>
                       )}
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button type="button" onClick={handleGuardarCobro} disabled={editarCobro.isPending}
-                          style={{ flex: 1, background: '#0D5C8A', color: '#fff', border: 'none', borderRadius: 10, padding: '10px', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 40, opacity: editarCobro.isPending ? 0.6 : 1 }}>
-                          {editarCobro.isPending ? 'Guardando…' : 'Guardar'}
-                        </button>
-                        <button type="button" onClick={() => setEditandoCobro(false)}
-                          style={{ flex: 1, background: 'transparent', color: '#4A5568', border: '1.5px solid #D1D5DB', borderRadius: 10, padding: '10px', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 40 }}>
-                          Cancelar
-                        </button>
-                      </div>
                     </div>
                   )}
                 </div>
@@ -444,74 +463,23 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
                       Confirmar cobro y cerrar venta
                     </p>
 
-                    {/* Total de referencia */}
-                    <div style={{
-                      background: '#D4EDDA', borderRadius: 10, padding: '10px 14px',
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    }}>
-                      <span style={{ fontSize: 12, color: '#145A32', fontWeight: 600 }}>Total pedido</span>
-                      <span style={{ fontSize: 20, fontWeight: 900, color: '#145A32', letterSpacing: -0.5 }}>
-                        ${Number(totalPedido(p)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-
-                    {/* Forma de cobro */}
-                    <div>
-                      <label style={labelUpperStyle}>Forma de cobro</label>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        {(['efectivo', 'transferencia', 'pendiente'] as const).map(f => (
-                          <button
-                            key={f}
-                            type="button"
-                            onClick={() => setCerrarForma(f)}
-                            style={{
-                              flex: 1, padding: '9px 6px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-                              border: `1.5px solid ${cerrarForma === f ? '#145A32' : '#D1D5DB'}`,
-                              background: cerrarForma === f ? '#D4EDDA' : '#fff',
-                              color: cerrarForma === f ? '#145A32' : '#4A5568',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            {f === 'efectivo' ? 'Efectivo' : f === 'transferencia' ? 'Transf.' : 'Pendiente'}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                    {/* Pagos múltiples */}
+                    <FormPagos
+                      totalPedido={Number(totalPedido(p))}
+                      pagos={cerrarPagos}
+                      onChange={setCerrarPagos}
+                    />
 
                     {/* Fecha de cobro */}
-                    {cerrarForma !== 'pendiente' && (
-                      <div>
-                        <label style={labelUpperStyle}>Fecha de cobro</label>
-                        <input
-                          type="date"
-                          value={cerrarFechaCobro}
-                          onChange={e => setCerrarFechaCobro(e.target.value)}
-                          style={inputFechaStyle}
-                          onFocus={e => (e.target.style.borderColor = '#1B9ED6')}
-                          onBlur={e  => (e.target.style.borderColor = 'rgba(105,105,105,0.4)')}
-                        />
-                      </div>
-                    )}
-
-                    {/* Monto cobrado */}
                     <div>
-                      <label style={labelUpperStyle}>
-                        Monto cobrado {cerrarForma !== 'pendiente' ? '*' : '(opcional)'}
-                      </label>
+                      <label style={labelUpperStyle}>Fecha de cobro</label>
                       <input
-                        type="number"
-                        value={cerrarMonto}
-                        onChange={e => setCerrarMonto(e.target.value)}
-                        placeholder="0.00"
-                        inputMode="decimal"
-                        style={{
-                          width: '100%', padding: '10px 12px',
-                          border: `1.5px solid ${cerrarError ? '#D32F2F' : '#D1D5DB'}`,
-                          borderRadius: 10, fontSize: 14, fontFamily: 'Inter, sans-serif',
-                          outline: 0, boxSizing: 'border-box',
-                        }}
-                        onFocus={e => (e.target.style.borderColor = '#145A32')}
-                        onBlur={e  => (e.target.style.borderColor = cerrarError ? '#D32F2F' : '#D1D5DB')}
+                        type="date"
+                        value={cerrarFechaPago}
+                        onChange={e => setCerrarFechaPago(e.target.value)}
+                        style={inputFechaStyle}
+                        onFocus={e => (e.target.style.borderColor = '#1B9ED6')}
+                        onBlur={e  => (e.target.style.borderColor = 'rgba(105,105,105,0.4)')}
                       />
                     </div>
 

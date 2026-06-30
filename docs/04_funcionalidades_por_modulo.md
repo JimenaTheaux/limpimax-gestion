@@ -148,16 +148,24 @@ Se abre en un drawer/sheet lateral (50% desktop, 100% mobile) con fondo oscureci
 
 ### F4.4 — Cerrar pedido (entrega + cobro)
 - Se abre mini-form inline en la card del pedido
-- Campos:
-  - Forma de cobro (radio: Efectivo / Transferencia / Pendiente de cobro)
-  - Fecha de cobro (date input, default hoy; visible solo si forma ≠ pendiente)
-  - Monto cobrado (obligatorio si forma ≠ pendiente; vacío/cero si es pendiente)
-  - Observaciones (opcional)
-- Estado de pago se deriva automáticamente:
-  - si forma = pendiente → estado_pago = 'pendiente', fecha_cobro = null
-  - si forma = efectivo o transferencia → estado_pago = 'cobrado', fecha_cobro = fecha seleccionada
-- Botón "Confirmar y cerrar pedido" (primary, 48px)
-- Al confirmar: pedido pasa a estado CERRADO (no a entregado)
+- **Lista de pagos (reemplaza forma_cobro/monto_cobrado único):**
+  - Cada fila: forma de pago (Efectivo / Transferencia) + monto
+  - Botón "+ Agregar otro pago" para casos de pago combinado
+  - Botón quitar fila (mínimo 1 fila, no puede quedar vacío)
+  - El resumen muestra en tiempo real: total del pedido, total pagado, diferencia
+    - Diferencia = 0 → indicador "✓ Pago completo"
+    - Diferencia > 0 → "Queda pendiente: $X"
+    - Diferencia < 0 → "A favor del cliente: $X"
+  - Se puede confirmar el cierre aunque quede diferencia (pago parcial válido)
+- Fecha de cobro (date input, default hoy)
+- Observaciones (opcional)
+- Botón "Confirmar entrega" (primary, 44px en mobile)
+- Al confirmar:
+  1. Se insertan en `pedido_pagos` una fila por cada pago
+  2. `clientes.saldo_pendiente` = diferencia (total_pedido - suma_pagos); reemplaza el valor anterior
+  3. El pedido pasa a estado CERRADO
+  4. `estado_pago` = 'cobrado' si diferencia ≤ 0; 'pendiente' si diferencia > 0
+  5. Se registra en `pedido_historial`
 - Badge en la card pasa a CERRADO visualmente
 
 ### F4.5 — Registrar entrega fallida

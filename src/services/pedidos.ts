@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/authStore'
 import { totalPedido } from '@/types'
-import type { Pedido, PedidoItem, PedidoHistorial, Cliente, Producto, EstadoPedido } from '@/types'
+import type { Pedido, PedidoItem, PedidoHistorial, PedidoPago, Cliente, Producto, EstadoPedido } from '@/types'
 
 export { totalPedido }
 
@@ -23,9 +23,17 @@ export type HistorialDetalle = PedidoHistorial & {
 export type PedidoDetalle = PedidoConCliente & {
   pedido_items:     ItemDetalle[]
   pedido_historial: HistorialDetalle[]
+  pedido_pagos:     PedidoPago[]
 }
 
 export type PedidoListItem = PedidoConCliente
+
+// ─── Tipo para filas de pago en el form de cierre ────────────────────────────
+
+export interface PagoInput {
+  forma_pago: 'efectivo' | 'transferencia'
+  monto:      string
+}
 
 // ─── Tipo para ítems del formulario (strings para inputs numéricos) ───────────
 
@@ -88,6 +96,11 @@ function parseItemDetalle(item: any): ItemDetalle {
         }
       : null,
   } as ItemDetalle
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parsePedidoPago(row: any): PedidoPago {
+  return { ...row, monto: Number(row.monto) }
 }
 
 // ─── Select para listas ───────────────────────────────────────────────────────
@@ -154,6 +167,7 @@ export const usePedidoDetalle = (id: string | null) =>
         { data: pedido,       error: e1 },
         { data: itemsRaw,     error: e2 },
         { data: historialRaw, error: e3 },
+        { data: pagosRaw,     error: e4 },
       ] = await Promise.all([
         supabase
           .from('pedidos')
@@ -175,17 +189,24 @@ export const usePedidoDetalle = (id: string | null) =>
           .select('*, perfiles(nombre)')
           .eq('pedido_id', id!)
           .order('created_at', { ascending: true }),
+        supabase
+          .from('pedido_pagos')
+          .select('*')
+          .eq('pedido_id', id!)
+          .order('created_at', { ascending: true }),
       ])
 
       if (e1) throw new Error(e1.message)
       if (e2) throw new Error(e2.message)
       if (e3) throw new Error(e3.message)
+      if (e4) throw new Error(e4.message)
       if (!pedido) throw new Error('Pedido no encontrado')
 
       return {
         ...parsePedido(pedido),
         pedido_items:     (itemsRaw    ?? []).map(parseItemDetalle),
         pedido_historial: (historialRaw ?? []) as HistorialDetalle[],
+        pedido_pagos:     (pagosRaw    ?? []).map(parsePedidoPago),
       } as PedidoDetalle
     },
   })
@@ -197,6 +218,7 @@ export async function fetchPedidoDetalle(id: string): Promise<PedidoDetalle> {
     { data: pedido,       error: e1 },
     { data: itemsRaw,     error: e2 },
     { data: historialRaw, error: e3 },
+    { data: pagosRaw,     error: e4 },
   ] = await Promise.all([
     supabase
       .from('pedidos')
@@ -218,17 +240,24 @@ export async function fetchPedidoDetalle(id: string): Promise<PedidoDetalle> {
       .select('*, perfiles(nombre)')
       .eq('pedido_id', id)
       .order('created_at', { ascending: true }),
+    supabase
+      .from('pedido_pagos')
+      .select('*')
+      .eq('pedido_id', id)
+      .order('created_at', { ascending: true }),
   ])
 
   if (e1) throw new Error(e1.message)
   if (e2) throw new Error(e2.message)
   if (e3) throw new Error(e3.message)
+  if (e4) throw new Error(e4.message)
   if (!pedido) throw new Error('Pedido no encontrado')
 
   return {
     ...parsePedido(pedido),
     pedido_items:     (itemsRaw    ?? []).map(parseItemDetalle),
     pedido_historial: (historialRaw ?? []) as HistorialDetalle[],
+    pedido_pagos:     (pagosRaw    ?? []).map(parsePedidoPago),
   } as PedidoDetalle
 }
 
@@ -457,42 +486,73 @@ export const useAnularPedido = () => {
 }
 
 // ─── useCerrarPedido ──────────────────────────────────────────────────────────
-// Cierra un pedido en_reparto: registra cobro y cambia estado a 'cerrado' en un solo RPC.
+// Cierra un pedido registrando N pagos y actualizando saldo del cliente.
 
 export const useCerrarPedido = () => {
   const qc      = useQueryClient()
   const usuario = useAuthStore(s => s.usuario)
 
   return useMutation({
-    mutationFn: async ({ id, estadoActual, forma_cobro, monto_cobrado, estado_pago, notas_entrega, fecha_cobro }: {
-      id:              string
-      estadoActual:    EstadoPedido
-      forma_cobro:     'efectivo' | 'transferencia' | 'pendiente'
-      monto_cobrado?:  string
-      estado_pago:     'cobrado' | 'pendiente'
-      notas_entrega?:  string
-      fecha_cobro?:    string
+    mutationFn: async ({ id, clienteId, estadoActual, pagos, totalPedido: totalPed, notas_entrega, fecha_pago }: {
+      id:             string
+      clienteId:      string
+      estadoActual:   EstadoPedido
+      pagos:          PagoInput[]
+      totalPedido:    number
+      notas_entrega?: string
+      fecha_pago?:    string
     }) => {
-      const { error } = await supabase.rpc('cerrar_pedido', {
-        p_pedido_id:       id,
-        p_estado_anterior: estadoActual,
-        p_forma_cobro:     forma_cobro,
-        p_monto_cobrado:   monto_cobrado ? parseFloat(monto_cobrado) : null,
-        p_estado_pago:     estado_pago,
-        p_notas_entrega:   notas_entrega ?? null,
-        p_usuario_id:      usuario?.id ?? null,
-      })
-      if (error) throw new Error(error.message)
+      const montoTotalPagado = pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0)
+      const diferencia       = totalPed - montoTotalPagado
+      const estadoPago: 'cobrado' | 'pendiente' = diferencia > 0 ? 'pendiente' : 'cobrado'
+      const fechaPago        = fecha_pago ?? new Date().toISOString().split('T')[0]
+      const fechaCobro       = montoTotalPagado > 0 ? fechaPago : null
 
-      const fechaCobroFinal = forma_cobro === 'pendiente'
-        ? null
-        : (fecha_cobro ?? new Date().toISOString().split('T')[0])
-
-      const { error: fechaErr } = await supabase
+      // 1. Cambiar estado a cerrado + campos de pago
+      const { error: updateErr } = await supabase
         .from('pedidos')
-        .update({ fecha_cobro: fechaCobroFinal })
+        .update({
+          estado:        'cerrado',
+          estado_pago:   estadoPago,
+          notas_entrega: notas_entrega ?? null,
+          fecha_cobro:   fechaCobro,
+          updated_at:    new Date().toISOString(),
+        })
         .eq('id', id)
-      if (fechaErr) throw new Error(fechaErr.message)
+      if (updateErr) throw new Error(updateErr.message)
+
+      // 2. Registrar en historial
+      const { error: histErr } = await supabase
+        .from('pedido_historial')
+        .insert({
+          pedido_id:       id,
+          estado_anterior: estadoActual,
+          estado_nuevo:    'cerrado',
+          usuario_id:      usuario?.id ?? null,
+          notas:           null,
+        })
+      if (histErr) throw new Error(histErr.message)
+
+      // 3. Insertar pagos (omitir filas con monto 0)
+      const pagosValidos = pagos.filter(p => (parseFloat(p.monto) || 0) > 0)
+      if (pagosValidos.length > 0) {
+        const { error: pagosErr } = await supabase
+          .from('pedido_pagos')
+          .insert(pagosValidos.map(p => ({
+            pedido_id:  id,
+            forma_pago: p.forma_pago,
+            monto:      parseFloat(p.monto),
+            fecha_pago: fechaPago,
+          })))
+        if (pagosErr) throw new Error(pagosErr.message)
+      }
+
+      // 4. Actualizar saldo del cliente (reemplaza valor anterior)
+      const { error: saldoErr } = await supabase
+        .from('clientes')
+        .update({ saldo_pendiente: diferencia })
+        .eq('id', clienteId)
+      if (saldoErr) throw new Error(saldoErr.message)
     },
 
     onMutate: async ({ id }) => {

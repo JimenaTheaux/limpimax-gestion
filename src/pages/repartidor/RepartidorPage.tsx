@@ -1,14 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import { IconChevronRight } from '@tabler/icons-react'
-import { FloatInput }       from '@/components/common/FloatInput'
 import { BadgeEstado }      from '@/components/common/BadgeEstado'
 import { Skeleton }         from '@/components/ui/skeleton'
 import { ToastContainer }   from '@/components/common/ToastContainer'
+import { FormPagos }        from '@/components/pedidos/FormPagos'
 import { useToast }         from '@/hooks/useToast'
 import { useOffline }       from '@/hooks/useOffline'
 import {
   usePedidos, usePedidoDetalle, useCambiarEstado, useCerrarPedido, totalPedido,
-  type PedidoListItem,
+  type PedidoListItem, type PagoInput,
 } from '@/services/pedidos'
 import { ESTADO_CONFIG } from '@/types'
 import type { AddActionInput } from '@/hooks/useOffline'
@@ -61,48 +61,6 @@ function ExpandedItems({ pedidoId }: { pedidoId: string }) {
   )
 }
 
-// ─── Forma de cobro — 3 opciones en fila ─────────────────────────────────────
-
-type FormaCobro = 'efectivo' | 'transferencia' | 'pendiente'
-
-function FormaCobroSelector({
-  value, onChange,
-}: { value: FormaCobro; onChange: (v: FormaCobro) => void }) {
-  const opts: { value: FormaCobro; label: string }[] = [
-    { value: 'efectivo',      label: 'Efectivo'     },
-    { value: 'transferencia', label: 'Transferencia' },
-    { value: 'pendiente',     label: 'Pendiente'    },
-  ]
-  return (
-    <div role="radiogroup" aria-label="Forma de cobro" style={{ display: 'flex', gap: 6 }}>
-      {opts.map(opt => {
-        const sel = opt.value === value
-        return (
-          <button
-            key={opt.value}
-            type="button"
-            role="radio"
-            aria-checked={sel}
-            onClick={() => onChange(opt.value)}
-            style={{
-              flex: 1, padding: '8px 4px', borderRadius: 8,
-              fontSize: 12, cursor: 'pointer',
-              border: `0.5px solid ${sel ? '#0D5C8A' : '#D1D5DB'}`,
-              background: sel ? '#E8F4FF' : '#fff',
-              color: sel ? '#0D5C8A' : '#4A5568',
-              fontWeight: sel ? 500 : 400,
-              fontFamily: 'Inter, sans-serif',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            {opt.label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
 // ─── Card repartidor ──────────────────────────────────────────────────────────
 
 function CardRepartidor({ pedido, isExpanded, onToggle, isOnline, addAction, onSaved }: {
@@ -120,11 +78,10 @@ function CardRepartidor({ pedido, isExpanded, onToggle, isOnline, addAction, onS
   const [formFalla,   setFormFalla]   = useState(false)
   const [confEmerg,   setConfEmerg]   = useState(false)
 
-  const [forma,      setForma]      = useState<FormaCobro>('efectivo')
-  const [monto,      setMonto]      = useState(String(Math.round(Number(totalPedido(pedido)))))
-  const [notas,      setNotas]      = useState('')
-  const [fechaCobro, setFechaCobro] = useState(() => new Date().toISOString().split('T')[0])
-  const [motivo,     setMotivo]     = useState('')
+  const [pagos,     setPagos]     = useState<PagoInput[]>([{ forma_pago: 'efectivo', monto: String(Math.round(Number(totalPedido(pedido)))) }])
+  const [notas,     setNotas]     = useState('')
+  const [fechaPago, setFechaPago] = useState(() => new Date().toISOString().split('T')[0])
+  const [motivo,    setMotivo]    = useState('')
 
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
@@ -171,30 +128,33 @@ function CardRepartidor({ pedido, isExpanded, onToggle, isOnline, addAction, onS
 
   // en_reparto → cerrado
   const handleConfirmarCierre = async () => {
-    if (forma !== 'pendiente' && !monto.trim()) {
-      showError('El monto cobrado es obligatorio')
-      return
-    }
-    const estadoPago: 'cobrado' | 'pendiente' = forma === 'pendiente' ? 'pendiente' : 'cobrado'
+    const montoTotalPagado = pagos.reduce((s, p) => s + (parseFloat(p.monto) || 0), 0)
+    const estadoPago: 'cobrado' | 'pendiente' = (total - montoTotalPagado) > 0 ? 'pendiente' : 'cobrado'
     setLoading(true)
     try {
       if (!isOnline) {
         await addAction({
-          type: 'cerrarPedido', pedidoId: pedido.id,
-          formaCobro: forma, montoCobrado: monto || undefined,
-          estadoPago, notasEntrega: notas.trim() || undefined,
-          fechaCobro: forma !== 'pendiente' ? fechaCobro : undefined,
+          type:        'cerrarPedido',
+          pedidoId:    pedido.id,
+          clienteId:   pedido.cliente_id,
+          pagos,
+          totalPedido: total,
+          estadoPago,
+          notasEntrega: notas.trim() || undefined,
+          fechaPago,
         })
         onSaved('Cierre guardado offline')
         setFormEntrega(false)
         return
       }
       await cerrar.mutateAsync({
-        id: pedido.id, estadoActual: pedido.estado,
-        forma_cobro: forma, monto_cobrado: monto || undefined,
-        estado_pago: estadoPago,
+        id:           pedido.id,
+        clienteId:    pedido.cliente_id,
+        estadoActual: pedido.estado,
+        pagos,
+        totalPedido:  total,
         notas_entrega: notas.trim() || undefined,
-        fecha_cobro: forma !== 'pendiente' ? fechaCobro : undefined,
+        fecha_pago:    fechaPago,
       })
       onSaved('Pedido cerrado correctamente')
       setFormEntrega(false)
@@ -340,46 +300,59 @@ function CardRepartidor({ pedido, isExpanded, onToggle, isOnline, addAction, onS
               formEntrega ? (
                 // Mini form registrar entrega
                 <div style={{ background: '#F4F6F8', borderRadius: 8, padding: 12, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <FormaCobroSelector value={forma} onChange={setForma} />
-
-                  {forma !== 'pendiente' && (
-                    <div>
-                      <label style={{
-                        display: 'block', fontSize: 10, fontWeight: 500,
-                        textTransform: 'uppercase', letterSpacing: '0.07em',
-                        color: '#4A5568', marginBottom: 5,
-                      }}>
-                        Fecha de cobro
-                      </label>
-                      <input
-                        type="date"
-                        value={fechaCobro}
-                        onChange={e => setFechaCobro(e.target.value)}
-                        style={{
-                          width: '100%', height: 44, padding: '0 10px',
-                          border: '0.5px solid #D1D5DB', borderRadius: 8,
-                          fontSize: 13, fontFamily: 'Inter, sans-serif',
-                          outline: 'none', boxSizing: 'border-box',
-                          background: '#fff',
-                        }}
-                        onFocus={e => (e.target.style.borderColor = '#1B9ED6')}
-                        onBlur={e  => (e.target.style.borderColor = '#D1D5DB')}
-                      />
-                    </div>
-                  )}
-
-                  <FloatInput
-                    label={forma === 'pendiente' ? 'Monto cobrado (opcional)' : 'Monto cobrado *'}
-                    value={monto}
-                    onChange={e => setMonto(e.target.value)}
-                    inputMode="decimal"
+                  <FormPagos
+                    totalPedido={total}
+                    pagos={pagos}
+                    onChange={setPagos}
+                    compact
                   />
 
-                  <FloatInput
-                    label="Observaciones (opcional)"
-                    value={notas}
-                    onChange={e => setNotas(e.target.value)}
-                  />
+                  <div>
+                    <label style={{
+                      display: 'block', fontSize: 10, fontWeight: 500,
+                      textTransform: 'uppercase', letterSpacing: '0.07em',
+                      color: '#4A5568', marginBottom: 5,
+                    }}>
+                      Fecha de cobro
+                    </label>
+                    <input
+                      type="date"
+                      value={fechaPago}
+                      onChange={e => setFechaPago(e.target.value)}
+                      style={{
+                        width: '100%', height: 36, padding: '0 10px',
+                        border: '0.5px solid #D1D5DB', borderRadius: 8,
+                        fontSize: 13, fontFamily: 'Inter, sans-serif',
+                        outline: 'none', boxSizing: 'border-box',
+                        background: '#fff',
+                      }}
+                      onFocus={e => (e.target.style.borderColor = '#1B9ED6')}
+                      onBlur={e  => (e.target.style.borderColor = '#D1D5DB')}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block', fontSize: 10, fontWeight: 500,
+                      textTransform: 'uppercase', letterSpacing: '0.07em',
+                      color: '#4A5568', marginBottom: 5,
+                    }}>
+                      Observaciones (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={notas}
+                      onChange={e => setNotas(e.target.value)}
+                      style={{
+                        width: '100%', height: 36, padding: '0 10px',
+                        border: '0.5px solid #D1D5DB', borderRadius: 8,
+                        fontSize: 13, fontFamily: 'Inter, sans-serif',
+                        outline: 'none', boxSizing: 'border-box',
+                      }}
+                      onFocus={e => (e.target.style.borderColor = '#1B9ED6')}
+                      onBlur={e  => (e.target.style.borderColor = '#D1D5DB')}
+                    />
+                  </div>
 
                   {error && <p style={{ color: '#D32F2F', fontSize: 12, margin: 0 }} role="alert">{error}</p>}
 
