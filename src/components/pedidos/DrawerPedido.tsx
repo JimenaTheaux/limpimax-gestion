@@ -682,7 +682,7 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
   const totalCalculado   = subtotalProductos + (Number(costoEnvio) || 0) + saldoAplicadoNum
   const totalMostrado    = totalManual ? Number(totalManual) : totalCalculado
   const totalEditado     = !!totalManual && Number(totalManual) !== totalCalculado
-  const showSaldoRow     = !pedido && saldoAplicadoNum !== 0
+  const showSaldoRow     = saldoAplicadoNum !== 0
 
   const handleClose = () => { reset(); onClose() }
 
@@ -974,6 +974,34 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
               </span>
             </div>
 
+            {/* Saldo del cliente */}
+            {showSaldoRow && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: saldoAplicadoNum > 0 ? '#C62828' : '#2E7D32' }}>
+                  {saldoAplicadoNum > 0 ? 'Saldo pendiente anterior' : 'Saldo a favor'}
+                </span>
+                {!pedido ? (
+                  <input
+                    {...register('saldoAplicado')}
+                    inputMode="decimal"
+                    placeholder="0"
+                    style={{
+                      width: 80, height: 28, border: `0.5px solid ${saldoAplicadoNum > 0 ? '#FFCDD2' : '#C8E6C9'}`, borderRadius: 6,
+                      padding: '0 8px', fontSize: 12, textAlign: 'right',
+                      fontFamily: 'Inter, sans-serif', outline: 'none',
+                      background: saldoAplicadoNum > 0 ? '#FFF5F5' : '#F1F8F1', color: '#1A2B3C',
+                    }}
+                    onFocus={e => { e.currentTarget.style.borderColor = '#1B9ED6' }}
+                    onBlur={e  => { e.currentTarget.style.borderColor = saldoAplicadoNum > 0 ? '#FFCDD2' : '#C8E6C9' }}
+                  />
+                ) : (
+                  <span style={{ fontSize: 12, color: saldoAplicadoNum > 0 ? '#C62828' : '#2E7D32', fontWeight: 500 }}>
+                    ${saldoAplicadoNum.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* Envío con input inline */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 12, color: '#4A5568' }}>Envío</span>
@@ -990,28 +1018,6 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
                 onBlur={e  => { e.currentTarget.style.borderColor = '#D1D5DB' }}
               />
             </div>
-
-            {/* Saldo del cliente (solo al crear) */}
-            {showSaldoRow && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: saldoAplicadoNum > 0 ? '#C62828' : '#2E7D32' }}>
-                  {saldoAplicadoNum > 0 ? 'Saldo pendiente anterior' : 'Saldo a favor'}
-                </span>
-                <input
-                  {...register('saldoAplicado')}
-                  inputMode="decimal"
-                  placeholder="0"
-                  style={{
-                    width: 80, height: 28, border: `0.5px solid ${saldoAplicadoNum > 0 ? '#FFCDD2' : '#C8E6C9'}`, borderRadius: 6,
-                    padding: '0 8px', fontSize: 12, textAlign: 'right',
-                    fontFamily: 'Inter, sans-serif', outline: 'none',
-                    background: saldoAplicadoNum > 0 ? '#FFF5F5' : '#F1F8F1', color: '#1A2B3C',
-                  }}
-                  onFocus={e => { e.currentTarget.style.borderColor = '#1B9ED6' }}
-                  onBlur={e  => { e.currentTarget.style.borderColor = saldoAplicadoNum > 0 ? '#FFCDD2' : '#C8E6C9' }}
-                />
-              </div>
-            )}
 
             <div style={{ height: '0.5px', background: '#D1D5DB' }} />
 

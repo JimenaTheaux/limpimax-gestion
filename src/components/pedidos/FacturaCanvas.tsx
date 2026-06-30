@@ -179,6 +179,18 @@ export function FacturaCanvas({ pedido }: { pedido: PedidoDetalle }) {
 
       {/* Totales */}
       <div style={{ marginTop: 16, borderTop: '0.5px solid #D1D5DB', paddingTop: 12, width: '100%', boxSizing: 'border-box' }}>
+        {pedido.saldo_anterior_aplicado != null && pedido.saldo_anterior_aplicado !== 0 && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontSize: 12,
+            color: pedido.saldo_anterior_aplicado > 0 ? '#C62828' : '#2E7D32',
+            marginBottom: 8, padding: '0 6px',
+          }}>
+            <span>{pedido.saldo_anterior_aplicado > 0 ? 'Saldo pendiente anterior' : 'Saldo a favor'}</span>
+            <span>{fmtMonto(pedido.saldo_anterior_aplicado)}</span>
+          </div>
+        )}
         {pedido.costo_envio > 0 && (
           <div style={{
             display: 'flex',

@@ -302,7 +302,7 @@ export const useCrearPedido = () => {
           costo_envio:              costoEnvio,
           total_calculado:          totalCalculado,
           total_manual:             data.total_manual ? parseFloat(data.total_manual) : null,
-          saldo_anterior_aplicado:  saldoAplicado !== 0 ? saldoAplicado : null,
+          saldo_anterior_aplicado:  saldoAplicado,
           estado:                   estadoInicial,
           creado_por:               usuario?.id ?? null,
         })
