@@ -5,6 +5,20 @@ import html2canvas from 'html2canvas'
 import { SaldoPendienteCanvas } from '@/components/pedidos/SaldoPendienteCanvas'
 import type { ClienteConSaldo, PedidoPendienteDetalle } from '@/services/produccion'
 
+function descargarBlob(blob: Blob, fileName: string): void {
+  const objectUrl = URL.createObjectURL(blob)
+  const a         = document.createElement('a')
+  a.href          = objectUrl
+  a.download      = fileName
+  document.body.appendChild(a)
+  a.click()
+  // Delay cleanup: remover inmediatamente cancela la descarga en Chromium/Edge
+  setTimeout(() => {
+    if (document.body.contains(a)) document.body.removeChild(a)
+    URL.revokeObjectURL(objectUrl)
+  }, 2000)
+}
+
 export function useCompartirSaldoPendiente() {
   const compartir = async (
     cliente: ClienteConSaldo,
@@ -18,13 +32,11 @@ export function useCompartirSaldoPendiente() {
     let canvas: HTMLCanvasElement | null = null
 
     try {
-      // Render sincrónico con flushSync para garantizar commit antes de capturar
       const root = createRoot(container)
       flushSync(() => {
         root.render(createElement(SaldoPendienteCanvas, { cliente, pedidos }))
       })
 
-      // Esperar fuentes web (Inter) antes de capturar
       await document.fonts.ready
 
       canvas = await html2canvas(container, {
@@ -96,31 +108,15 @@ export function useCompartirSaldoPendiente() {
         }
       }
 
-      // Fallback mobile: descargar JPG + abrir WhatsApp nativo
-      const objectUrl = URL.createObjectURL(blob)
-      const a         = document.createElement('a')
-      a.href          = objectUrl
-      a.download      = fileName
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(objectUrl)
-
+      // Fallback mobile: descargar primero, luego navegar a WhatsApp con delay
+      descargarBlob(blob, fileName)
       const waUrl = telefono
         ? `whatsapp://send?phone=54${telefono}&text=${mensaje}`
         : `whatsapp://send?text=${mensaje}`
-      window.location.href = waUrl
+      setTimeout(() => { window.location.href = waUrl }, 1500)
     } else {
-      // Desktop: descargar JPG + abrir WhatsApp Web en nueva pestaña
-      const objectUrl = URL.createObjectURL(blob)
-      const a         = document.createElement('a')
-      a.href          = objectUrl
-      a.download      = fileName
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(objectUrl)
-
+      // Desktop: descargar primero, luego abrir WhatsApp Web en nueva pestaña
+      descargarBlob(blob, fileName)
       const waUrl = telefono
         ? `https://web.whatsapp.com/send?phone=54${telefono}&text=${mensaje}`
         : `https://web.whatsapp.com/send?text=${mensaje}`
