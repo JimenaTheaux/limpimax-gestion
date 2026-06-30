@@ -427,9 +427,10 @@ function FilaPendiente({ p, onCobrado }: {
 
   return (
     <div style={{
-      background:  abierto ? '#fff' : '#FFFDE7',
-      border:      `1.5px solid ${abierto ? '#145A32' : '#F9A825'}`,
-      borderRadius: 16, overflow: 'hidden', transition: 'border-color 0.15s',
+      background: '#fff',
+      border: '1px solid #E5E7EB',
+      borderLeft: `3px solid ${abierto ? '#2E9E5C' : '#F9A825'}`,
+      borderRadius: 16, overflow: 'hidden', transition: 'border-left-color 0.15s',
     }}>
       {/* Resumen */}
       <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
@@ -467,7 +468,7 @@ function FilaPendiente({ p, onCobrado }: {
         </div>
 
         <div style={{ flexShrink: 0, textAlign: 'right' }}>
-          <p style={{ margin: '0 0 8px', fontWeight: 500, fontSize: 17, color: '#0D5C8A', letterSpacing: -0.5 }}>
+          <p style={{ margin: '0 0 8px', fontWeight: 700, fontSize: 17, color: '#F57C00', letterSpacing: -0.5 }}>
             {pesos(p.totalPedido)}
           </p>
           {!abierto && (
@@ -509,7 +510,7 @@ function FilaPendiente({ p, onCobrado }: {
           aria-label={`Registrar cobro — P-${String(p.numero).padStart(5, '0')}`}
           style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}
         >
-          <div style={{ height: 1, background: '#E8F0E8', margin: '0 0 4px' }} />
+          <div style={{ height: 1, background: '#E5E7EB', margin: '0 0 4px' }} />
 
           <div>
             <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#4A5568' }}>
@@ -673,11 +674,11 @@ function SheetPendientes({ open, onClose, pendientes, onRefetch }: {
         {lista.length > 0 && (
           <div style={{
             flexShrink: 0, padding: '16px 24px',
-            borderTop: '2px solid #F0F0F0', background: '#FDECEA',
+            borderTop: '1px solid #E5E7EB', background: '#fff',
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           }}>
-            <span style={{ fontSize: 14, fontWeight: 500, color: '#D32F2F' }}>Total pendiente</span>
-            <span style={{ fontSize: 22, fontWeight: 500, color: '#D32F2F', letterSpacing: -0.5 }}>
+            <span style={{ fontSize: 14, fontWeight: 500, color: '#4A5568' }}>Total pendiente</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: '#F57C00', letterSpacing: -0.5 }}>
               {pesos(total)}
             </span>
           </div>
@@ -852,7 +853,7 @@ export default function DashboardPage() {
           {/* Card 1 — Pedidos */}
           <div style={kpiCard}>
             <div style={kpiHeaderRow}>
-              <Package size={13} style={{ color: '#3DD6B5', flexShrink: 0 }} />
+              <Package size={13} style={{ color: '#1B9ED6', flexShrink: 0 }} />
               <span style={kpiLabelSt}>Pedidos</span>
             </div>
             <div style={kpiValueSt}>{kpi?.count ?? 0}</div>
@@ -862,7 +863,7 @@ export default function DashboardPage() {
           {/* Card 2 — Total cobrado */}
           <div style={kpiCard}>
             <div style={kpiHeaderRow}>
-              <Banknote size={13} style={{ color: '#7EB8E8', flexShrink: 0 }} />
+              <Banknote size={13} style={{ color: '#1B9ED6', flexShrink: 0 }} />
               <span style={kpiLabelSt}>Total cobrado</span>
             </div>
             <div style={kpiValueSt}>{pesos(kpiCobros?.totalCob ?? 0)}</div>
@@ -888,11 +889,11 @@ export default function DashboardPage() {
             }}
           >
             <div style={kpiHeaderRow}>
-              <Clock size={13} style={{ color: '#C47B00', flexShrink: 0 }} />
+              <Clock size={13} style={{ color: '#F9A825', flexShrink: 0 }} />
               <span style={kpiLabelSt}>Pend. de cobro</span>
             </div>
-            <div style={{ ...kpiValueSt, color: '#C47B00' }}>{pesos(pendientes?.total ?? 0)}</div>
-            <p style={{ ...kpiSubSt, color: '#3DD6B5', fontWeight: 600 }}>Ver detalle →</p>
+            <div style={{ ...kpiValueSt, color: '#F9A825' }}>{pesos(pendientes?.total ?? 0)}</div>
+            <p style={{ ...kpiSubSt, color: '#1B9ED6', fontWeight: 600 }}>Ver detalle →</p>
           </button>
 
         </div>
@@ -903,10 +904,10 @@ export default function DashboardPage() {
           {/* Card 4 — Costo de producción */}
           <div style={kpiCard}>
             <div style={kpiHeaderRow}>
-              <FlaskConical size={13} style={{ color: '#7EB8E8', flexShrink: 0 }} />
+              <FlaskConical size={13} style={{ color: '#1B9ED6', flexShrink: 0 }} />
               <span style={kpiLabelSt}>Costo prod.</span>
             </div>
-            <div style={{ ...kpiValueSt, color: '#7EB8E8' }}>{pesos(totalCostoProduccion)}</div>
+            <div style={{ ...kpiValueSt, color: '#1B9ED6' }}>{pesos(totalCostoProduccion)}</div>
             <p style={kpiSubSt}>ventas cobradas</p>
           </div>
 
@@ -920,7 +921,7 @@ export default function DashboardPage() {
               <Skeleton style={{ height: 28, width: 100, borderRadius: 4, marginBottom: 6 }} />
             ) : (
               <>
-                <div style={{ ...kpiValueSt, color: gananciaNeta >= 0 ? '#28B99A' : '#F05252' }}>
+                <div style={{ ...kpiValueSt, color: gananciaNeta >= 0 ? '#2E9E5C' : '#D32F2F' }}>
                   {pesos(gananciaNeta)}
                 </div>
                 <p style={kpiSubSt}>Egresos {pesos(totalEgresos)}</p>
