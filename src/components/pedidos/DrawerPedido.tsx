@@ -226,6 +226,9 @@ function SelectorCliente({
                     }}>
                       {c.tipo_cliente.toUpperCase()}
                     </span>
+                    {c.direccion && (
+                      <span style={{ marginLeft: 8, fontSize: 11, color: '#9CA3AF' }}>{c.direccion}</span>
+                    )}
                   </button>
                 ))}
               </div>
