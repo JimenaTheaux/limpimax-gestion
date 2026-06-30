@@ -10,9 +10,10 @@ const CAT_KEY = ['categorias']
 function parseProducto(row: any): Producto {
   return {
     ...row,
-    presentacion:     Number(row.presentacion),
-    precio_minorista: Number(row.precio_minorista),
-    precio_mayorista: Number(row.precio_mayorista),
+    presentacion:      Number(row.presentacion),
+    precio_minorista:  Number(row.precio_minorista),
+    precio_mayorista:  Number(row.precio_mayorista),
+    costo_produccion:  Number(row.costo_produccion ?? 0),
     categorias_producto: row.categorias_producto ?? null,
   } as Producto
 }
@@ -62,15 +63,16 @@ export const useCrearProducto = () => {
       const { data, error } = await supabase
         .from('productos')
         .insert({
-          nombre:           payload.nombre,
-          fragancia:        payload.fragancia     || null,
-          categoria_id:     payload.categoria_id  || null,
-          unidad_medida:    payload.unidad_medida  ?? 'litros',
-          presentacion:     payload.presentacion,
-          precio_minorista: payload.precio_minorista,
-          precio_mayorista: payload.precio_mayorista,
-          activo:           payload.activo ?? true,
-          codigo:           payload.codigo || null,
+          nombre:            payload.nombre,
+          fragancia:         payload.fragancia     || null,
+          categoria_id:      payload.categoria_id  || null,
+          unidad_medida:     payload.unidad_medida  ?? 'litros',
+          presentacion:      payload.presentacion,
+          precio_minorista:  payload.precio_minorista,
+          precio_mayorista:  payload.precio_mayorista,
+          costo_produccion:  payload.costo_produccion ?? 0,
+          activo:            payload.activo ?? true,
+          codigo:            payload.codigo || null,
         })
         .select('*, categorias_producto(id, nombre)')
         .single()
@@ -94,6 +96,7 @@ export const useEditarProducto = () => {
       if (payload.presentacion     !== undefined) patch.presentacion     = payload.presentacion
       if (payload.precio_minorista !== undefined) patch.precio_minorista = payload.precio_minorista
       if (payload.precio_mayorista !== undefined) patch.precio_mayorista = payload.precio_mayorista
+      if (payload.costo_produccion !== undefined) patch.costo_produccion = payload.costo_produccion
       if (payload.activo           !== undefined) patch.activo           = payload.activo
       if (payload.codigo           !== undefined) patch.codigo           = payload.codigo || null
 

@@ -60,18 +60,19 @@ export interface CategoriaProducto {
 }
 
 export interface Producto {
-  id:               string
-  codigo:           string | null
-  nombre:           string
-  fragancia:        string | null
-  categoria_id:     string | null
-  unidad_medida:    string
-  presentacion:     number
-  precio_minorista: number
-  precio_mayorista: number
-  activo:           boolean
-  created_at:       string
-  updated_at:       string
+  id:                string
+  codigo:            string | null
+  nombre:            string
+  fragancia:         string | null
+  categoria_id:      string | null
+  unidad_medida:     string
+  presentacion:      number
+  precio_minorista:  number
+  precio_mayorista:  number
+  costo_produccion:  number
+  activo:            boolean
+  created_at:        string
+  updated_at:        string
   // Join opcional
   categorias_producto?: CategoriaProducto | null
 }

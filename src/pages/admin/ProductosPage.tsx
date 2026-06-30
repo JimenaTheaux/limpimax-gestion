@@ -20,13 +20,14 @@ import type { Producto } from '@/types'
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
 const schema = z.object({
-  nombre:          z.string().min(1, 'El nombre es obligatorio'),
-  fragancia:       z.string().optional(),
-  categoriaId:     z.string().optional(),
-  presentacion:    z.enum(['0.5', '3', '5', '10', '20'], { message: 'Seleccioná una presentación' }),
-  precioMinorista: z.string().min(1, 'Requerido').regex(/^\d+(\.\d{0,2})?$/, 'Precio inválido'),
-  precioMayorista: z.string().min(1, 'Requerido').regex(/^\d+(\.\d{0,2})?$/, 'Precio inválido'),
-  codigo:          z.string().optional(),
+  nombre:           z.string().min(1, 'El nombre es obligatorio'),
+  fragancia:        z.string().optional(),
+  categoriaId:      z.string().optional(),
+  presentacion:     z.enum(['0.5', '3', '5', '10', '20'], { message: 'Seleccioná una presentación' }),
+  precioMinorista:  z.string().min(1, 'Requerido').regex(/^\d+(\.\d{0,2})?$/, 'Precio inválido'),
+  precioMayorista:  z.string().min(1, 'Requerido').regex(/^\d+(\.\d{0,2})?$/, 'Precio inválido'),
+  costoProduccion:  z.string().optional(),
+  codigo:           z.string().optional(),
 })
 
 type FormData = z.infer<typeof schema>
@@ -60,22 +61,24 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      nombre:          producto?.nombre                                                    ?? '',
-      fragancia:       producto?.fragancia                                                 ?? '',
-      categoriaId:     producto?.categoria_id                                              ?? '',
-      presentacion:    (producto?.presentacion != null ? String(producto.presentacion) : '5') as FormData['presentacion'],
-      precioMinorista: producto?.precio_minorista != null ? String(producto.precio_minorista) : '',
-      precioMayorista: producto?.precio_mayorista != null ? String(producto.precio_mayorista) : '',
-      codigo:          producto?.codigo                                                    ?? '',
+      nombre:           producto?.nombre                                                    ?? '',
+      fragancia:        producto?.fragancia                                                 ?? '',
+      categoriaId:      producto?.categoria_id                                              ?? '',
+      presentacion:     (producto?.presentacion != null ? String(producto.presentacion) : '5') as FormData['presentacion'],
+      precioMinorista:  producto?.precio_minorista != null ? String(producto.precio_minorista) : '',
+      precioMayorista:  producto?.precio_mayorista != null ? String(producto.precio_mayorista) : '',
+      costoProduccion:  producto?.costo_produccion != null ? String(producto.costo_produccion) : '',
+      codigo:           producto?.codigo                                                    ?? '',
     },
   })
 
   const categoriaVal = watch('categoriaId')
 
   const onSubmit = async (data: FormData) => {
-    const presentacionNum = parseFloat(data.presentacion)
-    const minorista       = parseFloat(data.precioMinorista)
-    const mayorista       = parseFloat(data.precioMayorista)
+    const presentacionNum  = parseFloat(data.presentacion)
+    const minorista        = parseFloat(data.precioMinorista)
+    const mayorista        = parseFloat(data.precioMayorista)
+    const costoProduccion  = parseFloat(data.costoProduccion || '0') || 0
     try {
       if (producto) {
         await editar.mutateAsync({
@@ -86,6 +89,7 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
           presentacion:     presentacionNum,
           precio_minorista: minorista,
           precio_mayorista: mayorista,
+          costo_produccion: costoProduccion,
           codigo:           data.codigo      || null,
           activo,
         })
@@ -99,6 +103,7 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
           presentacion:     presentacionNum,
           precio_minorista: minorista,
           precio_mayorista: mayorista,
+          costo_produccion: costoProduccion,
           activo,
           codigo:           data.codigo      || null,
         })
@@ -116,13 +121,14 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
   useEffect(() => {
     if (!open) return
     reset({
-      nombre:          producto?.nombre                                                    ?? '',
-      fragancia:       producto?.fragancia                                                 ?? '',
-      categoriaId:     producto?.categoria_id                                              ?? '',
-      presentacion:    (producto?.presentacion != null ? String(producto.presentacion) : '5') as FormData['presentacion'],
-      precioMinorista: producto?.precio_minorista != null ? String(producto.precio_minorista) : '',
-      precioMayorista: producto?.precio_mayorista != null ? String(producto.precio_mayorista) : '',
-      codigo:          producto?.codigo                                                    ?? '',
+      nombre:           producto?.nombre                                                    ?? '',
+      fragancia:        producto?.fragancia                                                 ?? '',
+      categoriaId:      producto?.categoria_id                                              ?? '',
+      presentacion:     (producto?.presentacion != null ? String(producto.presentacion) : '5') as FormData['presentacion'],
+      precioMinorista:  producto?.precio_minorista != null ? String(producto.precio_minorista) : '',
+      precioMayorista:  producto?.precio_mayorista != null ? String(producto.precio_mayorista) : '',
+      costoProduccion:  producto?.costo_produccion != null ? String(producto.costo_produccion) : '',
+      codigo:           producto?.codigo                                                    ?? '',
     })
     setActivo(producto?.activo ?? true)
   }, [open, producto])
@@ -310,6 +316,8 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
           <FloatInput label="Precio minorista *" error={errors.precioMinorista?.message} {...register('precioMinorista')} inputMode="decimal" />
           <FloatInput label="Precio mayorista *" error={errors.precioMayorista?.message} {...register('precioMayorista')} inputMode="decimal" />
         </div>
+
+        <FloatInput label="Costo de producción" {...register('costoProduccion')} inputMode="decimal" />
 
         <FloatInput label="Código (opcional)" {...register('codigo')} />
 
