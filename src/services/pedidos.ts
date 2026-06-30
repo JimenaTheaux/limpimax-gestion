@@ -63,6 +63,17 @@ export interface CrearPedidoInput {
   accion:                   'borrador' | 'confirmar'
 }
 
+// ─── Helper: costo de producción por producto ─────────────────────────────────
+
+async function fetchCostoMap(productoIds: string[]): Promise<Record<string, number>> {
+  const ids = [...new Set(productoIds)]
+  const { data } = await supabase
+    .from('productos')
+    .select('id, costo_produccion')
+    .in('id', ids)
+  return Object.fromEntries((data ?? []).map(p => [p.id, Number(p.costo_produccion ?? 0)]))
+}
+
 // ─── Parseo de numéricos ──────────────────────────────────────────────────────
 // Supabase retorna NUMERIC/DECIMAL como string — convertimos a number
 
@@ -300,6 +311,8 @@ export const useCrearPedido = () => {
 
       if (e1) throw new Error(e1.message)
 
+      const costoMap = await fetchCostoMap(data.items.map(i => i.producto_id))
+
       await Promise.all([
         supabase.from('pedido_items').insert(
           data.items.map(item => ({
@@ -309,6 +322,7 @@ export const useCrearPedido = () => {
             precio_unitario:   parseFloat(item.precio_unitario),
             precio_referencia: parseFloat(item.precio_referencia),
             bidon_nuevo:       item.bidon_nuevo,
+            costo_snapshot:    costoMap[item.producto_id] ?? 0,
           }))
         ),
         supabase.from('pedido_historial').insert({
@@ -357,6 +371,8 @@ export const useEditarPedido = () => {
       if (updateErr) throw new Error(updateErr.message)
 
       if (items && items.length > 0) {
+        const costoMap = await fetchCostoMap(items.map(i => i.producto_id))
+
         const { error: delErr } = await supabase.from('pedido_items').delete().eq('pedido_id', id)
         if (delErr) throw new Error(delErr.message)
 
@@ -368,6 +384,7 @@ export const useEditarPedido = () => {
             precio_unitario:   parseFloat(item.precio_unitario),
             precio_referencia: parseFloat(item.precio_referencia),
             bidon_nuevo:       item.bidon_nuevo,
+            costo_snapshot:    costoMap[item.producto_id] ?? 0,
           }))
         )
         if (insErr) throw new Error(insErr.message)
