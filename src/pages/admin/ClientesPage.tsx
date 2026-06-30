@@ -251,7 +251,7 @@ function BadgeActivo({ activo }: { activo: boolean }) {
 function ShimmerRow() {
   return (
     <tr>
-      {[160, 110, 180, 70, 60, 28].map((w, i) => (
+      {[160, 110, 180, 70, 60, 72, 28].map((w, i) => (
         <td key={i} style={{ padding: '10px 14px', borderBottom: '0.5px solid #F4F6F8' }}>
           <Skeleton style={{ height: 13, width: w, borderRadius: 6 }} />
         </td>
@@ -284,17 +284,72 @@ const ACTIVO_LABELS: Record<ActivoFiltro, string> = {
   todos: 'Todos', activo: 'Activos', inactivo: 'Inactivos',
 }
 
+type SaldoFiltro = 'todos' | 'deuda' | 'al_dia' | 'favor'
+
+const SALDO_LABELS: Record<SaldoFiltro, string> = {
+  todos:  'Todos',
+  deuda:  'Con deuda',
+  al_dia: 'Al día',
+  favor:  'A favor',
+}
+
+// ─── Badge saldo ──────────────────────────────────────────────────────────────
+
+function BadgeSaldo({ saldo }: { saldo: number | null | undefined }) {
+  const s = saldo ?? 0
+  if (s > 0) return (
+    <span style={{
+      backgroundColor: '#FDECEA', color: '#D32F2F',
+      fontSize: 9, fontWeight: 600, padding: '2px 8px', borderRadius: 99,
+      display: 'inline-block', whiteSpace: 'nowrap',
+    }}>
+      Debe ${Math.round(s).toLocaleString('es-AR')}
+    </span>
+  )
+  if (s < 0) return (
+    <span style={{
+      backgroundColor: '#E8F8F0', color: '#2E9E5C',
+      fontSize: 9, fontWeight: 600, padding: '2px 8px', borderRadius: 99,
+      display: 'inline-block', whiteSpace: 'nowrap',
+    }}>
+      A favor ${Math.round(Math.abs(s)).toLocaleString('es-AR')}
+    </span>
+  )
+  return (
+    <span style={{
+      backgroundColor: '#E8F4FF', color: '#1B9ED6',
+      fontSize: 9, fontWeight: 600, padding: '2px 8px', borderRadius: 99,
+      display: 'inline-block', whiteSpace: 'nowrap',
+    }}>
+      Al día
+    </span>
+  )
+}
+
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function ClientesPage() {
   const [q, setQ]                     = useState('')
   const [activoFiltro, setActivo]     = useState<ActivoFiltro>('activo')
+  const [saldoFiltro, setSaldoFiltro] = useState<SaldoFiltro>('todos')
   const [drawerOpen, setDrawer]       = useState(false)
   const [selected, setSelected]       = useState<Cliente | null>(null)
   const { toasts, show, dismiss }     = useToast()
 
   const qDebounced = useDebounce(q, 300)
   const { data: clientes, isLoading } = useClientes(qDebounced || undefined, ACTIVO_MAP[activoFiltro])
+
+  const clientesFiltrados = (() => {
+    if (!clientes) return []
+    if (saldoFiltro === 'todos') return clientes
+    return clientes.filter(c => {
+      const s = c.saldo_pendiente ?? 0
+      if (saldoFiltro === 'deuda')  return s > 0
+      if (saldoFiltro === 'al_dia') return s === 0
+      if (saldoFiltro === 'favor')  return s < 0
+      return true
+    })
+  })()
 
   const handleEdit  = (c: Cliente) => { setSelected(c); setDrawer(true) }
   const handleNew   = ()           => { setSelected(null); setDrawer(true) }
@@ -334,8 +389,8 @@ export default function ClientesPage() {
         </button>
       </div>
 
-      {/* Buscador + pills */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+      {/* Buscador + pills estado */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
         <div role="search" style={{ position: 'relative', flex: 1, minWidth: 180 }}>
           <label htmlFor="cli-search" className="sr-only">Buscar clientes</label>
           <Search
@@ -382,13 +437,37 @@ export default function ClientesPage() {
         </div>
       </div>
 
+      {/* Pills filtro de saldo */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+        {(['todos', 'deuda', 'al_dia', 'favor'] as SaldoFiltro[]).map(v => {
+          const isActive = saldoFiltro === v
+          return (
+            <button
+              key={v}
+              onClick={() => setSaldoFiltro(v)}
+              style={{
+                height: 28, padding: '0 10px', borderRadius: 99,
+                border: `1px solid ${isActive ? '#0D5C8A' : '#D1D5DB'}`,
+                background: isActive ? '#0D5C8A' : '#fff',
+                color: isActive ? '#fff' : '#4A5568',
+                fontSize: 11, fontWeight: isActive ? 500 : 400,
+                cursor: 'pointer', whiteSpace: 'nowrap',
+                transition: 'all 0.1s',
+              }}
+            >
+              {SALDO_LABELS[v]}
+            </button>
+          )
+        })}
+      </div>
+
       {/* ── DESKTOP ─────────────────────────────────────────────────────────── */}
       <div className="cli-desktop">
         <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #D1D5DB', overflow: 'hidden' }}>
           <table className="cli-table" aria-label="Listado de clientes">
             <thead>
               <tr style={{ background: '#F4F6F8', borderBottom: '0.5px solid #D1D5DB' }}>
-                {['Cliente', 'Contacto', 'Dirección', 'Tipo', 'Estado', 'Acciones'].map((h, i) => (
+                {['Cliente', 'Contacto', 'Dirección', 'Tipo', 'Estado', 'Saldo', 'Acciones'].map((h, i) => (
                   <th
                     key={h}
                     scope="col"
@@ -396,7 +475,7 @@ export default function ClientesPage() {
                       padding: '8px 14px',
                       fontSize: 10, fontWeight: 500, textTransform: 'uppercase',
                       letterSpacing: '0.06em', color: '#4A5568',
-                      textAlign: i === 5 ? 'right' : 'left',
+                      textAlign: i === 6 ? 'right' : 'left',
                       whiteSpace: 'nowrap',
                     }}
                   >
@@ -408,9 +487,9 @@ export default function ClientesPage() {
             <tbody>
               {isLoading ? (
                 Array.from({ length: 4 }).map((_, i) => <ShimmerRow key={i} />)
-              ) : !clientes?.length ? (
+              ) : !clientesFiltrados.length ? (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={7}>
                     <div style={{ padding: '48px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                       <Users size={40} strokeWidth={1.2} color="#D1D5DB" />
                       <p style={{ fontSize: 14, fontWeight: 500, color: '#1A2B3C', margin: 0 }}>Sin clientes</p>
@@ -430,7 +509,7 @@ export default function ClientesPage() {
                   </td>
                 </tr>
               ) : (
-                clientes.map(c => (
+                clientesFiltrados.map(c => (
                   <tr key={c.id} style={{ background: '#fff' }}>
                     <th
                       scope="row"
@@ -456,6 +535,9 @@ export default function ClientesPage() {
                     </td>
                     <td style={{ padding: '0 14px', height: 48, borderBottom: '0.5px solid #F4F6F8', whiteSpace: 'nowrap' }}>
                       <BadgeActivo activo={c.activo ?? true} />
+                    </td>
+                    <td style={{ padding: '0 14px', height: 48, borderBottom: '0.5px solid #F4F6F8', whiteSpace: 'nowrap' }}>
+                      <BadgeSaldo saldo={c.saldo_pendiente} />
                     </td>
                     <td style={{ padding: '0 14px', height: 48, borderBottom: '0.5px solid #F4F6F8', textAlign: 'right' }}>
                       <button
@@ -483,10 +565,10 @@ export default function ClientesPage() {
             </tbody>
           </table>
 
-          {!isLoading && !!clientes?.length && (
+          {!isLoading && !!clientesFiltrados.length && (
             <div style={{ padding: '10px 14px', borderTop: '0.5px solid #F4F6F8' }}>
               <span style={{ fontSize: 12, color: '#4A5568' }}>
-                {clientes.length} {clientes.length === 1 ? 'cliente' : 'clientes'}
+                {clientesFiltrados.length} {clientesFiltrados.length === 1 ? 'cliente' : 'clientes'}
               </span>
             </div>
           )}
@@ -497,7 +579,7 @@ export default function ClientesPage() {
       <div className="cli-mobile">
         {isLoading ? (
           Array.from({ length: 4 }).map((_, i) => <ShimmerCard key={i} />)
-        ) : !clientes?.length ? (
+        ) : !clientesFiltrados.length ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', gap: 12, textAlign: 'center' }}>
             <Users size={40} strokeWidth={1.2} color="#D1D5DB" />
             <p style={{ fontSize: 14, fontWeight: 500, color: '#1A2B3C', margin: 0 }}>Sin clientes</p>
@@ -516,7 +598,7 @@ export default function ClientesPage() {
           </div>
         ) : (
           <>
-            {clientes.map(c => (
+            {clientesFiltrados.map(c => (
               <div
                 key={c.id}
                 className="cli-card card-tappable"
@@ -540,10 +622,13 @@ export default function ClientesPage() {
                     </span>
                     <BadgeTipo tipo={c.tipo_cliente} />
                   </div>
-                  {/* Línea 2 */}
-                  <p style={{ fontSize: 12, color: '#4A5568', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {[c.telefono, c.direccion].filter(Boolean).join(' · ') || '—'}
-                  </p>
+                  {/* Línea 2: info + badge saldo */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <p style={{ fontSize: 12, color: '#4A5568', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                      {[c.telefono, c.direccion].filter(Boolean).join(' · ') || '—'}
+                    </p>
+                    <BadgeSaldo saldo={c.saldo_pendiente} />
+                  </div>
                 </div>
                 <button
                   onClick={e => e.stopPropagation()}
@@ -562,7 +647,7 @@ export default function ClientesPage() {
               </div>
             ))}
             <p style={{ fontSize: 12, color: '#4A5568', textAlign: 'center', padding: '12px 0', margin: 0 }}>
-              {clientes.length} {clientes.length === 1 ? 'cliente' : 'clientes'}
+              {clientesFiltrados.length} {clientesFiltrados.length === 1 ? 'cliente' : 'clientes'}
             </p>
           </>
         )}

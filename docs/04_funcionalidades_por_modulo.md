@@ -195,17 +195,22 @@ Cards KPI:
 - Pedidos en reparto (listos + en camino)
 - Pedidos con entrega fallida (alerta visual)
 - **Cobrado hoy:** pedidos estado=cerrado AND estado_pago=cobrado · suma de monto_cobrado · desglose efectivo/transferencia
-- **Pendiente de cobro** (alerta visual): pedidos estado=cerrado AND estado_pago=pendiente · conteo + monto total · click abre panel con listado detallado
+- **Pendiente de cobro** (alerta visual): suma de `clientes.saldo_pendiente` para todos los clientes con saldo > 0 · conteo de clientes · click abre panel agrupado por cliente
 
 ### F5.2 — Tablero de estados
 - Lista agrupada por estado con conteo por grupo
 - Cada pedido como card con: número, cliente, total, badge de estado
 - Clic → abre drawer lateral con detalle completo y acciones de override
 
-### F5.3 — Seguimiento de cobros
-- Lista de pedidos cerrados con detalle de cobro
-- Total cobrado en efectivo / total por transferencia del día
-- Pedidos con estado_pago=pendiente resaltados con alerta visual
+### F5.3 — Seguimiento de cobros (drawer pendientes)
+El drawer "Pendientes de cobro" agrupa por cliente, no por pedido individual:
+- Una card por cliente con `saldo_pendiente > 0`
+- Muestra: nombre del cliente, monto total que debe (`saldo_pendiente`), botón WhatsApp de recordatorio, botón "Ver detalle"
+- El botón WhatsApp abre la app con un mensaje de texto predefinido al número del cliente (sin generar imagen)
+- Al expandir "Ver detalle": lista de los pedidos cerrados con `estado_pago=pendiente` de ese cliente
+  - Columnas: Pedido (P-XXXXX) · Fecha producción · Total del pedido · Cuánto pagó (suma pedido_pagos) · Cuánto queda (diferencia)
+- El total del drawer es la suma de `saldo_pendiente` de todos los clientes con saldo > 0
+- Fuente de datos: `clientes.saldo_pendiente` para el total; `pedidos` con estado=cerrado AND estado_pago=pendiente para el detalle expandible
 
 ### F5.4 — Dashboard de ventas (KPIs)
 - Selector de rango personalizado: inputs date [Desde] [Hasta]; default = primer día del mes → hoy
@@ -223,6 +228,15 @@ Cards KPI:
 - Búsqueda por nombre o dirección
 - Indicador activo / inactivo
 - Botón "+ Nuevo cliente" abre drawer lateral
+- **Semáforo de saldo** (badge junto a cada cliente):
+  - `saldo_pendiente > 0` → badge rojo "Debe $X"
+  - `saldo_pendiente == 0` o null → badge azul accent "Al día"
+  - `saldo_pendiente < 0` → badge verde "A favor $X"
+- **Filtro rápido de saldo** (pills, debajo del buscador): Todos · Con deuda · Al día · Con saldo a favor
+  - Filtrado client-side sobre los datos ya cargados (complementa el filtro activo/inactivo)
+  - "Con deuda": muestra solo clientes con `saldo_pendiente > 0`
+  - "Al día": muestra clientes con `saldo_pendiente == 0` o null
+  - "Con saldo a favor": muestra clientes con `saldo_pendiente < 0`
 
 ### F6.2 — Crear / editar cliente (en drawer)
 - Nombre y apellido (obligatorio)

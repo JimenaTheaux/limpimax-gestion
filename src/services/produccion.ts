@@ -231,6 +231,74 @@ export const useResumenProduccion = (fecha?: string) => {
   })
 }
 
+// ─── Clientes con saldo pendiente ─────────────────────────────────────────────
+
+export interface ClienteConSaldo {
+  id:              string
+  nombre:          string
+  telefono:        string | null
+  saldo_pendiente: number
+}
+
+export interface PedidoPendienteDetalle {
+  id:              string
+  numero:          number
+  fechaProduccion: string | null
+  totalPedido:     number
+  sumaPagos:       number
+  pendiente:       number
+}
+
+export const useClientesConDeuda = () =>
+  useQuery({
+    queryKey:        ['clientes-con-deuda'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('id, nombre, telefono, saldo_pendiente')
+        .gt('saldo_pendiente', 0)
+        .order('saldo_pendiente', { ascending: false })
+      if (error) throw new Error(error.message)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data ?? []).map((r: any) => ({
+        id:              r.id              as string,
+        nombre:          r.nombre          as string,
+        telefono:        (r.telefono ?? null) as string | null,
+        saldo_pendiente: Number(r.saldo_pendiente),
+      })) as ClienteConSaldo[]
+    },
+    refetchInterval: 60_000,
+  })
+
+export const useClientePendientes = (clienteId: string | null) =>
+  useQuery({
+    queryKey:        ['cliente-pendientes', clienteId],
+    enabled:         !!clienteId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pedidos')
+        .select('id, numero, fecha_produccion, total_calculado, total_manual, pedido_pagos(monto)')
+        .eq('cliente_id', clienteId!)
+        .eq('estado', 'cerrado')
+        .eq('estado_pago', 'pendiente')
+        .order('fecha_produccion', { ascending: false })
+      if (error) throw new Error(error.message)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data ?? []).map((p: any): PedidoPendienteDetalle => {
+        const total     = parseFloat(p.total_manual ?? p.total_calculado ?? '0') || 0
+        const sumaPagos = (p.pedido_pagos ?? []).reduce((s: number, pg: any) => s + Number(pg.monto), 0)
+        return {
+          id:              p.id,
+          numero:          p.numero,
+          fechaProduccion: p.fecha_produccion,
+          totalPedido:     total,
+          sumaPagos,
+          pendiente:       Math.max(0, total - sumaPagos),
+        }
+      })
+    },
+  })
+
 export const useDashboard = () => {
   const hoy = new Date().toISOString().split('T')[0]
 

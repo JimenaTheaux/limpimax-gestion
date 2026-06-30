@@ -2,16 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Chart, registerables, type TooltipItem } from 'chart.js'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import { Clock, Package, Banknote, FlaskConical, BarChart2 } from 'lucide-react'
+import { Clock, Package, Banknote, FlaskConical, BarChart2, ChevronDown } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { BadgeEstado } from '@/components/common/BadgeEstado'
-import { BtnWhatsapp } from '@/components/common/BtnWhatsapp'
-import { useEditarCobro, fetchPedidoDetalle } from '@/services/pedidos'
-import { useCompartirFactura } from '@/hooks/useCompartirFactura'
-import { useDashboard } from '@/services/produccion'
-import { ESTADO_CONFIG, formatNumero, type EstadoPedido } from '@/types'
-import type { PedidoPendienteCobro } from '@/services/produccion'
+import { useClientesConDeuda, useClientePendientes } from '@/services/produccion'
+import type { ClienteConSaldo } from '@/services/produccion'
+import { ESTADO_CONFIG, type EstadoPedido } from '@/types'
 import { supabase } from '@/lib/supabase'
 
 Chart.register(...registerables)
@@ -25,6 +22,8 @@ interface PedidoItemRow {
     nombre:               string
     presentacion:         number
     fragancia:            string | null
+    categorias_produto?: { nombre: string } | null
+    categorias_produto2?: { nombre: string } | null
     categorias_producto?: { nombre: string } | null
   } | null
 }
@@ -377,272 +376,144 @@ function GraficoLinea({ labels, actual, anterior }: {
   )
 }
 
-// ─── FilaPendiente ────────────────────────────────────────────────────────────
+// ─── WA icon ──────────────────────────────────────────────────────────────────
 
-function FilaPendiente({ p, onCobrado }: {
-  p:         PedidoPendienteCobro
-  onCobrado: (msg: string) => void
-}) {
-  const editarCobro = useEditarCobro()
-  const { compartir, loading: loadingWA } = useCompartirFactura()
-  const [abierto,    setAbierto]    = useState(false)
-  const [forma,      setForma]      = useState<'efectivo' | 'transferencia'>('efectivo')
-  const [monto,      setMonto]      = useState(String(Math.round(p.totalPedido)))
-  const [fechaCobro, setFechaCobro] = useState(() => new Date().toISOString().split('T')[0])
-  const [loading,    setLoading]    = useState(false)
-  const [error,      setError]      = useState<string | null>(null)
-  const montoRef = useRef<HTMLInputElement>(null)
-  const btnRef   = useRef<HTMLButtonElement>(null)
+const WA_SVG = (
+  <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 14, height: 14 }} aria-hidden="true">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.112 1.528 5.836L.057 23.804a.5.5 0 00.608.65l6.08-1.433A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.65-.52-5.16-1.427l-.36-.214-3.733.88.936-3.629-.235-.373A9.944 9.944 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z" />
+  </svg>
+)
 
-  useEffect(() => { if (abierto) montoRef.current?.focus() }, [abierto])
+// ─── CardClienteDeudor ────────────────────────────────────────────────────────
 
-  const dias = Math.floor((Date.now() - new Date(p.createdAt).getTime()) / 86_400_000)
+function CardClienteDeudor({ cliente }: { cliente: ClienteConSaldo }) {
+  const [expanded, setExpanded] = useState(false)
+  const { data: pedidos = [], isLoading } = useClientePendientes(expanded ? cliente.id : null)
 
-  const handleAbrir = () => {
-    setMonto(String(Math.round(p.totalPedido)))
-    setForma('efectivo')
-    setFechaCobro(new Date().toISOString().split('T')[0])
-    setError(null)
-    setAbierto(true)
-  }
-
-  const handleConfirmar = async () => {
-    if (!monto.trim()) { setError('Ingresá el monto cobrado'); return }
-    setLoading(true); setError(null)
-    try {
-      await editarCobro.mutateAsync({
-        id:          p.id,
-        forma_cobro: forma,
-        monto_cobrado: monto,
-        estado_pago: 'cobrado',
-        fecha_cobro: fechaCobro,
-      })
-      onCobrado(`P-${String(p.numero).padStart(5, '0')} marcado como cobrado`)
-    } catch {
-      setError('No se pudo guardar. Intentá de nuevo.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const telefono = cliente.telefono?.replace(/\D/g, '') ?? ''
+  const msg      = encodeURIComponent(
+    `Hola ${cliente.nombre}, te recordamos que tenés un saldo pendiente de ${pesos(cliente.saldo_pendiente)}. Muchas gracias.`
+  )
+  const waUrl = telefono
+    ? `https://wa.me/54${telefono}?text=${msg}`
+    : `https://wa.me/?text=${msg}`
 
   return (
     <div style={{
       background: '#fff',
       border: '1px solid #E5E7EB',
-      borderLeft: `3px solid ${abierto ? '#2E9E5C' : '#F9A825'}`,
-      borderRadius: 16, overflow: 'hidden', transition: 'border-left-color 0.15s',
+      borderLeft: '3px solid #F9A825',
+      borderRadius: 16,
+      overflow: 'hidden',
     }}>
-      {/* Resumen */}
-      <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+      {/* Header */}
+      <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 500, fontSize: 13, color: '#1A2B3C' }}>
-              P-{String(p.numero).padStart(5, '0')}
-            </span>
-            {dias > 0 && (
-              <span style={{
-                fontSize: 10, fontWeight: 500,
-                background: dias > 2 ? '#FDECEA' : '#FFFDE7',
-                color:      dias > 2 ? '#D32F2F' : '#F57C00',
-                padding: '2px 7px', borderRadius: 99,
-                display: 'flex', alignItems: 'center', gap: 3,
-              }}>
-                <Clock size={9} />
-                {dias === 1 ? 'ayer' : `${dias}d`}
-              </span>
-            )}
-          </div>
-          <p style={{ margin: 0, fontWeight: 500, fontSize: 14, color: '#1A2B3C', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {p.clienteNombre}
-          </p>
-          {p.fechaProduccion && (
-            <p style={{ margin: '2px 0 0', fontSize: 12, color: '#4A5568' }}>
-              Prod: {new Date(p.fechaProduccion + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })}
-            </p>
-          )}
-          <p style={{ margin: '2px 0 0', fontSize: 12, color: '#4A5568' }}>
-            Cobro: {p.fechaCobro
-              ? new Date(p.fechaCobro + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
-              : 'Sin fecha'}
+          <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: '#1A2B3C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {cliente.nombre}
           </p>
         </div>
-
-        <div style={{ flexShrink: 0, textAlign: 'right' }}>
-          <p style={{ margin: '0 0 8px', fontWeight: 700, fontSize: 17, color: '#F57C00', letterSpacing: -0.5 }}>
-            {pesos(p.totalPedido)}
-          </p>
-          {!abierto && (
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <BtnWhatsapp
-                variante="icono"
-                loading={loadingWA}
-                numeroLabel={formatNumero(p.numero)}
-                onClick={async () => {
-                  try {
-                    const detalle = await fetchPedidoDetalle(p.id)
-                    await compartir(detalle)
-                  } catch {
-                    // silencioso — el toast de error no está disponible aquí
-                  }
-                }}
-              />
-              <button
-                ref={btnRef}
-                onClick={handleAbrir}
-                aria-label={`Marcar cobrado el pedido P-${String(p.numero).padStart(5, '0')}`}
-                style={{
-                  background: '#0D5C8A', color: '#fff', border: 'none',
-                  borderRadius: 8, padding: '7px 14px',
-                  fontSize: 12, fontWeight: 500, cursor: 'pointer', minHeight: 34,
-                }}
-              >
-                Registrar cobro
-              </button>
-            </div>
-          )}
+        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontWeight: 700, fontSize: 16, color: '#F57C00', letterSpacing: -0.5 }}>
+            {pesos(cliente.saldo_pendiente)}
+          </span>
+          <a
+            href={waUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Recordatorio por WhatsApp a ${cliente.nombre}`}
+            onClick={e => e.stopPropagation()}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 28, height: 28, borderRadius: 6,
+              border: '0.5px solid #D1D5DB', color: '#25D366',
+              textDecoration: 'none', flexShrink: 0,
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#F0FDF4')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          >
+            {WA_SVG}
+          </a>
+          <button
+            onClick={() => setExpanded(v => !v)}
+            aria-expanded={expanded}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 3,
+              padding: '5px 10px', fontSize: 11, fontWeight: 500,
+              borderRadius: 6, border: '0.5px solid #D1D5DB',
+              background: expanded ? '#F4F6F8' : 'transparent',
+              color: '#1B9ED6', cursor: 'pointer', whiteSpace: 'nowrap',
+              minHeight: 28, fontFamily: 'Inter, sans-serif',
+            }}
+          >
+            {expanded ? 'Ocultar' : 'Ver detalle'}
+            <ChevronDown size={11} style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }} />
+          </button>
         </div>
       </div>
 
-      {/* Mini-form cobro */}
-      {abierto && (
-        <div
-          role="group"
-          aria-label={`Registrar cobro — P-${String(p.numero).padStart(5, '0')}`}
-          style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}
-        >
-          <div style={{ height: 1, background: '#E5E7EB', margin: '0 0 4px' }} />
-
-          <div>
-            <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#4A5568' }}>
-              Forma de cobro
-            </p>
-            <div role="radiogroup" aria-label="Forma de cobro" style={{ display: 'flex', gap: 8 }}>
-              {(['efectivo', 'transferencia'] as const).map(f => (
-                <button
-                  key={f}
-                  type="button"
-                  role="radio"
-                  aria-checked={forma === f}
-                  onClick={() => setForma(f)}
+      {/* Expandable pedidos detail */}
+      {expanded && (
+        <div style={{ borderTop: '1px solid #F4F6F8', padding: '10px 16px 14px' }}>
+          {isLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <Skeleton style={{ height: 20, borderRadius: 4 }} />
+              <Skeleton style={{ height: 20, borderRadius: 4 }} />
+            </div>
+          ) : pedidos.length === 0 ? (
+            <p style={{ fontSize: 12, color: '#4A5568', margin: 0 }}>Sin pedidos pendientes registrados</p>
+          ) : (
+            <div>
+              {/* Column headers */}
+              <div style={{ display: 'grid', gridTemplateColumns: '80px 52px 1fr 1fr 1fr', gap: 8, paddingBottom: 6 }}>
+                {['Pedido', 'Fecha', 'Total', 'Pagó', 'Debe'].map(h => (
+                  <span key={h} style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9CA3AF' }}>
+                    {h}
+                  </span>
+                ))}
+              </div>
+              {pedidos.map(p => (
+                <div
+                  key={p.id}
                   style={{
-                    flex: 1, padding: '10px 8px', borderRadius: 10,
-                    fontSize: 13, fontWeight: 500,
-                    border:      `2px solid ${forma === f ? '#145A32' : '#D1D5DB'}`,
-                    background:  forma === f ? '#D4EDDA' : '#F8F9FA',
-                    color:       forma === f ? '#145A32' : '#4A5568',
-                    cursor: 'pointer', transition: 'all 0.12s', minHeight: 44,
+                    display: 'grid', gridTemplateColumns: '80px 52px 1fr 1fr 1fr',
+                    gap: 8, paddingTop: 7, paddingBottom: 7,
+                    borderTop: '0.5px solid #F4F6F8',
+                    alignItems: 'center',
                   }}
                 >
-                  {f === 'efectivo' ? 'Efectivo' : 'Transferencia'}
-                </button>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: '#1A2B3C' }}>
+                    P-{String(p.numero).padStart(5, '0')}
+                  </span>
+                  <span style={{ fontSize: 11, color: '#4A5568' }}>
+                    {p.fechaProduccion
+                      ? new Date(p.fechaProduccion + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
+                      : '—'
+                    }
+                  </span>
+                  <span style={{ fontSize: 12, color: '#4A5568' }}>{pesos(p.totalPedido)}</span>
+                  <span style={{ fontSize: 12, color: '#4A5568' }}>{pesos(p.sumaPagos)}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#D32F2F' }}>{pesos(p.pendiente)}</span>
+                </div>
               ))}
             </div>
-          </div>
-
-          <div>
-            <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#4A5568' }}>
-              Fecha de cobro
-            </p>
-            <input
-              type="date"
-              value={fechaCobro}
-              onChange={e => setFechaCobro(e.target.value)}
-              style={{
-                width: '100%', height: 44, padding: '0 10px',
-                border: '1px solid rgba(105,105,105,0.4)',
-                borderRadius: 10, fontSize: 14, fontFamily: 'Inter, sans-serif',
-                outline: 'none', boxSizing: 'border-box',
-              }}
-              onFocus={e => (e.target.style.borderColor = '#1B9ED6')}
-              onBlur={e  => (e.target.style.borderColor = 'rgba(105,105,105,0.4)')}
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor={`monto-${p.id}`}
-              style={{ display: 'block', marginBottom: 6, fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#4A5568' }}
-            >
-              Monto cobrado *
-            </label>
-            <input
-              ref={montoRef}
-              id={`monto-${p.id}`}
-              type="number"
-              inputMode="decimal"
-              value={monto}
-              onChange={e => setMonto(e.target.value)}
-              aria-describedby={error ? `error-${p.id}` : undefined}
-              aria-invalid={!!error}
-              style={{
-                width: '100%', padding: '11px 14px',
-                border: `1.5px solid ${error ? '#D32F2F' : '#D1D5DB'}`,
-                borderRadius: 10, fontSize: 15, fontFamily: 'Inter, sans-serif',
-                outline: 0, boxSizing: 'border-box', transition: 'border-color 0.12s',
-              }}
-              onFocus={e  => (e.target.style.borderColor = '#145A32')}
-              onBlur={e   => (e.target.style.borderColor = error ? '#D32F2F' : '#D1D5DB')}
-              onKeyDown={e => { if (e.key === 'Enter') handleConfirmar() }}
-            />
-            {error && (
-              <p id={`error-${p.id}`} role="alert" style={{ margin: '6px 0 0', fontSize: 12, color: '#D32F2F' }}>
-                {error}
-              </p>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={handleConfirmar}
-              disabled={loading}
-              aria-disabled={loading}
-              style={{
-                flex: 1,
-                background: loading ? 'rgba(20,90,50,0.5)' : '#145A32',
-                color: '#fff', border: 'none', borderRadius: 10,
-                padding: '12px', fontSize: 14, fontWeight: 500,
-                cursor: loading ? 'not-allowed' : 'pointer', minHeight: 48,
-              }}
-            >
-              {loading ? 'Guardando…' : '✓ Confirmar cobro'}
-            </button>
-            <button
-              onClick={() => setAbierto(false)}
-              disabled={loading}
-              style={{
-                flex: 1, background: 'transparent', color: '#4A5568',
-                border: '1.5px solid #D1D5DB', borderRadius: 10,
-                padding: '12px', fontSize: 14, cursor: 'pointer', minHeight: 48,
-              }}
-            >
-              Cancelar
-            </button>
-          </div>
+          )}
         </div>
       )}
     </div>
   )
 }
 
-// ─── SheetPendientes ──────────────────────────────────────────────────────────
+// ─── SheetClientesDeudores ────────────────────────────────────────────────────
 
-function SheetPendientes({ open, onClose, pendientes, onRefetch }: {
-  open:       boolean
-  onClose:    () => void
-  pendientes: { count: number; total: number; pedidos: PedidoPendienteCobro[] }
-  onRefetch:  () => void
+function SheetClientesDeudores({ open, onClose }: {
+  open:    boolean
+  onClose: () => void
 }) {
-  const [lista, setLista] = useState<PedidoPendienteCobro[]>(pendientes.pedidos)
-
-  useEffect(() => { setLista(pendientes.pedidos) }, [pendientes.pedidos])
-
-  const total = lista.reduce((acc, p) => acc + p.totalPedido, 0)
-
-  const handleCobrado = (msg: string) => {
-    const numero = parseInt(msg.match(/P-(\d+)/)?.[1] ?? '0')
-    setLista(prev => prev.filter(p => p.numero !== numero))
-    onRefetch()
-  }
+  const { data: clientes = [], isLoading } = useClientesConDeuda()
+  const total = clientes.reduce((s, c) => s + c.saldo_pendiente, 0)
 
   return (
     <Sheet open={open} onOpenChange={v => { if (!v) onClose() }}>
@@ -652,26 +523,30 @@ function SheetPendientes({ open, onClose, pendientes, onRefetch }: {
       >
         <SheetHeader style={{ padding: '20px 24px 16px', borderBottom: '1px solid #F0F0F0', flexShrink: 0 }}>
           <SheetTitle style={{ fontSize: 16 }}>Pendientes de cobro</SheetTitle>
-          {lista.length > 0 && (
+          {clientes.length > 0 && (
             <p style={{ margin: '4px 0 0', fontSize: 13, color: '#4A5568' }}>
-              {lista.length} pedido{lista.length !== 1 ? 's' : ''} sin cobrar
+              {clientes.length} cliente{clientes.length !== 1 ? 's' : ''} con saldo pendiente
             </p>
           )}
         </SheetHeader>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {lista.length === 0 ? (
+          {isLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {[1, 2, 3].map(i => <Skeleton key={i} style={{ height: 60, borderRadius: 16 }} />)}
+            </div>
+          ) : clientes.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 20px' }}>
               <p style={{ fontSize: 32, margin: '0 0 8px' }}>✓</p>
               <p style={{ fontWeight: 500, fontSize: 15, color: '#1A2B3C', margin: 0 }}>Todo al día</p>
-              <p style={{ fontSize: 13, color: '#4A5568', margin: '4px 0 0' }}>No hay cobros pendientes</p>
+              <p style={{ fontSize: 13, color: '#4A5568', margin: '4px 0 0' }}>No hay saldos pendientes</p>
             </div>
-          ) : lista.map(p => (
-            <FilaPendiente key={p.id} p={p} onCobrado={handleCobrado} />
+          ) : clientes.map(c => (
+            <CardClienteDeudor key={c.id} cliente={c} />
           ))}
         </div>
 
-        {lista.length > 0 && (
+        {clientes.length > 0 && (
           <div style={{
             flexShrink: 0, padding: '16px 24px',
             borderTop: '1px solid #E5E7EB', background: '#fff',
@@ -708,19 +583,21 @@ export default function DashboardPage() {
   const { data: pedidos,    isLoading } = usePedidosPeriodo(desde, hasta)
   // Cobros por fecha_cobro (totales de dinero + costo_snapshot para costo producción)
   const { data: cobros }                = useCobrosperiodo(desde, hasta)
-  const { data: dashData, refetch }     = useDashboard()
+  // Clientes con saldo_pendiente > 0 (para KPI y drawer)
+  const { data: clientesDeuda = [] }    = useClientesConDeuda()
   const { data: evolData }              = useEvolucionRango(desde, hasta)
   const { data: egresosData, isLoading: isLoadingEgresos } = useEgresosDashboard(desde, hasta)
 
-  const kpi            = pedidos  ? calcKPIs(pedidos)     : null
-  const kpiCobros      = cobros   ? calcCobrosKPI(cobros) : null
-  const evolucion      = evolData ? calcEvolucionRango(evolData, desde, hasta) : null
-  const pendientes     = dashData?.pendientes
+  const kpi       = pedidos  ? calcKPIs(pedidos)     : null
+  const kpiCobros = cobros   ? calcCobrosKPI(cobros) : null
+  const evolucion = evolData ? calcEvolucionRango(evolData, desde, hasta) : null
 
-  const kpiEgresos             = egresosData ? calcEgresos(egresosData) : null
-  const totalEgresos           = kpiEgresos?.total ?? 0
-  const totalCostoProduccion   = cobros ? calcTotalCostoProduccion(cobros) : 0
-  const gananciaNeta           = (kpiCobros?.totalCob ?? 0) - totalCostoProduccion - totalEgresos
+  const totalPendienteClientes = clientesDeuda.reduce((s, c) => s + c.saldo_pendiente, 0)
+
+  const kpiEgresos           = egresosData ? calcEgresos(egresosData) : null
+  const totalEgresos         = kpiEgresos?.total ?? 0
+  const totalCostoProduccion = cobros ? calcTotalCostoProduccion(cobros) : 0
+  const gananciaNeta         = (kpiCobros?.totalCob ?? 0) - totalCostoProduccion - totalEgresos
 
   const todayStr = fmtDate(new Date())
 
@@ -879,21 +756,27 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Card 3 — Pendiente de cobro */}
+          {/* Card 3 — Pendiente de cobro (por saldo de clientes) */}
           <button
-            onClick={() => { if (pendientes) setSheetPend(true) }}
+            onClick={() => { if (clientesDeuda.length > 0) setSheetPend(true) }}
             style={{
               ...kpiCard,
               display: 'block', width: '100%', border: 'none',
-              cursor: 'pointer', textAlign: 'left', fontFamily: 'Inter, sans-serif',
+              cursor: clientesDeuda.length > 0 ? 'pointer' : 'default',
+              textAlign: 'left', fontFamily: 'Inter, sans-serif',
             }}
           >
             <div style={kpiHeaderRow}>
               <Clock size={13} style={{ color: '#F9A825', flexShrink: 0 }} />
               <span style={kpiLabelSt}>Pend. de cobro</span>
             </div>
-            <div style={{ ...kpiValueSt, color: '#F9A825' }}>{pesos(pendientes?.total ?? 0)}</div>
-            <p style={{ ...kpiSubSt, color: '#1B9ED6', fontWeight: 600 }}>Ver detalle →</p>
+            <div style={{ ...kpiValueSt, color: '#F9A825' }}>{pesos(totalPendienteClientes)}</div>
+            <p style={{ ...kpiSubSt, color: '#1B9ED6', fontWeight: 600 }}>
+              {clientesDeuda.length > 0
+                ? `${clientesDeuda.length} cliente${clientesDeuda.length !== 1 ? 's' : ''} · Ver →`
+                : 'Todo al día'
+              }
+            </p>
           </button>
 
         </div>
@@ -1136,15 +1019,11 @@ export default function DashboardPage() {
         )
       })()}
 
-      {/* ── Sheet pendientes ── */}
-      {pendientes && (
-        <SheetPendientes
-          open={sheetPend}
-          onClose={() => setSheetPend(false)}
-          pendientes={pendientes}
-          onRefetch={() => refetch()}
-        />
-      )}
+      {/* ── Sheet pendientes de cobro (agrupado por cliente) ── */}
+      <SheetClientesDeudores
+        open={sheetPend}
+        onClose={() => setSheetPend(false)}
+      />
     </div>
   )
 }
