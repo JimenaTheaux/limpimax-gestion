@@ -30,7 +30,14 @@ Se abre en un drawer/sheet lateral (50% desktop, 100% mobile) con fondo oscureci
   - Subtotal calculado automáticamente
   - Bidón nuevo (checkbox por ítem)
 - Costo de envío (opcional, numérico)
-- Total: calculado automáticamente, pero editable manualmente (si se modifica manualmente, se resalta visualmente)
+- Saldo del cliente (cargado automáticamente al seleccionar cliente):
+  - Se lee `clientes.saldo_pendiente` del cliente seleccionado
+  - Si > 0: aparece como "Saldo pendiente anterior" y suma al total
+  - Si < 0: aparece como "Saldo a favor" y resta del total
+  - Si = 0: no se muestra
+  - El monto es editable manualmente (campo inline en el resumen de totales, igual que envío)
+  - Al guardar, el valor final se guarda en `pedidos.saldo_anterior_aplicado`
+- Total: calculado automáticamente (`subtotal + costo_envio + saldo_anterior_aplicado`), pero editable manualmente (si se modifica manualmente, se resalta visualmente)
 - Notas internas (solo Admin)
 - Notas para producción (visible para Producción y Admin)
 

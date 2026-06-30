@@ -4,7 +4,7 @@ import type { Cliente } from '@/types'
 
 const KEY = ['clientes']
 
-const SELECT = 'id, nombre, telefono, direccion, tipo_cliente, notas, activo, created_at, updated_at'
+const SELECT = 'id, nombre, telefono, direccion, tipo_cliente, notas, activo, saldo_pendiente, created_at, updated_at'
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 

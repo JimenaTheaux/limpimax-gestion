@@ -25,15 +25,16 @@ const itemSchema = z.object({
 })
 
 const schema = z.object({
-  clienteId:        z.string().min(1, 'El cliente es obligatorio'),
-  tipoPrecio:       z.enum(['minorista', 'mayorista']),
-  fechaProduccion:  z.string().min(1, 'La fecha es obligatoria'),
-  direccionEntrega: z.string().optional(),
-  notasProduccion:  z.string().optional(),
-  notasInternas:    z.string().optional(),
-  costoEnvio:       z.string().optional(),
-  totalManual:      z.string().optional(),
-  items:            z.array(itemSchema).min(1, 'Agregá al menos un producto'),
+  clienteId:              z.string().min(1, 'El cliente es obligatorio'),
+  tipoPrecio:             z.enum(['minorista', 'mayorista']),
+  fechaProduccion:        z.string().min(1, 'La fecha es obligatoria'),
+  direccionEntrega:       z.string().optional(),
+  notasProduccion:        z.string().optional(),
+  notasInternas:          z.string().optional(),
+  costoEnvio:             z.string().optional(),
+  totalManual:            z.string().optional(),
+  saldoAplicado:          z.string().optional(),
+  items:                  z.array(itemSchema).min(1, 'Agregá al menos un producto'),
 })
 
 type FormData = z.infer<typeof schema>
@@ -109,7 +110,7 @@ function SelectorCliente({
   value, onChange, error,
 }: {
   value:    string
-  onChange: (id: string, tipo: 'minorista' | 'mayorista', dir: string) => void
+  onChange: (id: string, tipo: 'minorista' | 'mayorista', dir: string, saldo: number) => void
   error?:   string
 }) {
   const [q, setQ]       = useState('')
@@ -147,7 +148,7 @@ function SelectorCliente({
         activo:       true,
       })
       setRecienCreado(nuevo)
-      onChange(nuevo.id, nuevo.tipo_cliente, nuevo.direccion ?? '')
+      onChange(nuevo.id, nuevo.tipo_cliente, nuevo.direccion ?? '', 0)
       setMiniOpen(false)
       setMiniNombre(''); setMiniTel(''); setMiniDir(''); setMiniTipo('minorista')
     } catch {
@@ -176,7 +177,7 @@ function SelectorCliente({
           </div>
           <button
             type="button"
-            onClick={() => { onChange('', 'minorista', ''); setQ(''); setRecienCreado(null) }}
+            onClick={() => { onChange('', 'minorista', '', 0); setQ(''); setRecienCreado(null) }}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1B9ED6', fontSize: 11, fontWeight: 600, padding: '4px 8px' }}
           >
             Cambiar
@@ -210,7 +211,7 @@ function SelectorCliente({
                 {clientes.slice(0, 8).map(c => (
                   <button
                     key={c.id} type="button"
-                    onClick={() => { onChange(c.id, c.tipo_cliente, c.direccion ?? ''); setQ(c.nombre); setOpen(false) }}
+                    onClick={() => { onChange(c.id, c.tipo_cliente, c.direccion ?? '', c.saldo_pendiente ?? 0); setQ(c.nombre); setOpen(false) }}
                     style={{
                       width: '100%', textAlign: 'left', padding: '8px 12px',
                       background: 'none', border: 'none', cursor: 'pointer', display: 'block',
@@ -668,30 +669,34 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
     setNotasOpen(false)
   }, [open, pedido])
 
-  const tipoPrecio  = watch('tipoPrecio')
-  const costoEnvio  = watch('costoEnvio')
-  const totalManual = watch('totalManual')
-  const itemsWatch  = watch('items')
+  const tipoPrecio    = watch('tipoPrecio')
+  const costoEnvio    = watch('costoEnvio')
+  const totalManual   = watch('totalManual')
+  const saldoAplicado = watch('saldoAplicado')
+  const itemsWatch    = watch('items')
 
   const subtotalProductos = (itemsWatch ?? []).reduce(
     (acc, i) => acc + (Number(i.cantidad) || 0) * (Number(i.precioUnitario) || 0), 0
   )
-  const totalCalculado = subtotalProductos + (Number(costoEnvio) || 0)
-  const totalMostrado  = totalManual ? Number(totalManual) : totalCalculado
-  const totalEditado   = !!totalManual && Number(totalManual) !== totalCalculado
+  const saldoAplicadoNum = Number(saldoAplicado) || 0
+  const totalCalculado   = subtotalProductos + (Number(costoEnvio) || 0) + saldoAplicadoNum
+  const totalMostrado    = totalManual ? Number(totalManual) : totalCalculado
+  const totalEditado     = !!totalManual && Number(totalManual) !== totalCalculado
+  const showSaldoRow     = !pedido && saldoAplicadoNum !== 0
 
   const handleClose = () => { reset(); onClose() }
 
   const submit = async (data: FormData, accion: 'borrador' | 'confirmar') => {
     const mapped: CrearPedidoInput = {
-      cliente_id:        data.clienteId,
-      tipo_precio:       data.tipoPrecio,
-      fecha_produccion:  data.fechaProduccion ?? '',
-      direccion_entrega: data.direccionEntrega ?? '',
-      notas_produccion:  data.notasProduccion ?? '',
-      notas_internas:    data.notasInternas ?? '',
-      costo_envio:       data.costoEnvio ?? '0',
-      total_manual:      data.totalManual ?? '',
+      cliente_id:               data.clienteId,
+      tipo_precio:              data.tipoPrecio,
+      fecha_produccion:         data.fechaProduccion ?? '',
+      direccion_entrega:        data.direccionEntrega ?? '',
+      notas_produccion:         data.notasProduccion ?? '',
+      notas_internas:           data.notasInternas ?? '',
+      costo_envio:              data.costoEnvio ?? '0',
+      total_manual:             data.totalManual ?? '',
+      saldo_anterior_aplicado:  data.saldoAplicado ?? '',
       items: data.items.map((item): ItemForm => ({
         producto_id:       item.productoId,
         producto_nombre:   item.productoNombre,
@@ -816,11 +821,14 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
               <SelectorCliente
                 value={field.value}
                 error={fieldState.error?.message}
-                onChange={(id, tipo, dir) => {
+                onChange={(id, tipo, dir, saldo) => {
                   field.onChange(id)
                   if (id) {
                     setValue('tipoPrecio', tipo)
                     setValue('direccionEntrega', dir)
+                    setValue('saldoAplicado', saldo !== 0 ? String(saldo) : '')
+                  } else {
+                    setValue('saldoAplicado', '')
                   }
                 }}
               />
@@ -983,6 +991,28 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
               />
             </div>
 
+            {/* Saldo del cliente (solo al crear) */}
+            {showSaldoRow && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: saldoAplicadoNum > 0 ? '#C62828' : '#2E7D32' }}>
+                  {saldoAplicadoNum > 0 ? 'Saldo pendiente anterior' : 'Saldo a favor'}
+                </span>
+                <input
+                  {...register('saldoAplicado')}
+                  inputMode="decimal"
+                  placeholder="0"
+                  style={{
+                    width: 80, height: 28, border: `0.5px solid ${saldoAplicadoNum > 0 ? '#FFCDD2' : '#C8E6C9'}`, borderRadius: 6,
+                    padding: '0 8px', fontSize: 12, textAlign: 'right',
+                    fontFamily: 'Inter, sans-serif', outline: 'none',
+                    background: saldoAplicadoNum > 0 ? '#FFF5F5' : '#F1F8F1', color: '#1A2B3C',
+                  }}
+                  onFocus={e => { e.currentTarget.style.borderColor = '#1B9ED6' }}
+                  onBlur={e  => { e.currentTarget.style.borderColor = saldoAplicadoNum > 0 ? '#FFCDD2' : '#C8E6C9' }}
+                />
+              </div>
+            )}
+
             <div style={{ height: '0.5px', background: '#D1D5DB' }} />
 
             {/* Total */}
@@ -1070,6 +1100,7 @@ function buildDefaults(pedido: PedidoDetalle | null): FormData {
     notasInternas:    pedido?.notas_internas      ?? '',
     costoEnvio:       String(pedido?.costo_envio  ?? 0),
     totalManual:      pedido?.total_manual != null ? String(pedido.total_manual) : '',
+    saldoAplicado:    pedido?.saldo_anterior_aplicado != null ? String(pedido.saldo_anterior_aplicado) : '',
     items: pedido?.pedido_items?.map(i => ({
       productoId:       i.producto_id,
       productoNombre:   i.productos?.nombre ?? '',

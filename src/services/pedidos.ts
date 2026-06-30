@@ -42,16 +42,17 @@ export interface ItemForm {
 // ─── Tipo de entrada para crear/editar pedido ─────────────────────────────────
 
 export interface CrearPedidoInput {
-  cliente_id:        string
-  tipo_precio:       'minorista' | 'mayorista'
-  direccion_entrega: string
-  fecha_produccion:  string
-  notas_internas:    string
-  notas_produccion:  string
-  costo_envio:       string
-  total_manual:      string
-  items:             ItemForm[]
-  accion:            'borrador' | 'confirmar'
+  cliente_id:               string
+  tipo_precio:              'minorista' | 'mayorista'
+  direccion_entrega:        string
+  fecha_produccion:         string
+  notas_internas:           string
+  notas_produccion:         string
+  costo_envio:              string
+  total_manual:             string
+  saldo_anterior_aplicado?: string
+  items:                    ItemForm[]
+  accion:                   'borrador' | 'confirmar'
 }
 
 // ─── Parseo de numéricos ──────────────────────────────────────────────────────
@@ -61,10 +62,11 @@ export interface CrearPedidoInput {
 function parsePedido(row: any): PedidoConCliente {
   return {
     ...row,
-    costo_envio:     Number(row.costo_envio     ?? 0),
-    total_calculado: Number(row.total_calculado ?? 0),
-    total_manual:    row.total_manual  != null ? Number(row.total_manual)  : null,
-    monto_cobrado:   row.monto_cobrado != null ? Number(row.monto_cobrado) : null,
+    costo_envio:             Number(row.costo_envio     ?? 0),
+    total_calculado:         Number(row.total_calculado ?? 0),
+    total_manual:            row.total_manual            != null ? Number(row.total_manual)            : null,
+    monto_cobrado:           row.monto_cobrado           != null ? Number(row.monto_cobrado)           : null,
+    saldo_anterior_aplicado: row.saldo_anterior_aplicado != null ? Number(row.saldo_anterior_aplicado) : null,
   } as PedidoConCliente
 }
 
@@ -93,7 +95,7 @@ function parseItemDetalle(item: any): ItemDetalle {
 const LIST_SELECT = `
   id, numero, estado, tipo_precio, direccion_entrega, fecha_produccion,
   total_calculado, total_manual, costo_envio, forma_cobro, monto_cobrado,
-  fecha_cobro, estado_pago, motivo_falla,
+  fecha_cobro, estado_pago, motivo_falla, saldo_anterior_aplicado,
   notas_produccion, notas_internas, created_at, updated_at, cliente_id,
   clientes!inner(nombre, direccion, tipo_cliente, telefono)
 ` as const
@@ -241,26 +243,28 @@ export const useCrearPedido = () => {
       const estadoInicial: EstadoPedido =
         data.accion === 'confirmar' ? 'en_produccion' : 'borrador'
       const costoEnvio    = parseFloat(data.costo_envio) || 0
+      const saldoAplicado = data.saldo_anterior_aplicado ? parseFloat(data.saldo_anterior_aplicado) : 0
       const subtotal      = data.items.reduce(
         (acc, item) => acc + parseFloat(item.cantidad) * parseFloat(item.precio_unitario),
         0
       )
-      const totalCalculado = subtotal + costoEnvio
+      const totalCalculado = subtotal + costoEnvio + saldoAplicado
 
       const { data: pedido, error: e1 } = await supabase
         .from('pedidos')
         .insert({
-          cliente_id:        data.cliente_id,
-          tipo_precio:       data.tipo_precio,
-          direccion_entrega: data.direccion_entrega || null,
-          fecha_produccion:  data.fecha_produccion  || null,
-          notas_internas:    data.notas_internas    || null,
-          notas_produccion:  data.notas_produccion  || null,
-          costo_envio:       costoEnvio,
-          total_calculado:   totalCalculado,
-          total_manual:      data.total_manual ? parseFloat(data.total_manual) : null,
-          estado:            estadoInicial,
-          creado_por:        usuario?.id ?? null,
+          cliente_id:               data.cliente_id,
+          tipo_precio:              data.tipo_precio,
+          direccion_entrega:        data.direccion_entrega || null,
+          fecha_produccion:         data.fecha_produccion  || null,
+          notas_internas:           data.notas_internas    || null,
+          notas_produccion:         data.notas_produccion  || null,
+          costo_envio:              costoEnvio,
+          total_calculado:          totalCalculado,
+          total_manual:             data.total_manual ? parseFloat(data.total_manual) : null,
+          saldo_anterior_aplicado:  saldoAplicado !== 0 ? saldoAplicado : null,
+          estado:                   estadoInicial,
+          creado_por:               usuario?.id ?? null,
         })
         .select(LIST_SELECT)
         .single()

@@ -73,6 +73,7 @@ export type Cliente = {
   tipo_cliente: 'minorista' | 'mayorista'
   notas: string | null
   activo: boolean
+  saldo_pendiente?: number | null   // positivo = debe, negativo = a favor
   created_at: string
   updated_at: string
 }
@@ -206,6 +207,7 @@ export type Pedido = {
   notas_entrega: string | null
   motivo_falla: string | null
   motivo_anulacion: string | null
+  saldo_anterior_aplicado: number | null   // snapshot del saldo del cliente al crear el pedido
   creado_por: string | null
   repartidor_id: string | null
   created_at: string
@@ -217,6 +219,7 @@ export type Pedido = {
 
 // Total a mostrar siempre:
 // const total = pedido.total_manual ?? pedido.total_calculado
+// total_calculado = sum(items * precio_unitario) + costo_envio + saldo_anterior_aplicado
 ```
 
 ---

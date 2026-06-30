@@ -42,15 +42,16 @@ export interface Perfil {
 }
 
 export interface Cliente {
-  id:           string
-  nombre:       string
-  telefono:     string | null
-  direccion:    string | null
-  tipo_cliente: TipoCliente
-  notas:        string | null
-  activo:       boolean
-  created_at:   string
-  updated_at:   string
+  id:               string
+  nombre:           string
+  telefono:         string | null
+  direccion:        string | null
+  tipo_cliente:     TipoCliente
+  notas:            string | null
+  activo:           boolean
+  saldo_pendiente?: number | null
+  created_at:       string
+  updated_at:       string
 }
 
 export interface CategoriaProducto {
@@ -116,11 +117,12 @@ export interface Pedido {
   monto_cobrado:    number | null
   fecha_cobro:      string | null
   estado_pago:      'cobrado' | 'pendiente' | null
-  notas_entrega:    string | null
-  motivo_falla:     string | null
-  motivo_anulacion: string | null
-  creado_por:       string | null
-  repartidor_id:    string | null
+  notas_entrega:           string | null
+  motivo_falla:            string | null
+  motivo_anulacion:        string | null
+  saldo_anterior_aplicado: number | null
+  creado_por:              string | null
+  repartidor_id:           string | null
   created_at:       string
   updated_at:       string
   // Joins opcionales
