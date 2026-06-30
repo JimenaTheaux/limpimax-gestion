@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { flushSync } from 'react-dom'
 import html2canvas from 'html2canvas'
 import { createElement } from 'react'
 import { FacturaCanvas } from '@/components/pedidos/FacturaCanvas'
@@ -15,22 +16,22 @@ export function useCompartirFactura() {
   ) => {
     setLoading(true)
 
-    // 1. Montar FacturaCanvas en div oculto
     const container = document.createElement('div')
-    container.style.cssText = 'position:absolute;left:-9999px;top:0;width:600px;pointer-events:none'
+    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:600px;pointer-events:none'
     document.body.appendChild(container)
 
     let canvas: HTMLCanvasElement | null = null
 
     try {
-      // 2. Renderizar el componente React en el container
-      await new Promise<void>(resolve => {
-        const root = createRoot(container)
+      // Render sincrónico con flushSync para garantizar commit antes de capturar
+      const root = createRoot(container)
+      flushSync(() => {
         root.render(createElement(FacturaCanvas, { pedido }))
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
       })
 
-      // 3. Capturar con html2canvas
+      // Esperar fuentes web (Inter) antes de capturar
+      await document.fonts.ready
+
       canvas = await html2canvas(container, {
         scale:           2,
         useCORS:         true,
@@ -41,7 +42,6 @@ export function useCompartirFactura() {
     } catch (err) {
       console.error('useCompartirFactura: error al generar imagen', err)
       onError?.('No se pudo generar la imagen. Intentá de nuevo.')
-      document.body.removeChild(container)
       setLoading(false)
       return
     } finally {
@@ -56,24 +56,23 @@ export function useCompartirFactura() {
       return
     }
 
-    // 4. Convertir canvas a Blob JPG
     let blob: Blob
     try {
       blob = await new Promise<Blob>((resolve, reject) =>
         canvas!.toBlob(b => (b ? resolve(b) : reject(new Error('toBlob falló'))), 'image/jpeg', 0.95)
       )
-    } catch {
+    } catch (err) {
+      console.error('useCompartirFactura: error al convertir canvas a blob', err)
       onError?.('No se pudo generar la imagen. Intentá de nuevo.')
       setLoading(false)
       return
     }
 
-    const numStr  = String(pedido.numero).padStart(5, '0')
+    const numStr   = String(pedido.numero).padStart(5, '0')
     const fileName = `factura-P${numStr}.jpg`
     const file     = new File([blob], fileName, { type: 'image/jpeg' })
     const numero   = formatNumero(pedido.numero)
 
-    // Limpiar teléfono: quitar no-dígitos, 0 inicial y 54 si ya lo tenía
     const telefono = pedido.clientes?.telefono
       ?.replace(/\D/g, '')
       ?.replace(/^0/, '')
@@ -86,7 +85,6 @@ export function useCompartirFactura() {
     const esMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 
     if (esMobile) {
-      // Intentar Web Share API primero (más moderno)
       if (
         navigator.share &&
         typeof navigator.canShare === 'function' &&
@@ -114,7 +112,9 @@ export function useCompartirFactura() {
       const a         = document.createElement('a')
       a.href          = objectUrl
       a.download      = fileName
+      document.body.appendChild(a)
       a.click()
+      document.body.removeChild(a)
       URL.revokeObjectURL(objectUrl)
 
       const waUrl = telefono
@@ -127,7 +127,9 @@ export function useCompartirFactura() {
       const a         = document.createElement('a')
       a.href          = objectUrl
       a.download      = fileName
+      document.body.appendChild(a)
       a.click()
+      document.body.removeChild(a)
       URL.revokeObjectURL(objectUrl)
 
       const waUrl = telefono

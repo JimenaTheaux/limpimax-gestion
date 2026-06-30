@@ -1,5 +1,6 @@
 import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
+import { flushSync } from 'react-dom'
 import html2canvas from 'html2canvas'
 import { SaldoPendienteCanvas } from '@/components/pedidos/SaldoPendienteCanvas'
 import type { ClienteConSaldo, PedidoPendienteDetalle } from '@/services/produccion'
@@ -10,22 +11,22 @@ export function useCompartirSaldoPendiente() {
     pedidos: PedidoPendienteDetalle[],
     onError?: (msg: string) => void,
   ) => {
-    // 1. Montar SaldoPendienteCanvas en div oculto
     const container = document.createElement('div')
-    container.style.cssText = 'position:absolute;left:-9999px;top:0;width:600px;pointer-events:none'
+    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:600px;pointer-events:none'
     document.body.appendChild(container)
 
     let canvas: HTMLCanvasElement | null = null
 
     try {
-      // 2. Renderizar el componente React en el container
-      await new Promise<void>(resolve => {
-        const root = createRoot(container)
+      // Render sincrónico con flushSync para garantizar commit antes de capturar
+      const root = createRoot(container)
+      flushSync(() => {
         root.render(createElement(SaldoPendienteCanvas, { cliente, pedidos }))
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
       })
 
-      // 3. Capturar con html2canvas
+      // Esperar fuentes web (Inter) antes de capturar
+      await document.fonts.ready
+
       canvas = await html2canvas(container, {
         scale:           2,
         useCORS:         true,
@@ -36,7 +37,6 @@ export function useCompartirSaldoPendiente() {
     } catch (err) {
       console.error('useCompartirSaldoPendiente: error al generar imagen', err)
       onError?.('No se pudo generar la imagen. Intentá de nuevo.')
-      document.body.removeChild(container)
       return
     } finally {
       if (document.body.contains(container)) {
@@ -49,13 +49,13 @@ export function useCompartirSaldoPendiente() {
       return
     }
 
-    // 4. Convertir canvas a Blob JPG
     let blob: Blob
     try {
       blob = await new Promise<Blob>((resolve, reject) =>
         canvas!.toBlob(b => (b ? resolve(b) : reject(new Error('toBlob falló'))), 'image/jpeg', 0.95)
       )
-    } catch {
+    } catch (err) {
+      console.error('useCompartirSaldoPendiente: error al convertir canvas a blob', err)
       onError?.('No se pudo generar la imagen. Intentá de nuevo.')
       return
     }
@@ -64,7 +64,6 @@ export function useCompartirSaldoPendiente() {
     const fileName = `saldo-${slug}.jpg`
     const file     = new File([blob], fileName, { type: 'image/jpeg' })
 
-    // Limpiar teléfono: quitar no-dígitos, 0 inicial y 54 si ya lo tenía
     const telefono = cliente.telefono
       ?.replace(/\D/g, '')
       ?.replace(/^0/, '')
