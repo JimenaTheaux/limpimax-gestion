@@ -127,12 +127,14 @@ export function useCompartirFactura() {
         : `whatsapp://send?text=${mensaje}`
       setTimeout(() => { window.location.href = waUrl }, 1500)
     } else {
-      // Desktop: descargar primero, luego abrir WhatsApp Web en nueva pestaña
+      // Desktop (incl. PWA instalada): descargar primero, luego abrir WA con delay.
+      // En PWA standalone, window.open('_blank') puede navegar la ventana actual,
+      // cancelando la descarga si se llama en el mismo tick.
       descargarBlob(blob, fileName)
       const waUrl = telefono
         ? `https://web.whatsapp.com/send?phone=54${telefono}&text=${mensaje}`
         : `https://web.whatsapp.com/send?text=${mensaje}`
-      window.open(waUrl, '_blank')
+      setTimeout(() => { window.open(waUrl, '_blank') }, 1500)
     }
 
     setLoading(false)
