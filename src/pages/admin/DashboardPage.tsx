@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Chart, registerables, type TooltipItem } from 'chart.js'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import { Clock, Package, Banknote, FlaskConical, BarChart2, ChevronDown, Loader2 } from 'lucide-react'
+import { Clock, Package, Banknote, FlaskConical, BarChart2, ChevronDown, Loader2, Download } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { BadgeEstado } from '@/components/common/BadgeEstado'
@@ -51,6 +52,16 @@ type EgresoItem = {
   monto:        number | string
   categoria:    string
   fecha_egreso: string
+}
+
+interface BidonesRow {
+  id:               string
+  numero:           number
+  fecha_produccion: string | null
+  total_calculado:  number
+  total_manual:     number | null
+  costo_bidones:    number
+  clientes:         { nombre: string } | null
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -169,6 +180,32 @@ function useEgresosDashboard(desde: string, hasta: string) {
       return (data ?? []) as EgresoItem[]
     },
     staleTime: 1000 * 60 * 3,
+  })
+}
+
+function useBidonesPeriodo(inicio: string, fin: string) {
+  return useQuery({
+    queryKey:        ['pedidos', 'dash-bidones', inicio, fin],
+    placeholderData: keepPreviousData,
+    queryFn:  async () => {
+      const { data, error } = await supabase
+        .from('pedidos')
+        .select('id, numero, fecha_produccion, total_calculado, total_manual, costo_bidones, clientes(nombre)')
+        .gt('costo_bidones', 0)
+        .gte('created_at', inicio)
+        .lte('created_at', fin + 'T23:59:59')
+        .order('fecha_produccion', { ascending: false })
+      if (error) throw new Error(error.message)
+      return (data ?? []).map(row => ({
+        ...row,
+        total_calculado: Number((row as any).total_calculado ?? 0),
+        total_manual:    (row as any).total_manual != null ? Number((row as any).total_manual) : null,
+        costo_bidones:   Number((row as any).costo_bidones ?? 0),
+        clientes:        (row as any).clientes ?? null,
+      })) as BidonesRow[]
+    },
+    refetchInterval: 30_000,
+    staleTime:       0,
   })
 }
 
@@ -612,6 +649,7 @@ export default function DashboardPage() {
   const { data: clientesDeuda = [] }    = useClientesConDeuda()
   const { data: evolData }              = useEvolucionRango(desde, hasta)
   const { data: egresosData, isLoading: isLoadingEgresos } = useEgresosDashboard(desde, hasta)
+  const { data: bidones = [] }                              = useBidonesPeriodo(desde, hasta)
 
   const kpi       = pedidos ? calcKPIs(pedidos)    : null
   const kpiCobros = pagos   ? calcCobrosKPI(pagos) : null
@@ -1040,6 +1078,123 @@ export default function DashboardPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )
+      })()}
+
+      {/* ── Detalle de bidones ── */}
+      {bidones.length > 0 && (() => {
+        const fmtP = (n: number) => `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+
+        const exportarBidones = () => {
+          const rows = bidones.map(p => ({
+            'N° Pedido':        `P-${String(p.numero).padStart(5, '0')}`,
+            'Fecha':            p.fecha_produccion ?? '',
+            'Cliente':          p.clientes?.nombre ?? '—',
+            'Total pedido':     p.total_manual ?? p.total_calculado,
+            'Costo bidones':    p.costo_bidones,
+            'Total sin bidones': (p.total_manual ?? p.total_calculado) - p.costo_bidones,
+          }))
+          const ws = XLSX.utils.json_to_sheet(rows)
+          const wb = XLSX.utils.book_new()
+          XLSX.utils.book_append_sheet(wb, ws, 'Bidones')
+          XLSX.writeFile(wb, `bidones-${desde}-${hasta}.xlsx`)
+        }
+
+        const sumTotal    = bidones.reduce((s, p) => s + (p.total_manual ?? p.total_calculado), 0)
+        const sumBidones  = bidones.reduce((s, p) => s + p.costo_bidones, 0)
+        const sumSinBid   = sumTotal - sumBidones
+
+        return (
+          <div style={{ background: '#fff', border: '0.5px solid #D1D5DB', borderRadius: 10, overflow: 'hidden' }}>
+            {/* Header */}
+            <div style={{ padding: '10px 16px', borderBottom: '0.5px solid #F4F6F8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: '#1A2B3C' }}>Detalle de bidones</span>
+              <button
+                onClick={exportarBidones}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  height: 28, padding: '0 10px', fontSize: 11, fontWeight: 500,
+                  color: '#0D5C8A', background: '#EEF4FA',
+                  border: '0.5px solid #BDD4EA', borderRadius: 6,
+                  cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#D8E9F7')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#EEF4FA')}
+              >
+                <Download size={12} />
+                Exportar Excel
+              </button>
+            </div>
+
+            {/* Columnas header */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: '100px 1fr 110px 110px 120px',
+              gap: 8, padding: '7px 16px',
+              borderBottom: '0.5px solid #F4F6F8',
+            }}>
+              {['N° Pedido', 'Cliente', 'Total pedido', 'Costo bidones', 'Total sin bid.'].map(h => (
+                <span key={h} style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9CA3AF' }}>
+                  {h}
+                </span>
+              ))}
+            </div>
+
+            {/* Filas */}
+            {bidones.map((p, i) => {
+              const totalPed = p.total_manual ?? p.total_calculado
+              const sinBid   = totalPed - p.costo_bidones
+              const isLast   = i === bidones.length - 1
+              return (
+                <div
+                  key={p.id}
+                  style={{
+                    display: 'grid', gridTemplateColumns: '100px 1fr 110px 110px 120px',
+                    gap: 8, padding: '9px 16px', alignItems: 'center',
+                    borderBottom: isLast ? 'none' : '0.5px solid #F4F6F8',
+                    transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#F9FAFB')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 500, color: '#0D5C8A' }}>
+                    P-{String(p.numero).padStart(5, '0')}
+                  </span>
+                  <span style={{ fontSize: 12, color: '#1A2B3C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {p.clientes?.nombre ?? '—'}
+                  </span>
+                  <span style={{ fontSize: 12, color: '#1A2B3C', textAlign: 'right' }}>
+                    {fmtP(totalPed)}
+                  </span>
+                  <span style={{ fontSize: 12, color: '#F57C00', fontWeight: 500, textAlign: 'right' }}>
+                    {fmtP(p.costo_bidones)}
+                  </span>
+                  <span style={{ fontSize: 12, color: '#2E9E5C', textAlign: 'right' }}>
+                    {fmtP(sinBid)}
+                  </span>
+                </div>
+              )
+            })}
+
+            {/* Fila de totales */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: '100px 1fr 110px 110px 120px',
+              gap: 8, padding: '9px 16px', alignItems: 'center',
+              borderTop: '1px solid #E5E7EB', background: '#F9FAFB',
+            }}>
+              <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#4A5568', gridColumn: '1 / 3' }}>
+                Total ({bidones.length} pedido{bidones.length !== 1 ? 's' : ''})
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 500, color: '#1A2B3C', textAlign: 'right' }}>
+                {fmtP(sumTotal)}
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 500, color: '#F57C00', textAlign: 'right' }}>
+                {fmtP(sumBidones)}
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 500, color: '#2E9E5C', textAlign: 'right' }}>
+                {fmtP(sumSinBid)}
+              </span>
+            </div>
           </div>
         )
       })()}

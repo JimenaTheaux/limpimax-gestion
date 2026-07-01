@@ -202,6 +202,17 @@ export function FacturaCanvas({ pedido }: { pedido: PedidoDetalle }) {
             <span>{fmtMonto(pedido.costo_envio)}</span>
           </div>
         )}
+        {pedido.costo_bidones > 0 && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontSize: 12, color: '#4A5568',
+            marginBottom: 8, padding: '0 6px',
+          }}>
+            <span>Costo de bidones</span>
+            <span>{fmtMonto(pedido.costo_bidones)}</span>
+          </div>
+        )}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',

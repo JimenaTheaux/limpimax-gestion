@@ -32,6 +32,7 @@ const schema = z.object({
   notasProduccion:        z.string().optional(),
   notasInternas:          z.string().optional(),
   costoEnvio:             z.string().optional(),
+  costoBidones:           z.string().optional(),
   totalManual:            z.string().optional(),
   saldoAplicado:          z.string().optional(),
   items:                  z.array(itemSchema).min(1, 'Agregá al menos un producto'),
@@ -671,6 +672,7 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
 
   const tipoPrecio    = watch('tipoPrecio')
   const costoEnvio    = watch('costoEnvio')
+  const costoBidones  = watch('costoBidones')
   const totalManual   = watch('totalManual')
   const saldoAplicado = watch('saldoAplicado')
   const itemsWatch    = watch('items')
@@ -679,7 +681,7 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
     (acc, i) => acc + (Number(i.cantidad) || 0) * (Number(i.precioUnitario) || 0), 0
   )
   const saldoAplicadoNum = Number(saldoAplicado) || 0
-  const totalCalculado   = subtotalProductos + (Number(costoEnvio) || 0) + saldoAplicadoNum
+  const totalCalculado   = subtotalProductos + (Number(costoEnvio) || 0) + (Number(costoBidones) || 0) + saldoAplicadoNum
   const totalMostrado    = totalManual ? Number(totalManual) : totalCalculado
   const totalEditado     = !!totalManual && Number(totalManual) !== totalCalculado
   const showSaldoRow     = saldoAplicadoNum !== 0
@@ -695,6 +697,7 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
       notas_produccion:         data.notasProduccion ?? '',
       notas_internas:           data.notasInternas ?? '',
       costo_envio:              data.costoEnvio ?? '0',
+      costo_bidones:            data.costoBidones ?? '0',
       total_manual:             data.totalManual ?? '',
       saldo_anterior_aplicado:  data.saldoAplicado ?? '',
       items: data.items.map((item): ItemForm => ({
@@ -1019,6 +1022,23 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
               />
             </div>
 
+            {/* Bidones con input inline */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: '#4A5568' }}>Bidones</span>
+              <input
+                {...register('costoBidones')}
+                inputMode="decimal"
+                placeholder="0"
+                style={{
+                  width: 80, height: 28, border: '0.5px solid #D1D5DB', borderRadius: 6,
+                  padding: '0 8px', fontSize: 12, textAlign: 'right',
+                  fontFamily: 'Inter, sans-serif', outline: 'none', background: '#fff', color: '#1A2B3C',
+                }}
+                onFocus={e => { e.currentTarget.style.borderColor = '#1B9ED6' }}
+                onBlur={e  => { e.currentTarget.style.borderColor = '#D1D5DB' }}
+              />
+            </div>
+
             <div style={{ height: '0.5px', background: '#D1D5DB' }} />
 
             {/* Total */}
@@ -1104,7 +1124,8 @@ function buildDefaults(pedido: PedidoDetalle | null): FormData {
     direccionEntrega: pedido?.direccion_entrega   ?? '',
     notasProduccion:  pedido?.notas_produccion    ?? '',
     notasInternas:    pedido?.notas_internas      ?? '',
-    costoEnvio:       String(pedido?.costo_envio  ?? 0),
+    costoEnvio:       String(pedido?.costo_envio    ?? 0),
+    costoBidones:     String(pedido?.costo_bidones  ?? 0),
     totalManual:      pedido?.total_manual != null ? String(pedido.total_manual) : '',
     saldoAplicado:    pedido?.saldo_anterior_aplicado != null ? String(pedido.saldo_anterior_aplicado) : '',
     items: pedido?.pedido_items?.map(i => ({
