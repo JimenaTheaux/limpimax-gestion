@@ -186,7 +186,7 @@ export const usePedidoDetalle = (id: string | null) =>
           .from('pedidos')
           .select(`
             id, numero, estado, tipo_precio, direccion_entrega, fecha_produccion,
-            total_calculado, total_manual, costo_envio, forma_cobro, monto_cobrado, fecha_cobro,
+            total_calculado, total_manual, costo_envio, costo_bidones, forma_cobro, monto_cobrado, fecha_cobro,
             estado_pago, notas_produccion, notas_internas, notas_entrega, motivo_falla,
             motivo_anulacion, created_at, updated_at, cliente_id,
             clientes!inner(nombre, direccion, tipo_cliente, telefono)
@@ -237,7 +237,7 @@ export async function fetchPedidoDetalle(id: string): Promise<PedidoDetalle> {
       .from('pedidos')
       .select(`
         id, numero, estado, tipo_precio, direccion_entrega, fecha_produccion,
-        total_calculado, total_manual, costo_envio, forma_cobro, monto_cobrado, fecha_cobro,
+        total_calculado, total_manual, costo_envio, costo_bidones, forma_cobro, monto_cobrado, fecha_cobro,
         notas_produccion, notas_internas, notas_entrega, motivo_falla,
         motivo_anulacion, created_at, updated_at, cliente_id, estado_pago,
         clientes!inner(nombre, direccion, tipo_cliente, telefono)
