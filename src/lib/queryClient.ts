@@ -22,7 +22,7 @@ export const queryClient = new QueryClient({
       },
       retryDelay:           800,
       refetchOnWindowFocus: false,
-      refetchOnMount:       'stale',
+      refetchOnMount:       true,
       refetchOnReconnect:   true,
     },
     mutations: {
