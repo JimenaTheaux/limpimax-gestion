@@ -159,14 +159,18 @@ CREATE TABLE pedidos (
   notas_internas TEXT,
   notas_produccion TEXT,
   costo_envio NUMERIC(10,2) DEFAULT 0,
-  total_calculado NUMERIC(10,2) DEFAULT 0,
+  costo_bidones NUMERIC(10,2) DEFAULT 0,           -- monto cobrado al cliente por bidones del pedido
+  saldo_anterior_aplicado NUMERIC(10,2) DEFAULT 0, -- snapshot del saldo del cliente al crear el pedido
+  total_calculado NUMERIC(10,2) DEFAULT 0,          -- subtotal + costo_envio + costo_bidones + saldo_anterior_aplicado
   total_manual NUMERIC(10,2),
-  forma_cobro TEXT CHECK (forma_cobro IN ('efectivo', 'transferencia', 'pendiente')),
-  monto_cobrado NUMERIC(10,2),
-  fecha_cobro DATE,                        -- fecha en que ingresó el dinero (null si pendiente)
+  estado_pago TEXT CHECK (estado_pago IN ('cobrado', 'pendiente')),  -- derivado al cerrar
+  fecha_cobro DATE,                                 -- fecha en que ingresó el dinero (null si pendiente)
   notas_entrega TEXT,
   motivo_falla TEXT,
   motivo_anulacion TEXT,
+  -- campos deprecated (backward compat con registros históricos — no usar en lógica nueva):
+  forma_cobro TEXT CHECK (forma_cobro IN ('efectivo', 'transferencia', 'pendiente')),
+  monto_cobrado NUMERIC(10,2),
   creado_por UUID REFERENCES perfiles(id),
   repartidor_id UUID REFERENCES perfiles(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -442,13 +446,13 @@ const { data: pedidos } = await supabase
   .gte('fecha_produccion', desde)
   .lte('fecha_produccion', hasta)
 
-// Cobros del período (por fecha de cobro)
+// Cobros del período (por fecha de cobro) — fuente: pedido_pagos (no pedidos.monto_cobrado)
 const { data: cobros } = await supabase
-  .from('pedidos')
-  .select('id, forma_cobro, monto_cobrado, fecha_cobro')
-  .eq('estado', 'cerrado')
-  .gte('fecha_cobro', desde)   // registros con fecha_cobro null no aparecen
-  .lte('fecha_cobro', hasta)
+  .from('pedido_pagos')
+  .select('pedido_id, forma_pago, monto, fecha_pago')
+  .gte('fecha_pago', desde)   // filas sin fecha_pago no aparecen
+  .lte('fecha_pago', hasta)
+// Luego agrupar en el cliente por forma_pago para el desglose efectivo/transferencia
 ```
 
 ---

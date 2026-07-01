@@ -20,6 +20,7 @@
 - **Íconos:** lucide-react y @tabler/icons-react
 - **Gráficos (dashboard):** Chart.js
 - **Generación de comprobantes/facturas imprimibles:** html2canvas
+- **Exportación Excel:** SheetJS (`xlsx`) — usado en la tabla de detalle de bidones del dashboard
 
 ### Backend / Base de datos
 - **Todo en Supabase** — no hay backend propio (sin Hono, sin servidor Node en producción):
@@ -103,10 +104,11 @@ limpimax-gestion/
 │   │   ├── LoginPage.tsx
 │   │   └── PerfilPage.tsx
 │   │
-│   ├── hooks/                # useAuth, useOffline, useSidebar, useToast, useDebounce, useScrollDirection, useCompartirFactura
+│   ├── hooks/                # useAuth, useOffline, useSidebar, useToast, useDebounce, useScrollDirection, useCompartirFactura, useCompartirSaldoPendiente
 │   ├── store/                 # authStore.ts (Zustand)
 │   ├── lib/
 │   │   ├── supabase.ts       # Cliente Supabase
+│   │   ├── queryClient.ts    # QueryClient configurado (staleTime, retry, onError 401, manejo de auth)
 │   │   ├── offlineQueue.ts   # Cola de acciones offline (idb)
 │   │   └── utils.ts
 │   ├── services/             # Llamadas a Supabase por entidad (pedidos, clientes, productos, usuarios, produccion, egresos)
@@ -188,6 +190,9 @@ No hay variables de servidor: todo corre en el cliente con la `anon key` + RLS.
 - **Perfil y rol:** tabla `perfiles` (1:1 con `auth.users`), con columna `activo` — un usuario desactivado pierde acceso aunque su sesión siga viva (`useAuth` cierra sesión si `activo = false`).
 - **No exponer datos sensibles por rol:** las políticas RLS de `pedidos` limitan qué filas puede ver cada rol (producción solo ve `en_produccion`/`listo_reparto`; repartidor solo pedidos del día).
 - **Variables de entorno:** `VITE_SUPABASE_ANON_KEY` es pública por diseño (Supabase está pensado para esto); la seguridad depende de RLS, no de ocultar la key.
+- **Refresh proactivo del token:** `useAuth` registra un listener `visibilitychange` a nivel módulo. Cuando la pestaña vuelve a estar visible después de ≥ 60 segundos oculta, llama a `supabase.auth.refreshSession()`. Si el refresh falla → redirect a `/login`. Si tiene éxito → invalida todas las queries de TanStack Query para refrescar datos.
+- **Manejo de errores 401 en QueryClient:** `src/lib/queryClient.ts` configura un `onError` global en mutations (y retry=false en queries) para los códigos `401` y `PGRST301`. Al detectarlos intenta `refreshSession`; si falla, redirige a `/login`.
+- **Cache del perfil:** `useAuth` persiste el perfil en `localStorage` (clave `limpimax-perfil-v2`) para evitar parpadeo al recargar. El perfil en cache se usa como valor inmediato; una actualización silenciosa en background sincroniza el estado real desde Supabase.
 
 ---
 

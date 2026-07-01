@@ -21,7 +21,7 @@
 Se abre en un drawer/sheet lateral (50% desktop, 100% mobile) con fondo oscurecido.
 
 **Campos:**
-- Cliente: selector con búsqueda por texto + botón "+ Cliente nuevo" que expande mini-form inline
+- Cliente: selector con búsqueda por nombre **o dirección** + botón "+ Cliente nuevo" que expande mini-form inline
 - Fecha de producción (date picker nativo estilizado)
 - Lista de ítems:
   - Producto (select del catálogo)
@@ -30,6 +30,10 @@ Se abre en un drawer/sheet lateral (50% desktop, 100% mobile) con fondo oscureci
   - Subtotal calculado automáticamente
   - Bidón nuevo (checkbox por ítem)
 - Costo de envío (opcional, numérico)
+- Costo de bidones (opcional, numérico): monto total cobrado al cliente por bidones del pedido.
+  Distinto del campo "bidón nuevo" por ítem — ese es un indicador de insumo; este es el cargo económico al cliente.
+  Suma al total del pedido igual que costo_envio. Aparece en factura JPG e imprimible si > 0.
+  Se guarda en `pedidos.costo_bidones`.
 - Saldo del cliente (cargado automáticamente al seleccionar cliente):
   - Se lee `clientes.saldo_pendiente` del cliente seleccionado
   - Si > 0: aparece como "Saldo pendiente anterior" y suma al total
@@ -37,7 +41,7 @@ Se abre en un drawer/sheet lateral (50% desktop, 100% mobile) con fondo oscureci
   - Si = 0: no se muestra
   - El monto es editable manualmente (campo inline en el resumen de totales, igual que envío)
   - Al guardar, el valor final se guarda en `pedidos.saldo_anterior_aplicado`
-- Total: calculado automáticamente (`subtotal + costo_envio + saldo_anterior_aplicado`), pero editable manualmente (si se modifica manualmente, se resalta visualmente)
+- Total: calculado automáticamente (`subtotal + costo_envio + costo_bidones + saldo_anterior_aplicado`), pero editable manualmente (si se modifica manualmente, se resalta visualmente)
 - Notas internas (solo Admin)
 - Notas para producción (visible para Producción y Admin)
 
@@ -75,7 +79,7 @@ Se abre en un drawer/sheet lateral (50% desktop, 100% mobile) con fondo oscureci
 ### F2.4 — Listado de pedidos (Admin)
 - Vista principal del dashboard
 - Filtros: por estado, por fecha de producción, por cliente
-- Búsqueda por número de pedido o nombre de cliente
+- Búsqueda por número de pedido, nombre de cliente **o dirección de entrega**
 - Indicadores visuales de estado (badge con colores exactos de la tabla)
 - Acceso rápido a cambiar estado (override)
 
@@ -194,8 +198,10 @@ Cards KPI:
 - Pedidos en producción
 - Pedidos en reparto (listos + en camino)
 - Pedidos con entrega fallida (alerta visual)
-- **Cobrado hoy:** pedidos estado=cerrado AND estado_pago=cobrado · suma de monto_cobrado · desglose efectivo/transferencia
+- **Cobrado hoy:** pedidos estado=cerrado AND estado_pago=cobrado · suma de `pedido_pagos.monto` para esos pedidos · desglose efectivo/transferencia (fuente: tabla `pedido_pagos`, no `pedidos.monto_cobrado`)
 - **Pendiente de cobro** (alerta visual): suma de `clientes.saldo_pendiente` para todos los clientes con saldo > 0 · conteo de clientes · click abre panel agrupado por cliente
+- **Egresos del período:** suma de `egresos.monto` para el mes en curso · filtrado por `fecha_egreso`
+- **Ganancia neta:** total cobrado del período − egresos del período
 
 ### F5.2 — Tablero de estados
 - Lista agrupada por estado con conteo por grupo
@@ -216,8 +222,12 @@ El drawer "Pendientes de cobro" agrupa por cliente, no por pedido individual:
 - Selector de rango personalizado: inputs date [Desde] [Hasta]; default = primer día del mes → hoy
 - **Pedidos** (count, pendientes de cierre, panel de estados): filtrados por `fecha_produccion`
 - **Cobros** (total cobrado, efectivo, transferencia, delta vs mes anterior): filtrados por `fecha_cobro`
+  - Fuente: tabla `pedido_pagos` — se agrupa `SUM(monto)` con `GROUP BY forma_pago` para el rango
   - Esto permite ver "hice 10 pedidos esta semana pero cobré algunos de la semana pasada"
   - Registros sin `fecha_cobro` (pendientes o datos legacy) no aparecen en los KPIs de cobro
+- **Egresos del período:** suma de `egresos.monto` filtrada por `fecha_egreso` dentro del rango seleccionado
+- **Ganancia neta:** total cobrado − egresos del período (visible en el mismo rango)
+- **Tabla detalle de bidones:** visible solo cuando hay pedidos con `costo_bidones > 0` en el período; muestra número de pedido, cliente, fecha y costo_bidones; exportable a Excel (SheetJS)
 - Gráfico de evolución: cobros agrupados por `fecha_cobro`, comparado con el mismo rango del mes anterior
 
 ---
@@ -352,6 +362,13 @@ Accesible desde: drawer de editar usuario en `/admin/usuarios`.
 - Si html2canvas falla: toast de error "No se pudo generar la imagen"
 - Componentes: `FacturaCanvas`, `BtnWhatsapp` (variantes "icono" y "pill"), hook `useCompartirFactura`
 
+### F9.4 — Compartir saldo pendiente por WhatsApp (JPG)
+- Disponible desde: drawer "Pendientes de cobro" del dashboard, al expandir el detalle de un cliente
+- Genera una imagen JPG con el resumen de deuda del cliente usando html2canvas sobre el componente `SaldoPendienteCanvas`
+- El JPG muestra: nombre del cliente, monto total adeudado (`saldo_pendiente`), y detalle de pedidos pendientes
+- Mismo flujo de envío que F9.3 (Web Share API en mobile, descarga + WhatsApp Web en desktop)
+- Componentes: `SaldoPendienteCanvas`, hook `useCompartirSaldoPendiente`
+
 ---
 
 ## MÓDULO 10: Notificaciones (fuera del MVP)
@@ -398,8 +415,18 @@ Confirmación inline antes de eliminar:
 "¿Eliminar este egreso? Esta acción no se puede deshacer."
 Botones: [Sí, eliminar] (error) · [Cancelar]
 
-### Categorías disponibles (enum fijo en DB):
-  sueldos · alquiler · droguería · gráfica · packaging · luz · otros
+### Categorías de egresos:
+Las categorías son configurables desde la UI (tabla `categorias_egreso`). Las iniciales cargadas en la migración son:
+sueldos · alquiler · droguería · gráfica · packaging · luz · otros
+
+Cada categoría tiene `nombre`, `color_bg` y `color_texto` para el badge visual.
+
+### F11.5 — Gestión de categorías de egresos (Admin) — próximo sprint
+- Accesible desde la página de Egresos (botón "Gestionar categorías")
+- Crear, editar nombre y colores de categoría
+- Borrar categoría con guard: no se puede borrar si tiene egresos asociados (`COUNT(egresos WHERE categoria_id) > 0`)
+  → muestra mensaje: "No se puede borrar. Tiene egresos asociados."
+- No borrar una categoría no elimina los egresos — quedan con la categoría hasta que se reasignen
 
 ### Reglas:
 - Solo Admin puede ver, crear, editar y eliminar egresos

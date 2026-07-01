@@ -251,7 +251,27 @@ Rol del usuario: [rol] con estas restricciones: [describir]
 
 ### Módulo de Egresos — implementado ✅
 
-El módulo de Egresos (lista, crear, editar, eliminar, KPI de "Egresos del período" y "Ganancia neta" en el dashboard) ya está implementado. Schema final, tipos y queries en `06_estructura_de_datos.md` (tabla `egresos`, `CategoriaEgreso`, `CATEGORIA_EGRESO_LABELS`). Servicio en `src/services/egresos.ts`, UI en `src/pages/admin/EgresosPage.tsx`.
+El módulo de Egresos (lista, crear, editar, eliminar, KPI de "Egresos del período" y "Ganancia neta" en el dashboard) ya está implementado. Schema final, tipos y queries en `06_estructura_de_datos.md` (tabla `egresos`, `CategoriaEgreso`). Servicio en `src/services/egresos.ts`, UI en `src/pages/admin/EgresosPage.tsx`.
+
+### Pagos múltiples — implementado ✅
+
+Tabla `pedido_pagos` reemplaza `pedidos.forma_cobro` / `pedidos.monto_cobrado` para el registro de cobros al cerrar pedidos. Soporta pagos combinados (efectivo + transferencia) y pagos parciales. Componente `FormPagos` en `src/components/pedidos/FormPagos.tsx`. Los campos `forma_cobro` y `monto_cobrado` en `pedidos` se mantienen solo por backward compat con datos históricos.
+
+### Saldo de clientes — implementado ✅
+
+`clientes.saldo_pendiente` refleja el saldo acumulado del cliente (positivo = debe, negativo = crédito). Al crear un pedido se lee y aplica como `saldo_anterior_aplicado` (snapshot). Al cerrar se recalcula y actualiza con la diferencia `total_pedido - SUM(pedido_pagos.monto)`.
+
+### Costo de bidones — implementado ✅
+
+Campo `pedidos.costo_bidones` para registrar el costo económico total de bidones cobrado al cliente (distinto del campo `bidon_nuevo` por ítem). Aparece en factura JPG e imprimible. Tabla de detalle en el dashboard con exportación Excel (SheetJS).
+
+### Compartir saldo pendiente por WhatsApp — implementado ✅
+
+Imagen JPG con resumen de deuda del cliente generada desde `SaldoPendienteCanvas` vía `useCompartirSaldoPendiente`. Accesible desde el drawer de pendientes de cobro del dashboard.
+
+### Gestión de categorías de egresos configurables — próximo sprint
+
+La tabla `categorias_egreso` ya existe en la DB y las categorías son gestionables desde la capa de datos. Pendiente: UI en `EgresosPage` para crear, editar nombre/colores y borrar categorías (con guard que impide borrar si tiene egresos asociados). Ver `F11.5` en `04_funcionalidades_por_modulo.md`.
 
 ### Limitación conocida a resolver: historial offline
 

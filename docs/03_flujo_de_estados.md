@@ -54,26 +54,29 @@ Cada transición registra: estado anterior, estado nuevo, usuario, timestamp.
 ### `CERRADO`
 - **Quién lo establece:** Repartidor (al confirmar entrega) o Administración.
 - **Qué significa:** Pedido entregado y cobro registrado. Estado final de entrega.
-- **Campos obligatorios al cerrar:**
-  - `forma_cobro`: efectivo / transferencia / pendiente
-  - `monto_cobrado`: numérico (obligatorio si forma ≠ pendiente)
-  - `estado_pago`: cobrado | pendiente (se deriva automáticamente de forma_cobro)
-- **Acciones disponibles:** Admin puede editar cobro (forma_cobro, monto_cobrado, estado_pago, fecha_cobro).
+- **Registro de pagos al cerrar:**
+  - Se insertan N filas en `pedido_pagos` (una por forma de pago; puede ser combinado efectivo + transferencia)
+  - `estado_pago`: `cobrado` si `SUM(pedido_pagos.monto) >= total_pedido`; `pendiente` si queda diferencia > 0
+  - `fecha_cobro`: fecha en que ingresó el dinero (null si todos los pagos son pendientes)
+  - Al cerrar se recalcula y actualiza `clientes.saldo_pendiente = total_pedido - SUM(pedido_pagos.monto)`
+- **Acciones disponibles:** Admin puede editar cobro (agregar/modificar filas en `pedido_pagos`, `estado_pago`, `fecha_cobro`).
 - **No se puede anular ni retroceder.**
 - **Visible para:** Administración.
+- **Campos deprecated en `pedidos`** (backward compat, no usar en lógica nueva): `forma_cobro`, `monto_cobrado`.
 
 #### Relación `fecha_cobro` / `estado_pago`
 
-| forma_cobro | estado_pago | fecha_cobro |
+| pagos registrados | estado_pago | fecha_cobro |
 |---|---|---|
-| efectivo / transferencia | cobrado | fecha seleccionada al cerrar |
-| pendiente | pendiente | null |
+| SUM(pagos) >= total | cobrado | fecha seleccionada al cerrar |
+| SUM(pagos) < total (pago parcial) | pendiente | fecha del pago (si hubo alguno) |
+| sin pagos / todos pendientes | pendiente | null |
 
 - `fecha_cobro` = fecha en que ingresó el dinero (no la fecha del pedido ni la de producción).
 - Los KPIs de cobros en el dashboard filtran por `fecha_cobro`, no por `fecha_produccion`.
   - Un pedido producido el 5/6 puede tener `fecha_cobro = 8/6` si cobró días después.
   - Pedidos con `estado_pago = 'pendiente'` tienen `fecha_cobro = null` y no aparecen en los KPIs de cobros hasta que se registre el cobro.
-- Al editar cobro en un pedido cerrado, `estado_pago` se recalcula automáticamente desde `forma_cobro`.
+- `clientes.saldo_pendiente` se actualiza en cada cierre: valor positivo = el cliente quedó debiendo; negativo = pagó de más (crédito a favor que descuenta del siguiente pedido).
 
 ### `ENTREGA FALLIDA`
 - **Quién lo establece:** Repartidor.
