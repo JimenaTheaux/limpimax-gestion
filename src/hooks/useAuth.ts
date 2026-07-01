@@ -1,10 +1,35 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { queryClient } from '@/lib/queryClient'
 import { useAuthStore } from '@/store/authStore'
 import type { Rol } from '@/types'
 
 // Perfil en localStorage para evitar parpadeo al recargar
 const CACHE_KEY = 'limpimax-perfil-v2'
+
+// ─── Listener de visibilidad — detecta pestaña dormida ───────────────────────
+let hiddenAt: number | null = null
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', async () => {
+    if (document.hidden) {
+      hiddenAt = Date.now()
+      return
+    }
+
+    const secondsHidden = hiddenAt ? (Date.now() - hiddenAt) / 1000 : 0
+    hiddenAt = null
+
+    if (secondsHidden > 60) {
+      const { error } = await supabase.auth.refreshSession()
+      if (error) {
+        window.location.href = '/login'
+        return
+      }
+      queryClient.invalidateQueries()
+    }
+  })
+}
 
 function getCachedPerfil() {
   try {

@@ -362,8 +362,12 @@ export default function ProduccionPage() {
   }, [pedidosProd])
 
   const handleMarcarListo = async (id: string) => {
-    await cambiarEstado.mutateAsync({ id, estadoActual: 'en_produccion', estado: 'listo_reparto' })
-    show('Pedido marcado como listo para reparto', 'success')
+    try {
+      await cambiarEstado.mutateAsync({ id, estadoActual: 'en_produccion', estado: 'listo_reparto' })
+      show('Pedido marcado como listo para reparto', 'success')
+    } catch (e) {
+      show(e instanceof Error ? e.message : 'Error al cambiar estado', 'error')
+    }
   }
 
   const totalPedidos = pedidosProd?.length ?? 0
