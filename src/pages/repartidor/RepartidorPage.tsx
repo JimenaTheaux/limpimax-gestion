@@ -34,6 +34,11 @@ function ExpandedItems({ pedidoId }: { pedidoId: string }) {
   const items = data?.pedido_items ?? []
   if (!items.length) return null
 
+  const pd = data!
+  const hayExtras = pd.costo_envio > 0 || pd.costo_bidones > 0 ||
+    (pd.saldo_anterior_aplicado != null && pd.saldo_anterior_aplicado !== 0)
+  const fmtM = (n: number) => `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+
   return (
     <div style={{ padding: '8px 14px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
       {items.map((item, i) => {
@@ -57,6 +62,29 @@ function ExpandedItems({ pedidoId }: { pedidoId: string }) {
           </div>
         )
       })}
+
+      {hayExtras && (
+        <div style={{ marginTop: 6, paddingTop: 6, borderTop: '0.5px solid #F4F6F8', display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {pd.saldo_anterior_aplicado != null && pd.saldo_anterior_aplicado !== 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: pd.saldo_anterior_aplicado > 0 ? '#C62828' : '#2E7D32' }}>
+              <span>{pd.saldo_anterior_aplicado > 0 ? 'Saldo pendiente anterior' : 'Saldo a favor'}</span>
+              <span>{fmtM(pd.saldo_anterior_aplicado)}</span>
+            </div>
+          )}
+          {pd.costo_envio > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#4A5568' }}>
+              <span>Envío</span>
+              <span>{fmtM(pd.costo_envio)}</span>
+            </div>
+          )}
+          {pd.costo_bidones > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#4A5568' }}>
+              <span>Bidones</span>
+              <span>{fmtM(pd.costo_bidones)}</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

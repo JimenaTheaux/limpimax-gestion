@@ -252,36 +252,79 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
               </div>
 
               {/* Ítems */}
-              <div style={{ background: '#fff', borderRadius: 16, padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                <p style={{ margin: '0 0 12px', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#4A5568' }}>Productos</p>
-                {p.pedido_items?.map(item => (
-                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: 10, marginBottom: 10, borderBottom: '1px solid #F4F6F8' }}>
-                    <div>
-                      <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>
-                        {item.productos?.nombre}
-                        {item.bidon_nuevo && (
-                          <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, background: '#FFF3E0', color: '#F57C00', padding: '2px 6px', borderRadius: 99 }}>BIDÓN NUEVO</span>
+              {(() => {
+                const subtotalItems = (p.pedido_items ?? []).reduce(
+                  (acc, item) => acc + item.cantidad * item.precio_unitario, 0
+                )
+                const hayExtras = p.costo_envio > 0 || p.costo_bidones > 0 ||
+                  (p.saldo_anterior_aplicado != null && p.saldo_anterior_aplicado !== 0)
+                const fmtM = (n: number) => `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+                const rowStyle: React.CSSProperties = {
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '5px 0', fontSize: 13, color: '#4A5568',
+                }
+                return (
+                  <div style={{ background: '#fff', borderRadius: 16, padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                    <p style={{ margin: '0 0 12px', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#4A5568' }}>Productos</p>
+                    {p.pedido_items?.map(item => (
+                      <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: 10, marginBottom: 10, borderBottom: '1px solid #F4F6F8' }}>
+                        <div>
+                          <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>
+                            {item.productos?.nombre}
+                            {item.bidon_nuevo && (
+                              <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, background: '#FFF3E0', color: '#F57C00', padding: '2px 6px', borderRadius: 99 }}>BIDÓN NUEVO</span>
+                            )}
+                          </p>
+                          <p style={{ margin: 0, fontSize: 12, color: '#4A5568' }}>
+                            {item.cantidad} × ${item.precio_unitario.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <span style={{ fontWeight: 600, fontSize: 14, color: '#0D5C8A' }}>
+                          ${(item.cantidad * item.precio_unitario).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    ))}
+
+                    {/* Desglose de extras */}
+                    {hayExtras && (
+                      <div style={{ borderTop: '1px solid #F4F6F8', paddingTop: 8, marginBottom: 4, display: 'flex', flexDirection: 'column', gap: 0 }}>
+                        <div style={rowStyle}>
+                          <span>Subtotal productos</span>
+                          <span>{fmtM(subtotalItems)}</span>
+                        </div>
+                        {p.saldo_anterior_aplicado != null && p.saldo_anterior_aplicado !== 0 && (
+                          <div style={{ ...rowStyle, color: p.saldo_anterior_aplicado > 0 ? '#C62828' : '#2E7D32' }}>
+                            <span>{p.saldo_anterior_aplicado > 0 ? 'Saldo pendiente anterior' : 'Saldo a favor'}</span>
+                            <span>{fmtM(p.saldo_anterior_aplicado)}</span>
+                          </div>
                         )}
-                      </p>
-                      <p style={{ margin: 0, fontSize: 12, color: '#4A5568' }}>
-                        {item.cantidad} × ${item.precio_unitario.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                      </p>
+                        {p.costo_envio > 0 && (
+                          <div style={rowStyle}>
+                            <span>Envío</span>
+                            <span>{fmtM(p.costo_envio)}</span>
+                          </div>
+                        )}
+                        {p.costo_bidones > 0 && (
+                          <div style={rowStyle}>
+                            <span>Bidones</span>
+                            <span>{fmtM(p.costo_bidones)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: hayExtras ? '1px solid #E5E7EB' : '1px solid #F4F6F8' }}>
+                      <span style={{ fontSize: 15, fontWeight: 700 }}>Total</span>
+                      <span style={{ fontSize: 18, fontWeight: 900, color: '#0D5C8A', letterSpacing: -0.5 }}>
+                        ${totalPedido(p).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                      </span>
                     </div>
-                    <span style={{ fontWeight: 600, fontSize: 14, color: '#0D5C8A' }}>
-                      ${(item.cantidad * item.precio_unitario).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                    </span>
+                    {p.total_manual && (
+                      <p style={{ fontSize: 11, color: '#F57C00', margin: '2px 0 0', textAlign: 'right' }}>Total editado manualmente</p>
+                    )}
                   </div>
-                ))}
-                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 4 }}>
-                  <span style={{ fontSize: 15, fontWeight: 700 }}>Total</span>
-                  <span style={{ fontSize: 18, fontWeight: 900, color: '#0D5C8A', letterSpacing: -0.5 }}>
-                    ${totalPedido(p).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-                {p.total_manual && (
-                  <p style={{ fontSize: 11, color: '#F57C00', margin: '2px 0 0', textAlign: 'right' }}>Total editado manualmente</p>
-                )}
-              </div>
+                )
+              })()}
 
               {/* Notas */}
               {(p.notas_produccion || p.notas_internas) && (
