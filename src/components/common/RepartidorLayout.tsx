@@ -1,22 +1,17 @@
-import { useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
-import {
-  IconWifi, IconWifiOff, IconLogout, IconTruck, IconClockHour3, IconRefresh, IconUser,
-} from '@tabler/icons-react'
+import { IconTruck, IconClockHour3, IconRefresh, IconUser } from '@tabler/icons-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { BottomNav }          from './BottomNav'
-import { RefreshBar }         from './RefreshBar'
-import { useAuth }            from '@/hooks/useAuth'
-import { useOffline }         from '@/hooks/useOffline'
-import { useScrollDirection } from '@/hooks/useScrollDirection'
+import { BottomNav }  from './BottomNav'
+import { Navbar }     from './Navbar'
+import { RefreshBar } from './RefreshBar'
+import { useAuth }    from '@/hooks/useAuth'
+import { useOffline } from '@/hooks/useOffline'
 
 export function RepartidorLayout() {
-  const { cerrarSesion }                            = useAuth()
-  const navigate                                    = useNavigate()
-  const queryClient                                 = useQueryClient()
-  const { isOnline, pendingCount, syncing, sync }   = useOffline()
-  const [logoutHover, setLogoutHover]               = useState(false)
-  const scrollDir                                   = useScrollDirection()
+  const { cerrarSesion }                          = useAuth()
+  const navigate                                  = useNavigate()
+  const queryClient                               = useQueryClient()
+  const { isOnline, pendingCount, syncing, sync } = useOffline()
 
   const handleLogout = async () => {
     queryClient.clear()
@@ -27,107 +22,27 @@ export function RepartidorLayout() {
   return (
     <div style={{ minHeight: '100dvh', background: '#F4F6F8', overflowX: 'hidden' }}>
       <RefreshBar />
-      {/* Topbar — se oculta al scrollear hacia abajo en mobile */}
-      <header
-        className="topbar-scroll-aware"
-        style={{
-          height:         56,
-          background:     'rgba(255,255,255,0.9)',
-          backdropFilter: 'blur(8px)',
-          borderBottom:   '1px solid #D1D5DB',
-          padding:      '0 16px',
-          display:      'flex',
-          alignItems:   'center',
-          gap:          10,
-          position:     'sticky',
-          top:          0,
-          zIndex:       50,
-          transform:    scrollDir === 'down' ? 'translateY(-100%)' : 'translateY(0)',
-          transition:   'transform 0.25s ease',
-        }}
-      >
-        {/* LM mark */}
-        <div
-          style={{
-            width:          28,
-            height:         28,
-            borderRadius:   6,
-            background:     '#1B9ED6',
-            display:        'flex',
-            alignItems:     'center',
-            justifyContent: 'center',
-            color:          '#fff',
-            fontSize:       11,
-            fontWeight:     700,
-            flexShrink:     0,
-            letterSpacing:  '-0.5px',
-          }}
-        >
-          LM
-        </div>
-
-        {/* Título */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'baseline', gap: 4 }}>
-          <span style={{ fontSize: 13, fontWeight: 500, color: '#1A2B3C' }}>
-            Reparto
-          </span>
-          <span style={{ fontSize: 12, color: '#4A5568' }}>
-            — Repartidor
-          </span>
-        </div>
-
-        {/* Indicador de conexión — inline, sin pill */}
-        <div
-          aria-live="polite"
-          style={{
-            display:    'flex',
-            alignItems: 'center',
-            gap:        4,
-            flexShrink: 0,
-          }}
-        >
-          {isOnline ? (
-            <>
-              <IconWifi size={13} color="#2E9E5C" aria-label="En línea" />
-              <span className="hidden sm:inline" style={{ fontSize: 11, color: '#2E9E5C' }}>
-                En línea
-              </span>
-            </>
-          ) : (
-            <>
-              <IconWifiOff size={13} color="#9A9A9A" aria-label="Sin conexión" />
-              <span className="hidden sm:inline" style={{ fontSize: 11, color: '#9A9A9A' }}>
-                Sin conexión
-              </span>
-            </>
-          )}
-        </div>
-
-        {/* Logout */}
-        <button
-          onClick={handleLogout}
-          onMouseEnter={() => setLogoutHover(true)}
-          onMouseLeave={() => setLogoutHover(false)}
-          aria-label="Cerrar sesión"
-          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1B9ED6] focus-visible:ring-offset-2"
-          style={{
-            width:        32,
-            height:       32,
-            background:   'transparent',
-            border:       'none',
-            cursor:       'pointer',
-            color:        logoutHover ? '#D32F2F' : '#4A5568',
-            display:      'flex',
-            alignItems:   'center',
-            justifyContent: 'center',
-            borderRadius: 6,
-            flexShrink:   0,
-            transition:   'color 0.15s ease',
-          }}
-        >
-          <IconLogout size={16} color={logoutHover ? '#D32F2F' : '#4A5568'} />
-        </button>
-      </header>
+      <Navbar
+        onLogout={handleLogout}
+        rootPath="/repartidor"
+        roleLabel="repartidor"
+        extra={
+          <div aria-live="polite" style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <span
+              style={{
+                width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                background: isOnline ? '#2E9E5C' : '#9A9A9A',
+              }}
+            />
+            <span
+              className="hidden sm:inline"
+              style={{ fontSize: 11, color: isOnline ? '#2E9E5C' : '#9A9A9A' }}
+            >
+              {isOnline ? 'En línea' : 'Sin conexión'}
+            </span>
+          </div>
+        }
+      />
 
       {/* Banner: cambios pendientes de sincronizar */}
       {pendingCount > 0 && isOnline && !syncing && (

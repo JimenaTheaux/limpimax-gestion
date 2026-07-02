@@ -1,25 +1,13 @@
 import { NavLink } from 'react-router-dom'
-import {
-  IconLayoutDashboard, IconFileText, IconUsers, IconPackage,
-  IconReceipt, IconUsersGroup, IconLogout,
-} from '@tabler/icons-react'
+import { IconLogout } from '@tabler/icons-react'
 import { useAuth } from '@/hooks/useAuth'
 
-interface NavItem {
+export interface NavItem {
   to:    string
   end?:  boolean
   icon:  React.ReactNode
   label: string
 }
-
-const NAV_ADMIN: NavItem[] = [
-  { to: '/admin',           end: true, icon: <IconLayoutDashboard size={15} />, label: 'Dashboard' },
-  { to: '/admin/pedidos',              icon: <IconFileText        size={15} />, label: 'Pedidos' },
-  { to: '/admin/clientes',             icon: <IconUsers           size={15} />, label: 'Clientes' },
-  { to: '/admin/productos',            icon: <IconPackage         size={15} />, label: 'Productos' },
-  { to: '/admin/egresos',              icon: <IconReceipt         size={15} />, label: 'Egresos' },
-  { to: '/admin/usuarios',             icon: <IconUsersGroup      size={15} />, label: 'Usuarios' },
-]
 
 function getIniciales(nombre: string) {
   return nombre
@@ -30,10 +18,14 @@ function getIniciales(nombre: string) {
 }
 
 interface Props {
-  onLogout: () => void | Promise<void>
+  onLogout:   () => void | Promise<void>
+  rootPath?:  string
+  links?:     NavItem[]
+  roleLabel?: string
+  extra?:     React.ReactNode
 }
 
-export function Navbar({ onLogout }: Props) {
+export function Navbar({ onLogout, rootPath = '/admin', links = [], roleLabel, extra }: Props) {
   const { usuario } = useAuth()
 
   return (
@@ -53,7 +45,7 @@ export function Navbar({ onLogout }: Props) {
     >
       {/* Brand */}
       <NavLink
-        to="/admin"
+        to={rootPath}
         end
         style={{
           display:        'flex',
@@ -76,7 +68,7 @@ export function Navbar({ onLogout }: Props) {
 
       {/* Nav links */}
       <nav style={{ display: 'flex', gap: 2, flex: 1, minWidth: 0, overflowX: 'auto' }}>
-        {NAV_ADMIN.map((item) => (
+        {links.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -91,8 +83,10 @@ export function Navbar({ onLogout }: Props) {
 
       {/* Usuario + logout */}
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        {extra}
+
         <NavLink
-          to="/admin/perfil"
+          to={`${rootPath}/perfil`}
           title="Mi perfil"
           style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}
         >
@@ -116,6 +110,7 @@ export function Navbar({ onLogout }: Props) {
 
           <span className="hidden md:inline" style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
             {usuario?.nombre ?? '—'}
+            {roleLabel && <span style={{ color: 'rgba(255,255,255,0.4)' }}> · {roleLabel}</span>}
           </span>
         </NavLink>
 
