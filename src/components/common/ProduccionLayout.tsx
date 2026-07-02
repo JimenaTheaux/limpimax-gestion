@@ -1,8 +1,9 @@
 import { Outlet, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Navbar }     from './Navbar'
-import { RefreshBar } from './RefreshBar'
-import { useAuth }    from '@/hooks/useAuth'
+import { Navbar }          from './Navbar'
+import { NAV_PRODUCCION }  from './navProduccionConfig'
+import { RefreshBar }      from './RefreshBar'
+import { useAuth }         from '@/hooks/useAuth'
 
 export function ProduccionLayout() {
   const { cerrarSesion } = useAuth()
@@ -18,7 +19,7 @@ export function ProduccionLayout() {
   return (
     <div style={{ minHeight: '100dvh', background: '#F4F6F8', overflowX: 'hidden' }}>
       <RefreshBar />
-      <Navbar onLogout={handleLogout} rootPath="/produccion" roleLabel="producción" />
+      <Navbar onLogout={handleLogout} rootPath="/produccion" roleLabel="producción" links={NAV_PRODUCCION} />
 
       {/* Contenido */}
       <main style={{ padding: '16px' }}>
