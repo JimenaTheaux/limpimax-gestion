@@ -207,6 +207,56 @@
     font-weight: 600;
     color: #1B9ED6;
   }
+
+  /* ─── Navbar (Admin — top horizontal) ─────────────────────────────────────── */
+  .navbar-link {
+    position:       relative;
+    display:        flex;
+    align-items:    center;
+    gap:            6px;
+    padding:        6px 12px;
+    border-radius:  7px;
+    font-size:      12px;
+    font-weight:    400;
+    color:          rgba(255,255,255,0.55);
+    text-decoration:none;
+    cursor:         pointer;
+    white-space:    nowrap;
+    transition:     color 0.15s ease, background 0.15s ease;
+  }
+  .navbar-link:hover {
+    color:      rgba(255,255,255,0.9);
+    background: rgba(255,255,255,0.09);
+  }
+  .navbar-link::after {
+    content:    '';
+    position:   absolute;
+    left:       12px;
+    right:      12px;
+    bottom:     0;
+    height:     2px;
+    background: #1B9ED6;
+    opacity:    0;
+    transition: opacity 0.15s ease;
+  }
+  .navbar-link:hover::after {
+    opacity: 1;
+  }
+  .navbar-link.active {
+    background: #0D5C8A;
+    color:      #fff;
+    font-weight:500;
+  }
+  .navbar-link.active::after {
+    opacity: 0;
+  }
+  .navbar-logout-btn {
+    color:      rgba(255,255,255,0.4);
+    transition: color 0.15s ease;
+  }
+  .navbar-logout-btn:hover {
+    color: rgba(255,255,255,0.85);
+  }
 }
 
 /* ─── Print ──────────────────────────────────────────────────────────────── */

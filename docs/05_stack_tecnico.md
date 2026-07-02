@@ -93,7 +93,7 @@ limpimax-gestion/
 │   ├── components/
 │   │   ├── ui/              # shadcn/ui sobre Radix (button, dialog, sheet, toast, etc.)
 │   │   ├── common/          # AdminLayout, ProduccionLayout, RepartidorLayout,
-│   │   │                    # Sidebar, BottomNav, Drawer, BadgeEstado, ProtectedRoute, etc.
+│   │   │                    # Navbar, BottomNav, Drawer, BadgeEstado, ProtectedRoute, etc.
 │   │   └── pedidos/         # DrawerPedido, DrawerDetalle, FacturaCanvas
 │   │
 │   ├── pages/
@@ -104,7 +104,7 @@ limpimax-gestion/
 │   │   ├── LoginPage.tsx
 │   │   └── PerfilPage.tsx
 │   │
-│   ├── hooks/                # useAuth, useOffline, useSidebar, useToast, useDebounce, useScrollDirection, useCompartirFactura, useCompartirSaldoPendiente
+│   ├── hooks/                # useAuth, useOffline, useToast, useDebounce, useScrollDirection, useCompartirFactura, useCompartirSaldoPendiente
 │   ├── store/                 # authStore.ts (Zustand)
 │   ├── lib/
 │   │   ├── supabase.ts       # Cliente Supabase

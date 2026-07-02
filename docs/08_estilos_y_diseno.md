@@ -285,30 +285,31 @@ bg-white rounded-[20px] p-5 shadow-sm hover:shadow-md transition-shadow
 
 # LAYOUT
 
-## Sidebar (Admin — desktop)
+## Navbar (Admin — top horizontal)
 
 ```
-Estado abierto:  width 240px
-Estado cerrado:  width 64px (solo íconos, sin texto)
-Transición:      width 0.25s ease
-Fondo:           #1A2B3C
+Fondo:      #1A2B3C
+Altura:     52px
+Padding:    0 20px
+Posición:   sticky, top 0, z-index 50
 ```
 
 ```tsx
-// Hook useSidebar
-const { isOpen, toggle } = useSidebar()
-
-// El contenido principal responde:
-<main style={{ marginLeft: isOpen ? '240px' : '64px', transition: 'margin 0.25s ease' }}>
+// Layout principal — columna, sin margin-left
+<div style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
+  <Navbar onLogout={handleLogout} />
+  <div style={{ flex: 1, overflowY: 'auto' }}>
+    <Outlet />
+  </div>
+</div>
 ```
 
-- Logo arriba: cuadrado 32px `border-radius: 8px` background `#1B9ED6`, iniciales "LM"
-- Nav items abierto: ícono + texto, `font-size: 13px, color: rgba(255,255,255,0.6)`
-- Nav items cerrado: solo ícono, centrado, tooltip al hacer hover
-- Item activo: `background: #0D5C8A, color: #ffffff, font-weight: 600`
-- Botón toggle: flecha en el borde del sidebar, `position: absolute, right: -12px`
-- Footer: avatar iniciales + nombre + rol + botón logout
-- En mobile: sidebar oculto, reemplazado por bottom nav
+- Brand: logo mark 28px `border-radius: 7px` background `#1B9ED6` (o `/logo-mark.png`) + "Limpimax" `font-size 13px, font-weight 500, color #fff`, `margin-right: 32px`
+- Nav links: `Dashboard · Pedidos · Clientes · Productos · Egresos · Usuarios` — ícono Tabler 15px + texto, `padding: 6px 12px, border-radius: 7px, font-size: 12px, color: rgba(255,255,255,0.55)`
+- Item activo: `background: #0D5C8A, color: #ffffff, font-weight: 500`
+- Hover: `color: rgba(255,255,255,0.9), background: rgba(255,255,255,0.09), transition 0.15s ease` + underline `#1B9ED6` 2px que aparece con `opacity 0 → 1`
+- Right side (`margin-left: auto`): avatar circular 26px `background #0D5C8A` + iniciales, nombre `font-size 11px color rgba(255,255,255,0.6)`, botón logout `rgba(255,255,255,0.4)` (hover `rgba(255,255,255,0.85)`)
+- Mobile (<768px): se ocultan los labels de los links y del brand/usuario, quedan solo los íconos — sin bottom nav para Admin
 
 ## Bottom nav (mobile — todos los roles)
 
@@ -413,7 +414,7 @@ const { isOpen, toggle } = useSidebar()
 # PATRONES POR ROL
 
 ## Admin — decisión y control
-- Sidebar colapsable en desktop, bottom nav en mobile
+- Navbar horizontal superior, en desktop y mobile (sin bottom nav)
 - KPIs grandes arriba (mínimo 4)
 - Tablero de pedidos agrupados por estado
 - Todos los formularios en drawers laterales
@@ -474,7 +475,7 @@ const { isOpen, toggle } = useSidebar()
 | Card de pedido | `CardPedido` |
 | Card KPI | `CardKPI` |
 | Drawer/Sheet lateral | `Drawer` |
-| Sidebar colapsable | `Sidebar` |
+| Navbar superior (Admin) | `Navbar` |
 | Input con float label | `FloatInput` |
 | Dot animado | `PulseDot` |
 | Botón primary | `BtnPrimary` |
