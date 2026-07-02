@@ -712,8 +712,7 @@ export default function DashboardPage() {
   }
 
   const kpiCard = {
-    background: '#fff', borderRadius: 20, padding: '16px 18px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+    background: '#fff', border: '0.5px solid #D1D5DB', borderRadius: 10, padding: '14px 16px',
   }
   const kpiHeaderRow = {
     display: 'flex', alignItems: 'center', gap: '5px', marginBottom: 10,
@@ -785,10 +784,10 @@ export default function DashboardPage() {
       </p>
 
       {/* ── KPIs ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-        {/* Fila 1: Pedidos · Cobrado · Pend. cobro */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        {/* Fila 1: Pedidos · Cobrado (desglose) · Pend. cobro · Costo producción */}
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr_1fr_1fr] gap-2.5">
 
           {/* Card 1 — Pedidos */}
           <div style={kpiCard}>
@@ -800,19 +799,19 @@ export default function DashboardPage() {
             <p style={kpiSubSt}>{kpi?.pendCierre ?? 0} pendiente(s) de cierre</p>
           </div>
 
-          {/* Card 2 — Total cobrado */}
+          {/* Card 2 — Total cobrado (desglose Efectivo / Transferencia) */}
           <div style={kpiCard}>
             <div style={kpiHeaderRow}>
               <Banknote size={13} style={{ color: '#1B9ED6', flexShrink: 0 }} />
               <span style={kpiLabelSt}>Total cobrado</span>
             </div>
             <div style={kpiValueSt}>{pesos(kpiCobros?.totalCob ?? 0)}</div>
-            <div style={{ display: 'flex', gap: '6px', marginTop: 8 }}>
-              <div style={{ flex: 1, background: '#F5F7F9', borderRadius: 8, padding: '7px 10px' }}>
+            <div style={{ display: 'flex', marginTop: 8 }}>
+              <div style={{ flex: 1, borderRight: '0.5px solid #F4F6F8', paddingRight: 10 }}>
                 <div style={{ fontSize: 8, fontWeight: 500, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#4A5568', marginBottom: 2 }}>Efectivo</div>
                 <div style={{ fontSize: 12, fontWeight: 500, color: '#1A2B3C' }}>{pesos(kpiCobros?.totalEf ?? 0)}</div>
               </div>
-              <div style={{ flex: 1, background: '#F5F7F9', borderRadius: 8, padding: '7px 10px' }}>
+              <div style={{ flex: 1, paddingLeft: 10 }}>
                 <div style={{ fontSize: 8, fontWeight: 500, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#4A5568', marginBottom: 2 }}>Transf.</div>
                 <div style={{ fontSize: 12, fontWeight: 500, color: '#1A2B3C' }}>{pesos(kpiCobros?.totalTr ?? 0)}</div>
               </div>
@@ -824,7 +823,8 @@ export default function DashboardPage() {
             onClick={() => { if (clientesDeuda.length > 0) setSheetPend(true) }}
             style={{
               ...kpiCard,
-              display: 'block', width: '100%', border: 'none',
+              display: 'block', width: '100%',
+              border: '0.5px solid #F9D9A0',
               cursor: clientesDeuda.length > 0 ? 'pointer' : 'default',
               textAlign: 'left', fontFamily: 'Inter, sans-serif',
             }}
@@ -842,11 +842,6 @@ export default function DashboardPage() {
             </p>
           </button>
 
-        </div>
-
-        {/* Fila 2: Costo producción · Ganancia neta — centradas en desktop */}
-        <div className="grid grid-cols-2 gap-3 lg:w-2/3 lg:mx-auto">
-
           {/* Card 4 — Costo de producción */}
           <div style={kpiCard}>
             <div style={kpiHeaderRow}>
@@ -857,32 +852,37 @@ export default function DashboardPage() {
             <p style={kpiSubSt}>ventas cobradas</p>
           </div>
 
-          {/* Card 5 — Ganancia neta */}
-          <div style={kpiCard} aria-label={`KPI: Ganancia neta del período, ${pesos(gananciaNeta)}`}>
-            <div style={kpiHeaderRow}>
-              <BarChart2 size={13} style={{ color: '#1A2B3C', flexShrink: 0 }} />
-              <span style={kpiLabelSt}>Ganancia neta</span>
-            </div>
+        </div>
+
+        {/* Barra Ganancia neta — full width */}
+        <div
+          style={{
+            background: '#fff', border: '0.5px solid #D1D5DB', borderRadius: 10,
+            padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}
+          aria-label={`KPI: Ganancia neta del período, ${pesos(gananciaNeta)}`}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <BarChart2 size={13} style={{ color: '#1A2B3C', flexShrink: 0 }} />
+            <span style={kpiLabelSt}>Ganancia neta</span>
             {isLoadingEgresos ? (
-              <Skeleton style={{ height: 28, width: 100, borderRadius: 4, marginBottom: 6 }} />
+              <Skeleton style={{ height: 22, width: 100, borderRadius: 4 }} />
             ) : (
-              <>
-                <div style={{ ...kpiValueSt, color: gananciaNeta >= 0 ? '#2E9E5C' : '#D32F2F' }}>
-                  {pesos(gananciaNeta)}
-                </div>
-                <p style={kpiSubSt}>Egresos {pesos(totalEgresos)}</p>
-              </>
+              <span style={{ fontSize: 22, fontWeight: 500, color: gananciaNeta >= 0 ? '#2E9E5C' : '#D32F2F', letterSpacing: '-0.5px' }}>
+                {pesos(gananciaNeta)}
+              </span>
             )}
           </div>
-
+          <span style={{ fontSize: 12, fontWeight: 400, color: '#4A5568' }}>Egresos {pesos(totalEgresos)}</span>
         </div>
+
       </div>
 
-      {/* ── Panel inferior — 2 columnas ── */}
-      <div className="grid md:grid-cols-2 grid-cols-1 gap-3">
+      {/* ── Panel inferior — Evolución (span 2) + Estado de pedidos (340px) ── */}
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_340px] gap-2.5">
 
         {/* Panel izquierdo — Evolución de cobros (por fecha_cobro) */}
-        <div style={{ background: '#fff', border: '0.5px solid #D1D5DB', borderRadius: 10, overflow: 'hidden' }}>
+        <div style={{ background: '#fff', border: '0.5px solid #D1D5DB', borderRadius: 10, overflow: 'hidden', gridColumn: 'span 2' }}>
           <div style={{ padding: '12px 16px', borderBottom: '0.5px solid #F4F6F8' }}>
             <span style={{ fontSize: 12, fontWeight: 500, color: '#1A2B3C', letterSpacing: '-0.3px' }}>
               Evolución de ventas
@@ -980,6 +980,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Más vendidos + Detalle de bidones — 2 columnas ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
 
       {/* ── Top 5 más vendidos ── */}
       {(() => {
@@ -1198,6 +1201,8 @@ export default function DashboardPage() {
           </div>
         )
       })()}
+
+      </div>
 
       {/* ── Sheet pendientes de cobro (agrupado por cliente) ── */}
       <SheetClientesDeudores
