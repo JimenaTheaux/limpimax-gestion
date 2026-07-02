@@ -91,12 +91,12 @@ function ClienteDrawer({ open, onClose, cliente, onSaved }: DrawerProps) {
         type="submit"
         form="cliente-form"
         disabled={saving}
-        className="btn-press"
+        className="btn-press drawer-btn-primary"
         style={{
           background: saving ? 'rgba(13,92,138,0.5)' : '#0D5C8A',
           color: '#fff', border: 'none', borderRadius: 10,
-          height: 44, fontSize: 14, fontWeight: 600,
-          cursor: saving ? 'not-allowed' : 'pointer', width: '100%',
+          fontSize: 14, fontWeight: 600,
+          cursor: saving ? 'not-allowed' : 'pointer',
         }}
       >
         {saving ? 'Guardando…' : cliente ? 'Guardar cambios' : 'Crear cliente'}
@@ -104,11 +104,11 @@ function ClienteDrawer({ open, onClose, cliente, onSaved }: DrawerProps) {
       <button
         type="button"
         onClick={onClose}
-        className="btn-press"
+        className="btn-press drawer-btn-secondary"
         style={{
           background: 'transparent', color: '#4A5568',
-          border: 'none', height: 36, fontSize: 13,
-          cursor: 'pointer', width: '100%',
+          border: 'none', fontSize: 13,
+          cursor: 'pointer',
         }}
       >
         Cancelar

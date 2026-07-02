@@ -199,8 +199,8 @@ function CategoriasEgresoDrawer({ open, onClose, onMsg }: CatDrawerProps) {
     <button
       type="button"
       onClick={onClose}
-      className="btn-press"
-      style={{ background: 'transparent', color: '#4A5568', border: 'none', height: 40, width: '100%', fontSize: 14, cursor: 'pointer' }}
+      className="btn-press drawer-btn-primary"
+      style={{ background: 'transparent', color: '#4A5568', border: 'none', fontSize: 14, cursor: 'pointer' }}
     >
       Cerrar
     </button>
@@ -447,12 +447,12 @@ function EgresoDrawer({ open, onClose, egreso, onSaved }: EgresoDrawerProps) {
         type="submit"
         form="egreso-form"
         disabled={saving}
-        className="btn-press"
+        className="btn-press drawer-btn-primary"
         style={{
           background: saving ? 'rgba(13,92,138,0.5)' : '#0D5C8A',
           color: '#fff', border: 'none', borderRadius: 10,
-          height: 44, fontSize: 14, fontWeight: 600,
-          cursor: saving ? 'not-allowed' : 'pointer', width: '100%',
+          fontSize: 14, fontWeight: 600,
+          cursor: saving ? 'not-allowed' : 'pointer',
         }}
       >
         {saving ? 'Guardando…' : egreso ? 'Guardar cambios' : 'Registrar egreso'}
@@ -460,10 +460,10 @@ function EgresoDrawer({ open, onClose, egreso, onSaved }: EgresoDrawerProps) {
       <button
         type="button"
         onClick={onClose}
-        className="btn-press"
+        className="btn-press drawer-btn-secondary"
         style={{
           background: 'transparent', color: '#4A5568', border: 'none',
-          height: 36, fontSize: 13, cursor: 'pointer', width: '100%',
+          fontSize: 13, cursor: 'pointer',
         }}
       >
         Cancelar

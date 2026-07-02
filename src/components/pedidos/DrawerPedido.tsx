@@ -53,7 +53,7 @@ interface Props {
 
 function SecLabel({ label, badge }: { label: string; badge?: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+    <div className="drawer-section-label" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
       <span style={{ fontSize: 9, fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
         {label}
       </span>
@@ -761,11 +761,12 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
         type="button"
         onClick={handleSubmit(d => submit(d, 'confirmar'))}
         disabled={saving}
+        className="drawer-btn-primary"
         style={{
           background: saving ? 'rgba(13,92,138,0.5)' : '#0D5C8A',
           color: '#fff', border: 'none', borderRadius: 10,
-          height: 44, fontSize: 14, fontWeight: 700,
-          cursor: saving ? 'not-allowed' : 'pointer', width: '100%',
+          fontSize: 14, fontWeight: 700,
+          cursor: saving ? 'not-allowed' : 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
         }}
       >
@@ -779,11 +780,12 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
           type="button"
           onClick={handleSubmit(d => submit(d, 'borrador'))}
           disabled={saving}
+          className="drawer-btn-secondary"
           style={{
             background: 'transparent', color: '#0D5C8A',
             border: '0.5px solid #0D5C8A', borderRadius: 10,
-            height: 38, fontSize: 13, fontWeight: 600,
-            cursor: saving ? 'not-allowed' : 'pointer', width: '100%',
+            fontSize: 13, fontWeight: 600,
+            cursor: saving ? 'not-allowed' : 'pointer',
           }}
         >
           Guardar borrador
@@ -799,7 +801,6 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
       title={pedido ? `Pedido P-${String(pedido.numero).padStart(5, '0')}` : 'Nuevo pedido'}
       footer={footer}
       scrollRef={scrollRef}
-      panelStyle={{ width: '100%', maxWidth: 560 }}
     >
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
 

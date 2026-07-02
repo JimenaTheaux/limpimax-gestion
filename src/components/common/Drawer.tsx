@@ -47,22 +47,18 @@ export function Drawer({ open, onClose, title, children, footer, scrollRef, pane
         aria-label={title}
         className="drawer-panel"
         style={{
-          position: 'fixed', top: 0, right: 0, bottom: 0,
           background: '#F4F6F8',
           zIndex: 201,
           display: 'flex',
           flexDirection: 'column',
-          animation: 'slideInDrawer 0.25s ease',
           overflow: 'hidden',
           ...panelStyle,
         }}
       >
         {/* Header sticky */}
-        <div style={{
+        <div className="drawer-header" style={{
           background: '#fff',
           borderBottom: '0.5px solid #D1D5DB',
-          padding: '0 16px',
-          height: 56,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -89,11 +85,11 @@ export function Drawer({ open, onClose, title, children, footer, scrollRef, pane
         {/* Body scrollable */}
         <div
           ref={scrollRef}
+          className="drawer-body"
           style={{
             flex: 1,
             overflowY: 'auto',
             WebkitOverflowScrolling: 'touch',
-            padding: 16,
             paddingBottom: footer ? 8 : 'max(32px, calc(16px + env(safe-area-inset-bottom)))',
             overscrollBehavior: 'contain',
           }}
@@ -103,14 +99,11 @@ export function Drawer({ open, onClose, title, children, footer, scrollRef, pane
 
         {/* Footer fijo — botones siempre visibles aunque el teclado suba */}
         {footer && (
-          <div style={{
+          <div className="drawer-footer" style={{
             background: '#fff',
             borderTop: '0.5px solid #D1D5DB',
-            padding: '12px 16px',
             paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
             display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
             flexShrink: 0,
           }}>
             {footer}

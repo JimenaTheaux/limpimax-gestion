@@ -78,10 +78,10 @@ function CrearUsuarioDrawer({ open, onClose, onSaved }: CrearDrawerProps) {
         type="submit"
         form="crear-usuario-form"
         disabled={saving}
-        className="btn-press"
+        className="btn-press drawer-btn-primary"
         style={{
           background: saving ? 'rgba(13,92,138,0.5)' : '#0D5C8A', color: '#fff',
-          border: 'none', borderRadius: 10, height: 44, width: '100%',
+          border: 'none', borderRadius: 10,
           fontSize: 14, fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer',
         }}
       >
@@ -90,10 +90,10 @@ function CrearUsuarioDrawer({ open, onClose, onSaved }: CrearDrawerProps) {
       <button
         type="button"
         onClick={onClose}
-        className="btn-press"
+        className="btn-press drawer-btn-secondary"
         style={{
           background: 'transparent', color: '#4A5568', border: 'none',
-          height: 36, width: '100%', fontSize: 13, cursor: 'pointer',
+          fontSize: 13, cursor: 'pointer',
         }}
       >
         Cancelar
