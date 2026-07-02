@@ -23,6 +23,7 @@ if (typeof document !== 'undefined') {
     if (secondsHidden > 60) {
       const { error } = await supabase.auth.refreshSession()
       if (error) {
+        await supabase.auth.signOut().catch(() => {})
         window.location.href = '/login'
         return
       }

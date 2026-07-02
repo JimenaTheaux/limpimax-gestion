@@ -24,6 +24,7 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       refetchOnMount:       true,
       refetchOnReconnect:   true,
+      placeholderData:      (prev: unknown) => prev,
     },
     mutations: {
       onError: (error: any) => {

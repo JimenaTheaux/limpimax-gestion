@@ -84,6 +84,22 @@ export default defineConfig({
     },
   },
 
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return
+          if (/react-router-dom|\/react\/|\/react-dom\//.test(id)) return 'vendor-react'
+          if (id.includes('@tanstack/react-query')) return 'vendor-query'
+          if (id.includes('@supabase/supabase-js')) return 'vendor-supabase'
+          if (/@radix-ui|lucide-react|@tabler\/icons-react/.test(id)) return 'vendor-ui'
+          if (id.includes('chart.js')) return 'vendor-charts'
+          if (id.includes('xlsx')) return 'vendor-xlsx'
+        },
+      },
+    },
+  },
+
   server: {
     proxy: {
       '/api': {
