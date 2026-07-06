@@ -1,15 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { queryKeys } from '@/lib/queryKeys'
 import type { CategoriaEgreso } from '@/types'
-
-const KEY     = ['categorias-egreso']
-const EGR_KEY = ['egresos']
 
 // ─── useCategoriaEgresos ──────────────────────────────────────────────────────
 
 export const useCategoriaEgresos = () =>
   useQuery({
-    queryKey:  KEY,
+    queryKey:  queryKeys.categoriasEgreso.all(),
     staleTime: 1000 * 60 * 30,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -35,7 +33,7 @@ export const useCrearCategoriaEgreso = () => {
       if (error) throw new Error(error.message)
       return data as CategoriaEgreso
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.categoriasEgreso.all() }),
   })
 }
 
@@ -55,8 +53,8 @@ export const useEditarCategoriaEgreso = () => {
       return data as CategoriaEgreso
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: KEY })
-      qc.invalidateQueries({ queryKey: EGR_KEY })
+      qc.invalidateQueries({ queryKey: queryKeys.categoriasEgreso.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.egresos.all() })
     },
   })
 }
@@ -78,6 +76,6 @@ export const useBorrarCategoriaEgreso = () => {
       const { error } = await supabase.from('categorias_egreso').delete().eq('id', id)
       if (error) throw new Error(error.message)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.categoriasEgreso.all() }),
   })
 }

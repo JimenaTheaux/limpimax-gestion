@@ -1,5 +1,6 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { queryKeys } from '@/lib/queryKeys'
 import type { EstadoPedido } from '@/types'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -93,7 +94,7 @@ const ESTADOS_TERMINALES: EstadoPedido[] = ['cerrado', 'anulado']
 
 export const usePedidosProduccion = (fecha?: string) =>
   useQuery({
-    queryKey:        ['produccion', fecha],
+    queryKey:        queryKeys.produccion.list(fecha),
     placeholderData: keepPreviousData,
     queryFn: async () => {
       let q = supabase
@@ -146,7 +147,7 @@ export const usePedidosProduccion = (fecha?: string) =>
 
 export const usePedidosListosHoy = () => {
   return useQuery({
-    queryKey:        ['produccion', 'listos'],
+    queryKey:        queryKeys.produccion.listos(),
     placeholderData: keepPreviousData,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -177,7 +178,7 @@ export const useResumenProduccion = (fecha?: string) => {
   const fechaTarget = fecha ?? hoy
 
   return useQuery({
-    queryKey:        ['produccion', 'resumen', fechaTarget],
+    queryKey:        queryKeys.produccion.resumen(fechaTarget),
     placeholderData: keepPreviousData,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -251,7 +252,7 @@ export interface PedidoPendienteDetalle {
 
 export const useClientesConDeuda = () =>
   useQuery({
-    queryKey:        ['clientes-con-deuda'],
+    queryKey:        queryKeys.clientes.conDeuda(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('clientes')
@@ -297,7 +298,7 @@ export async function fetchClientePendientes(clienteId: string): Promise<PedidoP
 
 export const useClientePendientes = (clienteId: string | null) =>
   useQuery({
-    queryKey: ['cliente-pendientes', clienteId],
+    queryKey: queryKeys.clientes.pendientes(clienteId),
     enabled:  !!clienteId,
     queryFn:  () => fetchClientePendientes(clienteId!),
   })
@@ -306,7 +307,7 @@ export const useDashboard = () => {
   const hoy = new Date().toISOString().split('T')[0]
 
   return useQuery({
-    queryKey:        ['dashboard', hoy],
+    queryKey:        queryKeys.dashboard.hoy(hoy),
     placeholderData: keepPreviousData,
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_dashboard_stats', { p_fecha: hoy })

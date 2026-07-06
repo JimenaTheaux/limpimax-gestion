@@ -1,8 +1,7 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { queryKeys } from '@/lib/queryKeys'
 import type { Cliente } from '@/types'
-
-const KEY = ['clientes']
 
 const SELECT = 'id, nombre, telefono, direccion, tipo_cliente, notas, activo, saldo_pendiente, created_at, updated_at'
 
@@ -10,7 +9,7 @@ const SELECT = 'id, nombre, telefono, direccion, tipo_cliente, notas, activo, sa
 
 export const useClientes = (q?: string, activo: boolean | null = true) =>
   useQuery({
-    queryKey:        [...KEY, q, activo],
+    queryKey:        queryKeys.clientes.list(q, activo),
     placeholderData: keepPreviousData,
     staleTime:       1000 * 60 * 2,
     queryFn: async () => {
@@ -30,7 +29,7 @@ export const useClientes = (q?: string, activo: boolean | null = true) =>
 
 export const useCliente = (id: string) =>
   useQuery({
-    queryKey: [...KEY, id],
+    queryKey: queryKeys.clientes.detail(id),
     enabled:  !!id,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -65,7 +64,7 @@ export const useCrearCliente = () => {
       if (error) throw new Error(error.message)
       return data as Cliente
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.clientes.all() }),
   })
 }
 
@@ -91,6 +90,6 @@ export const useEditarCliente = () => {
       if (error) throw new Error(error.message)
       return data as Cliente
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.clientes.all() }),
   })
 }

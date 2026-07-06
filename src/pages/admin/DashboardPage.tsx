@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { Chart, registerables, type TooltipItem } from 'chart.js'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { Clock, Package, Banknote, FlaskConical, BarChart2, ChevronDown, Loader2, Download } from 'lucide-react'
-import * as XLSX from 'xlsx'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { BadgeEstado } from '@/components/common/BadgeEstado'
@@ -1089,7 +1088,8 @@ export default function DashboardPage() {
       {bidones.length > 0 && (() => {
         const fmtP = (n: number) => `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
 
-        const exportarBidones = () => {
+        const exportarBidones = async () => {
+          const XLSX = await import('xlsx')
           const rows = bidones.map(p => ({
             'N° Pedido':        `P-${String(p.numero).padStart(5, '0')}`,
             'Fecha':            p.fecha_produccion ?? '',

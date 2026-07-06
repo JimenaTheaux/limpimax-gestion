@@ -1,9 +1,7 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { queryKeys } from '@/lib/queryKeys'
 import type { Producto, CategoriaProducto } from '@/types'
-
-const KEY     = ['productos']
-const CAT_KEY = ['categorias']
 
 // Supabase devuelve NUMERIC como string — parseamos a number para coincidir con el tipo
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -22,7 +20,7 @@ function parseProducto(row: any): Producto {
 
 export const useProductos = (q?: string, categoriaId?: string, activo: boolean | null = true) =>
   useQuery({
-    queryKey:        [...KEY, q, categoriaId, activo],
+    queryKey:        queryKeys.productos.list(q, categoriaId, activo),
     placeholderData: keepPreviousData,
     staleTime:       1000 * 60 * 5,
     queryFn: async () => {
@@ -43,7 +41,7 @@ export const useProductos = (q?: string, categoriaId?: string, activo: boolean |
 
 export const useCategorias = () =>
   useQuery({
-    queryKey:  CAT_KEY,
+    queryKey:  queryKeys.productos.categorias(),
     staleTime: 1000 * 60 * 30,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -80,7 +78,7 @@ export const useCrearProducto = () => {
       if (error) throw new Error(error.message)
       return parseProducto(data)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.productos.all() }),
   })
 }
 
@@ -110,7 +108,7 @@ export const useEditarProducto = () => {
       if (error) throw new Error(error.message)
       return parseProducto(data)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.productos.all() }),
   })
 }
 
@@ -127,7 +125,7 @@ export const useCrearCategoria = () => {
       if (error) throw new Error(error.message)
       return data as CategoriaProducto
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: CAT_KEY }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.productos.categorias() }),
   })
 }
 
@@ -146,8 +144,8 @@ export const useEditarCategoria = () => {
       return data as CategoriaProducto
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: CAT_KEY })
-      qc.invalidateQueries({ queryKey: KEY })
+      qc.invalidateQueries({ queryKey: queryKeys.productos.categorias() })
+      qc.invalidateQueries({ queryKey: queryKeys.productos.all() })
     },
   })
 }
@@ -173,8 +171,8 @@ export const useBorrarCategoria = () => {
       if (error) throw new Error(error.message)
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: CAT_KEY })
-      qc.invalidateQueries({ queryKey: KEY })
+      qc.invalidateQueries({ queryKey: queryKeys.productos.categorias() })
+      qc.invalidateQueries({ queryKey: queryKeys.productos.all() })
     },
   })
 }
@@ -194,6 +192,6 @@ export const useBorrarProducto = () => {
       const { error } = await supabase.from('productos').delete().eq('id', id)
       if (error) throw new Error(error.message)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.productos.all() }),
   })
 }

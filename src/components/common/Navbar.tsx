@@ -59,6 +59,10 @@ export function Navbar({ onLogout, rootPath = '/admin', links = [], roleLabel, e
         <img
           src="/logo-mark.png"
           alt="Limpimax"
+          width={28}
+          height={28}
+          fetchPriority="high"
+          loading="eager"
           style={{ width: 28, height: 28, borderRadius: 7, objectFit: 'contain', flexShrink: 0 }}
         />
         <span className="hidden md:inline" style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>

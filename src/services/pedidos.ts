@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { queryKeys } from '@/lib/queryKeys'
 import { useAuthStore } from '@/store/authStore'
 import { totalPedido } from '@/types'
 import type { Pedido, PedidoItem, PedidoHistorial, PedidoPago, Cliente, Producto, EstadoPedido } from '@/types'
@@ -126,8 +127,6 @@ const LIST_SELECT = `
   clientes!inner(nombre, direccion, tipo_cliente, telefono)
 ` as const
 
-const KEY = ['pedidos']
-
 // ─── usePedidos ───────────────────────────────────────────────────────────────
 
 export const usePedidos = (filtros?: {
@@ -138,7 +137,7 @@ export const usePedidos = (filtros?: {
   q?:               string
 }) =>
   useQuery({
-    queryKey:        [...KEY, filtros],
+    queryKey:        queryKeys.pedidos.list(filtros),
     placeholderData: keepPreviousData,
     queryFn: async () => {
       let q = supabase
@@ -173,7 +172,7 @@ export const usePedidos = (filtros?: {
 
 export const usePedidoDetalle = (id: string | null) =>
   useQuery({
-    queryKey: [...KEY, id],
+    queryKey: queryKeys.pedidos.detail(id),
     enabled:  !!id,
     queryFn: async () => {
       const [
@@ -340,7 +339,7 @@ export const useCrearPedido = () => {
 
       return parsePedido(pedido)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.pedidos.all() }),
   })
 }
 
@@ -403,8 +402,8 @@ export const useEditarPedido = () => {
       return parsePedido(updated)
     },
     onSuccess: (_, { id }) => {
-      qc.invalidateQueries({ queryKey: KEY })
-      qc.invalidateQueries({ queryKey: [...KEY, id] })
+      qc.invalidateQueries({ queryKey: queryKeys.pedidos.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.pedidos.detail(id) })
     },
   })
 }
@@ -442,9 +441,9 @@ export const useCambiarEstado = () => {
     },
 
     onMutate: async ({ id, estado }) => {
-      await qc.cancelQueries({ queryKey: KEY })
-      const snapshots = qc.getQueriesData<PedidoConCliente[]>({ queryKey: KEY })
-      qc.setQueriesData<PedidoConCliente[]>({ queryKey: KEY }, (old) => {
+      await qc.cancelQueries({ queryKey: queryKeys.pedidos.all() })
+      const snapshots = qc.getQueriesData<PedidoConCliente[]>({ queryKey: queryKeys.pedidos.all() })
+      qc.setQueriesData<PedidoConCliente[]>({ queryKey: queryKeys.pedidos.all() }, (old) => {
         if (!Array.isArray(old)) return old
         return old.map(p => p.id === id ? { ...p, estado } : p)
       })
@@ -454,8 +453,8 @@ export const useCambiarEstado = () => {
       ctx?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data))
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: KEY })
-      qc.invalidateQueries({ queryKey: ['produccion'] })
+      qc.invalidateQueries({ queryKey: queryKeys.pedidos.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.produccion.all()})
     },
   })
 }
@@ -490,9 +489,9 @@ export const useAnularPedido = () => {
     },
 
     onMutate: async ({ id }) => {
-      await qc.cancelQueries({ queryKey: KEY })
-      const snapshots = qc.getQueriesData<PedidoConCliente[]>({ queryKey: KEY })
-      qc.setQueriesData<PedidoConCliente[]>({ queryKey: KEY }, (old) => {
+      await qc.cancelQueries({ queryKey: queryKeys.pedidos.all() })
+      const snapshots = qc.getQueriesData<PedidoConCliente[]>({ queryKey: queryKeys.pedidos.all() })
+      qc.setQueriesData<PedidoConCliente[]>({ queryKey: queryKeys.pedidos.all() }, (old) => {
         if (!Array.isArray(old)) return old
         return old.map(p => p.id === id ? { ...p, estado: 'anulado' } : p)
       })
@@ -502,8 +501,8 @@ export const useAnularPedido = () => {
       ctx?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data))
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: KEY })
-      qc.invalidateQueries({ queryKey: ['produccion'] })
+      qc.invalidateQueries({ queryKey: queryKeys.pedidos.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.produccion.all()})
     },
   })
 }
@@ -579,9 +578,9 @@ export const useCerrarPedido = () => {
     },
 
     onMutate: async ({ id }) => {
-      await qc.cancelQueries({ queryKey: KEY })
-      const snapshots = qc.getQueriesData<PedidoConCliente[]>({ queryKey: KEY })
-      qc.setQueriesData<PedidoConCliente[]>({ queryKey: KEY }, (old) => {
+      await qc.cancelQueries({ queryKey: queryKeys.pedidos.all() })
+      const snapshots = qc.getQueriesData<PedidoConCliente[]>({ queryKey: queryKeys.pedidos.all() })
+      qc.setQueriesData<PedidoConCliente[]>({ queryKey: queryKeys.pedidos.all() }, (old) => {
         if (!Array.isArray(old)) return old
         return old.map(p => p.id === id ? { ...p, estado: 'cerrado' as EstadoPedido } : p)
       })
@@ -590,7 +589,7 @@ export const useCerrarPedido = () => {
     onError: (_, __, ctx) => {
       ctx?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data))
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSettled: () => qc.invalidateQueries({ queryKey: queryKeys.pedidos.all() }),
   })
 }
 
@@ -625,6 +624,6 @@ export const useEditarCobro = () => {
 
       if (error) throw new Error(error.message)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.pedidos.all() }),
   })
 }

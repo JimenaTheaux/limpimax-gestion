@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh run *)",
+      "Bash(find db *)",
+      "Bash(cat server.ts)",
+      "Bash(cat drizzle.config.ts)",
+      "Bash(ls -la api)",
+      "Bash(ls -la db)"
+    ]
+  }
+}

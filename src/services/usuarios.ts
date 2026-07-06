@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { queryKeys } from '@/lib/queryKeys'
 import type { Perfil, Rol } from '@/types'
 
 // Cliente admin — solo para listUsers (emails) si la service role key está configurada.
@@ -22,13 +23,11 @@ export interface UsuarioConEmail extends Omit<Perfil, 'updatedAt'> {
   updatedAt: string
 }
 
-const KEY = ['usuarios']
-
 // ─── Listar usuarios ──────────────────────────────────────────────────────────
 
 export const useUsuarios = () =>
   useQuery({
-    queryKey: KEY,
+    queryKey: queryKeys.usuarios.all(),
     queryFn: async () => {
       // RPC con SECURITY DEFINER — bypasea RLS para devolver todos los perfiles.
       const { data: perfilesRaw, error } = await supabase.rpc('get_all_perfiles')
@@ -90,7 +89,7 @@ export const useCrearUsuario = () => {
         throw new Error(perfilErr.message)
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.usuarios.all() }),
   })
 }
 
@@ -112,7 +111,7 @@ export const useEditarUsuario = () => {
 
       if (error) throw new Error(error.message)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.usuarios.all() }),
   })
 }
 

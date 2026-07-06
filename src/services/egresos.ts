@@ -1,9 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { queryKeys } from '@/lib/queryKeys'
 import { useAuthStore } from '@/store/authStore'
 import type { Egreso } from '@/types'
-
-const KEY = ['egresos']
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -27,7 +26,7 @@ function parseEgreso(row: any): Egreso {
 
 export const useEgresos = (mes: number, anio: number, categoriaId?: string) =>
   useQuery({
-    queryKey:  [...KEY, mes, anio, categoriaId ?? null],
+    queryKey:  queryKeys.egresos.list(mes, anio, categoriaId),
     staleTime: 1000 * 60 * 5,
     queryFn: async () => {
       let q = supabase
@@ -74,7 +73,7 @@ export const useCrearEgreso = () => {
       if (error) throw new Error(error.message)
       return parseEgreso(data)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.egresos.all() }),
   })
 }
 
@@ -102,7 +101,7 @@ export const useEditarEgreso = () => {
       if (error) throw new Error(error.message)
       return parseEgreso(data)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.egresos.all() }),
   })
 }
 
@@ -121,9 +120,9 @@ export const useEliminarEgreso = () => {
       if (error) throw new Error(error.message)
     },
     onMutate: async (id) => {
-      await qc.cancelQueries({ queryKey: KEY })
-      const snapshots = qc.getQueriesData<Egreso[]>({ queryKey: KEY })
-      qc.setQueriesData<Egreso[]>({ queryKey: KEY }, (old) => {
+      await qc.cancelQueries({ queryKey: queryKeys.egresos.all() })
+      const snapshots = qc.getQueriesData<Egreso[]>({ queryKey: queryKeys.egresos.all() })
+      qc.setQueriesData<Egreso[]>({ queryKey: queryKeys.egresos.all() }, (old) => {
         if (!Array.isArray(old)) return old
         return old.filter(e => e.id !== id)
       })
@@ -132,6 +131,6 @@ export const useEliminarEgreso = () => {
     onError: (_, __, ctx) => {
       ctx?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data))
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSettled: () => qc.invalidateQueries({ queryKey: queryKeys.egresos.all() }),
   })
 }
