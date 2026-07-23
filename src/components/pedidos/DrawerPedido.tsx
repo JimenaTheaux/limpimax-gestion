@@ -688,18 +688,20 @@ function ItemFormInline({
       border: '0.5px solid #D1D5DB', display: 'flex', flexDirection: 'column',
       gap: 10, animation: 'fadeSlideIn 0.18s ease', marginTop: 4,
     }}>
-      {/* Paso 1 — Producto */}
-      <div>
-        <label style={{ fontSize: 10, fontWeight: 500, color: '#4A5568', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>
-          Producto
-        </label>
-        <SelectorProducto
-          value={prodId}
-          onChange={handleProductoChange}
-          productos={productos}
-          error={lErr && !prodId ? lErr : undefined}
-        />
-      </div>
+      {/* Paso 1 — Producto (una vez elegida la presentación, se resume en la fila combinada de abajo) */}
+      {!presentacionSel && (
+        <div>
+          <label style={{ fontSize: 10, fontWeight: 500, color: '#4A5568', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>
+            Producto
+          </label>
+          <SelectorProducto
+            value={prodId}
+            onChange={handleProductoChange}
+            productos={productos}
+            error={lErr && !prodId ? lErr : undefined}
+          />
+        </div>
+      )}
 
       {/* Paso 2 — Presentación (se omite si el producto tiene una sola) */}
       {productoSel && presentacionesProducto.length > 1 && (
@@ -730,9 +732,20 @@ function ItemFormInline({
         </div>
       )}
 
-      {/* Paso 4 — Cantidad + precio */}
+      {/* Paso 4 — Producto (resumen) + Cantidad + Precio + Quitar, combinados en una fila en desktop */}
       {presentacionSel && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div className="ped-item-row">
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 500, color: '#4A5568', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>
+              Producto
+            </label>
+            <SelectorProducto
+              value={prodId}
+              onChange={handleProductoChange}
+              productos={productos}
+              error={lErr && !prodId ? lErr : undefined}
+            />
+          </div>
           {isEdit && register && index !== undefined ? (
             <>
               <FloatInput label="Cantidad" {...register(`items.${index}.cantidad`)} inputMode="decimal" />
@@ -749,6 +762,24 @@ function ItemFormInline({
               <FloatInput label="Precio unit." value={lPrecio} onChange={e => setLPrecio(e.target.value)} inputMode="decimal" />
             </>
           )}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: 10, marginBottom: 5, display: 'block', height: 12 }} aria-hidden="true" />
+            <button
+              type="button"
+              onClick={onCancel}
+              aria-label="Cancelar"
+              className="fi-input"
+              style={{
+                width: '100%', minWidth: 32, background: '#fff', border: '0.5px solid #D1D5DB',
+                borderRadius: 8, cursor: 'pointer', color: '#9CA3AF',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#D32F2F'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#D32F2F' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#9CA3AF'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#D1D5DB' }}
+            >
+              <X size={14} />
+            </button>
+          </div>
         </div>
       )}
 
@@ -961,6 +992,7 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
       title={pedido ? `Pedido P-${String(pedido.numero).padStart(5, '0')}` : 'Nuevo pedido'}
       footer={footer}
       scrollRef={scrollRef}
+      width={680}
     >
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
 
@@ -1130,9 +1162,9 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
 
         {/* ── BLOQUE 4 — Totales ──────────────────────────────────────────────── */}
         <div>
-          <div style={{ background: '#F4F6F8', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="ped-totales-box" style={{ background: '#F4F6F8', borderRadius: 8, padding: '10px 12px' }}>
             {/* Subtotal */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="ped-tot-subtotal" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 12, color: '#4A5568' }}>Subtotal</span>
               <span style={{ fontSize: 12, color: '#4A5568' }}>
                 ${subtotalProductos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
@@ -1141,7 +1173,7 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
 
             {/* Saldo del cliente */}
             {showSaldoRow && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="ped-tot-saldo" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 12, color: saldoAplicadoNum > 0 ? '#C62828' : '#2E7D32' }}>
                   {saldoAplicadoNum > 0 ? 'Saldo pendiente anterior' : 'Saldo a favor'}
                 </span>
@@ -1168,7 +1200,7 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
             )}
 
             {/* Envío con input inline */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="ped-tot-envio" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 12, color: '#4A5568' }}>Envío</span>
               <input
                 {...register('costoEnvio')}
@@ -1185,7 +1217,7 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
             </div>
 
             {/* Bidones con input inline */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="ped-tot-bidones" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 12, color: '#4A5568' }}>Bidones</span>
               <input
                 {...register('costoBidones')}
@@ -1201,10 +1233,10 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
               />
             </div>
 
-            <div style={{ height: '0.5px', background: '#D1D5DB' }} />
+            <div className="ped-tot-divider" style={{ height: '0.5px', background: '#D1D5DB' }} />
 
             {/* Total */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="ped-tot-total" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 13, fontWeight: 500, color: '#1A2B3C' }}>Total</span>
               <span style={{ fontSize: 16, fontWeight: 600, color: totalEditado ? '#F57C00' : '#0D5C8A', letterSpacing: '-0.3px' }}>
                 ${totalMostrado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
@@ -1212,7 +1244,7 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
             </div>
 
             {totalEditado && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: '#F57C00' }}>
+              <div className="ped-tot-modificado" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: '#F57C00' }}>
                 <span>Modificado · calculado: ${totalCalculado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                 <button type="button" onClick={() => setValue('totalManual', '')}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1B9ED6', fontSize: 11, fontWeight: 600, textDecoration: 'underline', padding: 0 }}>

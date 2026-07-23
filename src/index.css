@@ -116,7 +116,8 @@
       right: auto;
       bottom: auto;
       transform: translate(-50%, -50%);
-      width: 480px;
+      width: var(--drawer-width, 480px);
+      max-width: 92vw;
       max-height: 88vh;
       border-radius: 14px;
       box-shadow: 0 8px 32px rgba(0,0,0,0.12);
@@ -236,6 +237,61 @@
   @media (min-width: 1024px) {
     .form-grid-2 { grid-template-columns: 1fr 1fr; }
   }
+
+  /* ─── Pedidos: mini-form de ítem — fila combinada en desktop ───────────── */
+  .ped-item-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  @media (min-width: 1024px) {
+    .ped-item-row {
+      display: grid;
+      grid-template-columns: 45% 20% 25% 10%;
+      gap: 10px;
+      align-items: start;
+    }
+  }
+
+  /* ─── Pedidos: totales — dos columnas en desktop ────────────────────────── */
+  .ped-totales-box {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "subtotal"
+      "saldo"
+      "envio"
+      "bidones"
+      "divider"
+      "total"
+      "modificado";
+    gap: 8px;
+  }
+  @media (min-width: 1024px) {
+    .ped-totales-box {
+      grid-template-columns: 1fr auto;
+      grid-template-areas:
+        "subtotal   total"
+        "saldo      total"
+        "envio      total"
+        "bidones    total"
+        "modificado modificado";
+      column-gap: 24px;
+    }
+    .ped-totales-box .ped-tot-divider { display: none; }
+    .ped-totales-box .ped-tot-total {
+      align-self: center;
+      justify-self: end;
+      text-align: right;
+    }
+  }
+  .ped-tot-subtotal   { grid-area: subtotal; }
+  .ped-tot-saldo      { grid-area: saldo; }
+  .ped-tot-envio      { grid-area: envio; }
+  .ped-tot-bidones    { grid-area: bidones; }
+  .ped-tot-divider    { grid-area: divider; }
+  .ped-tot-total      { grid-area: total; }
+  .ped-tot-modificado { grid-area: modificado; }
 
   .form-label {
     position: relative;

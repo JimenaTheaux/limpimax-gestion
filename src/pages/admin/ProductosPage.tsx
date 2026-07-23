@@ -224,6 +224,7 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
       onClose={onClose}
       title={producto ? 'Editar producto' : 'Nuevo producto'}
       footer={footer}
+      width={600}
     >
       <form
         id="producto-form"
@@ -318,7 +319,7 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
               const rowErr = errors.presentaciones?.[i]
               return (
                 <div key={field.id} style={{
-                  display: 'grid', gridTemplateColumns: '76px 1fr 1fr 1fr 28px', gap: 6, alignItems: 'start',
+                  display: 'grid', gridTemplateColumns: '90px 1fr 1fr 1fr 32px', gap: 8, alignItems: 'start',
                   background: '#F9FAFB', border: '0.5px solid #D1D5DB', borderRadius: 8, padding: 8,
                 }}>
                   <div style={{ position: 'relative' }}>
@@ -379,7 +380,7 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
                     disabled={fields.length <= 1}
                     aria-label="Quitar presentación"
                     style={{
-                      width: 28, height: 34, background: 'transparent', border: 'none',
+                      width: 32, height: 34, background: 'transparent', border: 'none',
                       cursor: fields.length <= 1 ? 'not-allowed' : 'pointer',
                       color: fields.length <= 1 ? '#D1D5DB' : '#D32F2F',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',

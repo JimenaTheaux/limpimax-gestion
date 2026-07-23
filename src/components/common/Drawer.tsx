@@ -9,9 +9,11 @@ interface DrawerProps {
   footer?:     React.ReactNode
   scrollRef?:  React.RefObject<HTMLDivElement | null>
   panelStyle?: React.CSSProperties
+  /** Ancho del dialog en desktop (px). En mobile siempre es 100% independientemente de este valor. */
+  width?:      number
 }
 
-export function Drawer({ open, onClose, title, children, footer, scrollRef, panelStyle }: DrawerProps) {
+export function Drawer({ open, onClose, title, children, footer, scrollRef, panelStyle, width }: DrawerProps) {
   useEffect(() => {
     if (!open) return
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -52,6 +54,7 @@ export function Drawer({ open, onClose, title, children, footer, scrollRef, pane
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          ...(width ? ({ '--drawer-width': `${width}px` } as React.CSSProperties) : {}),
           ...panelStyle,
         }}
       >
