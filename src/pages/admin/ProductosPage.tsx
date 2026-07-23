@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Search, Edit2, Package, MoreHorizontal, Eye, EyeOff, Trash2, Pencil, ChevronDown, X, Droplet } from 'lucide-react'
+import { Plus, Search, Edit2, Package, MoreHorizontal, Eye, EyeOff, Trash2, Pencil, ChevronDown, X, Tag, Sparkles } from 'lucide-react'
 import { Skeleton }       from '@/components/ui/skeleton'
 import { Drawer }         from '@/components/common/Drawer'
 import { FloatInput }     from '@/components/common/FloatInput'
@@ -1189,30 +1189,57 @@ export default function ProductosPage() {
         .prd-table tbody tr { transition: background 0.1s; cursor: default; }
         .prd-table tbody tr:hover { background: #F9FAFB !important; }
         .prd-edit-btn:focus-visible { outline: 2px solid #1B9ED6; outline-offset: 2px; }
+        .prd-header-btn:hover { background: #F4F6F8 !important; }
         .prd-card:focus-visible { outline: 2px solid #1B9ED6; outline-offset: 2px; }
         @media (max-width: 1023px) { .prd-desktop { display: none !important; } }
         @media (min-width: 1024px) { .prd-mobile  { display: none !important; } }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
       `}</style>
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+      {/* Header — fila 1: título + acciones de gestión */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
         <h1 className="section-title">Productos</h1>
-        <button
-          onClick={handleNew}
-          className="btn-press"
-          style={{
-            background: '#0D5C8A', color: '#fff', border: 'none',
-            borderRadius: 10, height: 40, padding: '0 16px',
-            fontSize: 13, fontWeight: 600, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}
-        >
-          <Plus size={14} /> Nuevo producto
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setCatDrawer(true)}
+            className="prd-header-btn"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              height: 34, padding: '0 12px',
+              background: '#fff', border: '0.5px solid #D1D5DB', borderRadius: 8,
+              color: '#4A5568', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            <Tag size={13} /> Gestionar categorías
+          </button>
+          <button
+            onClick={() => setFragDrawer(true)}
+            className="prd-header-btn"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              height: 34, padding: '0 12px',
+              background: '#fff', border: '0.5px solid #D1D5DB', borderRadius: 8,
+              color: '#4A5568', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            <Sparkles size={13} /> Gestionar fragancias
+          </button>
+          <button
+            onClick={handleNew}
+            className="btn-press"
+            style={{
+              background: '#0D5C8A', color: '#fff', border: 'none',
+              borderRadius: 8, height: 34, padding: '0 14px',
+              fontSize: 12, fontWeight: 500, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <Plus size={14} /> Nuevo producto
+          </button>
+        </div>
       </div>
 
-      {/* Buscador + categoría + pills */}
+      {/* Header — fila 2: buscador + categoría + pills */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         <div role="search" style={{ position: 'relative', flex: 1, minWidth: 180 }}>
           <label htmlFor="prd-search" className="sr-only">Buscar productos</label>
@@ -1236,45 +1263,19 @@ export default function ProductosPage() {
           />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <select
-            value={catFiltro}
-            onChange={e => setCat(e.target.value)}
-            style={{
-              height: 36, padding: '0 10px',
-              border: '0.5px solid #D1D5DB', borderRadius: 8,
-              fontSize: 12, color: '#1A2B3C', background: '#fff',
-              cursor: 'pointer', outline: 0,
-            }}
-          >
-            <option value="">Todas las categorías</option>
-            {categorias?.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-          </select>
-          <button
-            onClick={() => setCatDrawer(true)}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: '#1B9ED6', fontSize: 11, fontWeight: 500,
-              whiteSpace: 'nowrap', padding: '0 2px',
-              textDecoration: 'underline', textUnderlineOffset: 2,
-            }}
-          >
-            Gestionar
-          </button>
-        </div>
-
-        <button
-          onClick={() => setFragDrawer(true)}
+        <select
+          value={catFiltro}
+          onChange={e => setCat(e.target.value)}
           style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            height: 36, padding: '0 12px',
-            background: '#fff', border: '0.5px solid #D1D5DB', borderRadius: 8,
-            color: '#4A5568', fontSize: 12, fontWeight: 500,
-            cursor: 'pointer', whiteSpace: 'nowrap',
+            height: 36, padding: '0 10px',
+            border: '0.5px solid #D1D5DB', borderRadius: 8,
+            fontSize: 12, color: '#1A2B3C', background: '#fff',
+            cursor: 'pointer', outline: 0,
           }}
         >
-          <Droplet size={13} /> Gestionar fragancias
-        </button>
+          <option value="">Todas las categorías</option>
+          {categorias?.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+        </select>
 
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
           {(['todos', 'activo', 'inactivo'] as ActivoFiltro[]).map(v => {

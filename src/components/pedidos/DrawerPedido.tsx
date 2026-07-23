@@ -464,33 +464,57 @@ function SelectorPresentacion({
   error?:   string
 }) {
   const presentaciones = [...(producto?.producto_presentaciones ?? [])].sort((a, b) => a.presentacion - b.presentacion)
+  const [hoverId, setHoverId] = useState<string | null>(null)
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleEnter = (id: string) => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current)
+    hoverTimer.current = setTimeout(() => setHoverId(id), 200)
+  }
+  const handleLeave = () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current)
+    setHoverId(null)
+  }
 
   return (
-    <div style={{ position: 'relative' }}>
-      <select
-        value={value}
-        onChange={e => {
-          const p = presentaciones.find(pp => pp.id === e.target.value)
-          if (p) onChange(p)
-        }}
-        className="fi-input"
-        style={{
-          width: '100%', height: 40, padding: '0 28px 0 12px',
-          border: `0.5px solid ${error ? '#D32F2F' : '#D1D5DB'}`, borderRadius: 8,
-          fontFamily: 'Inter, sans-serif', background: '#fff',
-          appearance: 'none', outline: 'none', cursor: 'pointer',
-          color: '#1A2B3C', boxSizing: 'border-box', fontSize: 13,
-        }}
-      >
-        <option value="">Elegí una presentación…</option>
-        {presentaciones.map(p => (
-          <option key={p.id} value={p.id}>
-            {p.presentacion === 0.5 ? '500 ml' : `${p.presentacion} L`}
-            {' — '}${p.precio_minorista.toLocaleString('es-AR', { minimumFractionDigits: 2 })} (min.) / ${p.precio_mayorista.toLocaleString('es-AR', { minimumFractionDigits: 2 })} (may.)
-          </option>
-        ))}
-      </select>
-      <ChevronDown size={13} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#4A5568' }} />
+    <div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {presentaciones.map(p => {
+          const selected = p.id === value
+          return (
+            <div
+              key={p.id}
+              style={{ position: 'relative' }}
+              onMouseEnter={() => !selected && handleEnter(p.id)}
+              onMouseLeave={handleLeave}
+            >
+              {hoverId === p.id && !selected && (
+                <div style={{
+                  position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+                  marginBottom: 6, background: '#1A2B3C', color: '#fff', fontSize: 10,
+                  padding: '4px 8px', borderRadius: 6, whiteSpace: 'nowrap', pointerEvents: 'none', zIndex: 10,
+                }}>
+                  Min. ${p.precio_minorista.toLocaleString('es-AR', { minimumFractionDigits: 0 })} · May. ${p.precio_mayorista.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => onChange(p)}
+                style={{
+                  height: 34, padding: '0 14px', borderRadius: 99,
+                  border: `0.5px solid ${selected ? '#0D5C8A' : '#D1D5DB'}`,
+                  background: selected ? '#0D5C8A' : '#fff',
+                  color: selected ? '#fff' : '#4A5568',
+                  fontSize: 12, fontWeight: selected ? 500 : 400,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                }}
+              >
+                {p.presentacion === 0.5 ? '500 ml' : `${p.presentacion}L`}
+              </button>
+            </div>
+          )
+        })}
+      </div>
       {error && <span style={{ color: '#D32F2F', fontSize: 11, marginTop: 4, display: 'block' }}>{error}</span>}
     </div>
   )
@@ -514,14 +538,14 @@ function SelectorFragancia({
         onChange={e => onChange(e.target.value)}
         className="fi-input"
         style={{
-          width: '100%', height: 40, padding: '0 28px 0 12px',
+          width: '100%', padding: '0 28px 0 12px',
           border: '0.5px solid #D1D5DB', borderRadius: 8,
           fontFamily: 'Inter, sans-serif', background: '#fff',
           appearance: 'none', outline: 'none', cursor: 'pointer',
           color: '#1A2B3C', boxSizing: 'border-box', fontSize: 13,
         }}
       >
-        <option value="">Sin fragancia</option>
+        <option value="">— Sin fragancia</option>
         {fragancias.map(f => (
           <option key={f.id} value={f.id}>{f.nombre}</option>
         ))}
@@ -585,6 +609,7 @@ function ItemFormInline({
   const prodId          = isEdit ? editProdId : lProdId
   const productoSel      = productos.find(p => p.id === prodId)
   const presentacionSel  = productoSel?.producto_presentaciones?.find(pp => pp.id === ePresentacionId)
+  const presentacionesProducto = productoSel?.producto_presentaciones ?? []
 
   const handleProductoChange = (id: string) => {
     if (isEdit && setValue && index !== undefined) {
@@ -612,6 +637,13 @@ function ItemFormInline({
       setLPrecRef(precio)
     }
   }
+
+  useEffect(() => {
+    if (presentacionesProducto.length === 1 && ePresentacionId !== presentacionesProducto[0].id) {
+      handlePresentacionChange(presentacionesProducto[0])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productoSel?.id])
 
   const handleFraganciaChange = (id: string) => {
     if (isEdit && setValue && index !== undefined) {
@@ -669,8 +701,8 @@ function ItemFormInline({
         />
       </div>
 
-      {/* Paso 2 — Presentación */}
-      {productoSel && (
+      {/* Paso 2 — Presentación (se omite si el producto tiene una sola) */}
+      {productoSel && presentacionesProducto.length > 1 && (
         <div>
           <label style={{ fontSize: 10, fontWeight: 500, color: '#4A5568', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>
             Presentación
@@ -688,7 +720,7 @@ function ItemFormInline({
       {presentacionSel && fragancias.length > 0 && (
         <div>
           <label style={{ fontSize: 10, fontWeight: 500, color: '#4A5568', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>
-            Fragancia
+            Fragancia (opcional)
           </label>
           <SelectorFragancia
             fragancias={fragancias}
