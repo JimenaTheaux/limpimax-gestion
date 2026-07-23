@@ -760,21 +760,7 @@ function ItemFormInline({
         </div>
       )}
 
-      {/* Paso 3 — Fragancia (solo si hay fragancias activas) */}
-      {presentacionSel && fragancias.length > 0 && (
-        <div>
-          <label style={{ fontSize: 10, fontWeight: 500, color: '#4A5568', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>
-            Fragancia (opcional)
-          </label>
-          <SelectorFragancia
-            fragancias={fragancias}
-            value={eFraganciaId ?? ''}
-            onChange={handleFraganciaChange}
-          />
-        </div>
-      )}
-
-      {/* Paso 4 — Producto (resumen) + Cantidad + Precio + Quitar, combinados en una fila en desktop */}
+      {/* Paso 3 — Producto (resumen) + Cantidad + Precio + Quitar, combinados en una fila en desktop */}
       {presentacionSel && (
         <div className="ped-item-row">
           <div>
@@ -822,6 +808,20 @@ function ItemFormInline({
               <X size={14} />
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Paso 4 — Fragancia (solo si hay fragancias activas) */}
+      {presentacionSel && fragancias.length > 0 && (
+        <div>
+          <label style={{ fontSize: 10, fontWeight: 500, color: '#4A5568', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>
+            Fragancia (opcional)
+          </label>
+          <SelectorFragancia
+            fragancias={fragancias}
+            value={eFraganciaId ?? ''}
+            onChange={handleFraganciaChange}
+          />
         </div>
       )}
 
