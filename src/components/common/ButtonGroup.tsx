@@ -41,7 +41,7 @@ export function ButtonGroup<T extends string>({
               onClick={() => onChange(opt.value)}
               style={{
                 flex:         1,
-                minWidth:     compact ? 0 : 80,
+                minWidth:     compact ? 'max-content' : 80,
                 height:       compact ? 34 : undefined,
                 minHeight:    compact ? undefined : 44,
                 padding:      compact ? '0 12px' : '10px 14px',

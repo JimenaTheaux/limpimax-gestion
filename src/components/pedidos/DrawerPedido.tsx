@@ -484,7 +484,7 @@ function SelectorPresentacion({
           return (
             <div
               key={p.id}
-              style={{ position: 'relative' }}
+              style={{ position: 'relative', flexShrink: 0 }}
               onMouseEnter={() => !selected && handleEnter(p.id)}
               onMouseLeave={handleLeave}
             >
@@ -501,12 +501,14 @@ function SelectorPresentacion({
                 type="button"
                 onClick={() => onChange(p)}
                 style={{
-                  height: 34, padding: '0 14px', borderRadius: 99,
+                  height: 34, padding: '0 16px', borderRadius: 99,
                   border: `0.5px solid ${selected ? '#0D5C8A' : '#D1D5DB'}`,
                   background: selected ? '#0D5C8A' : '#fff',
                   color: selected ? '#fff' : '#4A5568',
                   fontSize: 12, fontWeight: selected ? 500 : 400,
-                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 'max-content', fontFamily: 'Inter, sans-serif',
                 }}
               >
                 {p.presentacion === 0.5 ? '500 ml' : `${p.presentacion}L`}
@@ -531,26 +533,44 @@ function SelectorFragancia({
 }) {
   if (!fragancias.length) return null
 
+  const opcionStyle = (selected: boolean): React.CSSProperties => ({
+    height: 36, padding: '0 10px', borderRadius: 8,
+    border: `0.5px solid ${selected ? '#0D5C8A' : '#D1D5DB'}`,
+    background: selected ? '#0D5C8A' : '#fff',
+    color: selected ? '#fff' : '#4A5568',
+    fontSize: 12, fontWeight: selected ? 500 : 400,
+    cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+    textAlign: 'center' as const,
+  })
+
   return (
-    <div style={{ position: 'relative' }}>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="fi-input"
-        style={{
-          width: '100%', padding: '0 28px 0 12px',
-          border: '0.5px solid #D1D5DB', borderRadius: 8,
-          fontFamily: 'Inter, sans-serif', background: '#fff',
-          appearance: 'none', outline: 'none', cursor: 'pointer',
-          color: '#1A2B3C', boxSizing: 'border-box', fontSize: 13,
-        }}
+    <div role="radiogroup" aria-label="Fragancia" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={!value}
+        onClick={() => onChange('')}
+        style={{ ...opcionStyle(!value), gridColumn: '1 / -1' }}
       >
-        <option value="">— Sin fragancia</option>
-        {fragancias.map(f => (
-          <option key={f.id} value={f.id}>{f.nombre}</option>
-        ))}
-      </select>
-      <ChevronDown size={13} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#4A5568' }} />
+        — Sin fragancia
+      </button>
+      {fragancias.map(f => {
+        const selected = f.id === value
+        return (
+          <button
+            key={f.id}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            title={f.nombre}
+            onClick={() => onChange(f.id)}
+            style={opcionStyle(selected)}
+          >
+            {f.nombre}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -1074,11 +1094,11 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
               <button type="button" onClick={handleAgregarNuevo}
                 style={{
                   background: '#F4F6F8', border: '1.5px dashed #D1D5DB', borderRadius: 8,
-                  padding: '20px', cursor: 'pointer', color: '#4A5568',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13,
+                  height: 40, cursor: 'pointer', color: '#4A5568',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13,
                   width: '100%',
                 }}>
-                <Package size={16} /> Agregar primer producto
+                <Package size={15} /> Agregar primer producto
               </button>
             )}
 
