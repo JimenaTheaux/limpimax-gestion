@@ -531,46 +531,68 @@ function SelectorFragancia({
   value:      string
   onChange:   (id: string) => void
 }) {
+  const [open, setOpen] = useState(false)
   if (!fragancias.length) return null
 
-  const opcionStyle = (selected: boolean): React.CSSProperties => ({
-    height: 36, padding: '0 10px', borderRadius: 8,
-    border: `0.5px solid ${selected ? '#0D5C8A' : '#D1D5DB'}`,
-    background: selected ? '#0D5C8A' : '#fff',
-    color: selected ? '#fff' : '#4A5568',
-    fontSize: 12, fontWeight: selected ? 500 : 400,
-    cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+  const selectedNombre = fragancias.find(f => f.id === value)?.nombre
+
+  const itemStyle = (selected: boolean): React.CSSProperties => ({
+    padding: '5px 6px', fontSize: 12, cursor: 'pointer', borderRadius: 5,
+    color: selected ? '#0D5C8A' : '#4A5568', fontWeight: selected ? 600 : 400,
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-    textAlign: 'center' as const,
   })
 
   return (
-    <div role="radiogroup" aria-label="Fragancia" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+    <div style={{ position: 'relative' }}>
       <button
         type="button"
-        role="radio"
-        aria-checked={!value}
-        onClick={() => onChange('')}
-        style={{ ...opcionStyle(!value), gridColumn: '1 / -1' }}
+        onClick={() => setOpen(v => !v)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        className="fi-input"
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 12px', border: '0.5px solid #D1D5DB', borderRadius: 8,
+          background: '#fff', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+          color: value ? '#1A2B3C' : '#9CA3AF', fontSize: 13, boxSizing: 'border-box',
+        }}
       >
-        — Sin fragancia
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {selectedNombre ?? '— Sin fragancia'}
+        </span>
+        <ChevronDown size={13} color="#4A5568" style={{ flexShrink: 0, marginLeft: 8, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
       </button>
-      {fragancias.map(f => {
-        const selected = f.id === value
-        return (
-          <button
-            key={f.id}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            title={f.nombre}
-            onClick={() => onChange(f.id)}
-            style={opcionStyle(selected)}
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, marginTop: 4,
+          background: '#fff', border: '0.5px solid #D1D5DB', borderRadius: 8,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: 8, maxHeight: 200, overflowY: 'auto',
+        }}>
+          <div
+            onClick={() => onChange('')}
+            style={{ ...itemStyle(!value), paddingBottom: 6, marginBottom: 4, borderBottom: '0.5px solid #F4F6F8' }}
           >
-            {f.nombre}
-          </button>
-        )
-      })}
+            — Sin fragancia
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', columnGap: 8, rowGap: 1 }}>
+            {fragancias.map(f => {
+              const selected = f.id === value
+              return (
+                <div
+                  key={f.id}
+                  onClick={() => onChange(f.id)}
+                  title={f.nombre}
+                  style={itemStyle(selected)}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = '#F4F6F8' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
+                >
+                  {f.nombre}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
