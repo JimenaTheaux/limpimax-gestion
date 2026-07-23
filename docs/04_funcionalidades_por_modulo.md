@@ -23,12 +23,15 @@ Se abre en un drawer/sheet lateral (50% desktop, 100% mobile) con fondo oscureci
 **Campos:**
 - Cliente: selector con búsqueda por nombre **o dirección** + botón "+ Cliente nuevo" que expande mini-form inline
 - Fecha de producción (date picker nativo estilizado)
-- Lista de ítems:
-  - Producto (select del catálogo)
-  - Cantidad
-  - Precio unitario (precargado según tipo de cliente: mayorista/minorista; editable)
+- Lista de ítems — selección en 4 pasos:
+  1. Producto (búsqueda por nombre, catálogo)
+  2. Presentación: select con las presentaciones de ese producto, formato "5 L — $X.XXX (min.) / $X.XXX (may.)"
+  3. Fragancia: solo aparece si hay fragancias activas en el sistema; select con todas las activas + "Sin fragancia" (default)
+  4. Cantidad y precio unitario (precargado según tipo de cliente: mayorista/minorista según la presentación elegida; editable)
   - Subtotal calculado automáticamente
   - Bidón nuevo (checkbox por ítem)
+  - El ítem ya agregado se muestra como: "Nombre producto · Fragancia (si tiene) · PresentaciónL" —
+    armado siempre por `formatearItem()`, nunca concatenado inline en el componente
 - Costo de envío (opcional, numérico)
 - Costo de bidones (opcional, numérico): monto total cobrado al cliente por bidones del pedido.
   Distinto del campo "bidón nuevo" por ítem — ese es un indicador de insumo; este es el cargo económico al cliente.
@@ -266,28 +269,44 @@ El drawer "Pendientes de cobro" agrupa por cliente, no por pedido individual:
 
 ### F7.1 — Lista de productos
 - Búsqueda por nombre, filtro por categoría
-- Indicador activo / inactivo
+- Cada fila muestra: nombre, categoría, presentaciones disponibles como badges (ej: "0.5L · 1L · 5L"), activo/inactivo
 - Botón "+ Nuevo producto" abre drawer lateral
 - Gestión de categorías: editar nombre y borrar desde drawer accesible en la vista de productos.
   Borrar una categoría no afecta los productos — quedan sin categoría.
   No se puede borrar una categoría si tiene productos activos asociados.
+- Botón "Gestionar fragancias" abre drawer con el ABM de fragancias (ver F7.3)
 
 ### F7.2 — Crear / editar producto (en drawer)
-- Categoría, nombre (obligatorio), fragancia
-- Unidad: litros (fijo)
-- Presentación: lista fija `[0.5, 3, 5, 10, 20]` litros
-- Precio minorista y mayorista
-- Activo / inactivo
+- Nombre (obligatorio)
+- Categoría (selector existente con creación inline)
+- Sección Presentaciones (obligatoria al menos una):
+  - Lista de presentaciones ya cargadas, una fila por presentación: `[litros] [Precio min.] [Precio may.] [Costo prod.] [quitar]`
+  - Botón "+ Agregar presentación" agrega una fila nueva
+  - Presentación: select de valores fijos `[0.5, 1, 3, 5, 10, 20]` litros — no input libre
+  - No puede haber dos presentaciones repetidas en el mismo producto
+- Toggle activo / inactivo del producto (no existe activo/inactivo por presentación)
 
 **Lógica de precios:**
-- Dos precios por producto: minorista y mayorista
-- Al crear pedido, sistema precarga según tipo de cliente
+- Cada presentación tiene su propio precio minorista y mayorista
+- Al crear pedido, tras elegir producto y presentación, el sistema precarga el precio según tipo de cliente
 - Admin puede editar precio por ítem en el pedido sin afectar el catálogo
-- Cambiar precios en ABM no modifica pedidos ya existentes
+- Cambiar precios en ABM no modifica pedidos ya existentes — cada ítem de pedido conserva su `precio_unitario` snapshot
+
+**Editar producto:**
+- Guardar reemplaza todas las presentaciones (delete + insert) en vez de diffear — más simple, y los
+  pedidos ya creados no se ven afectados porque conservan el snapshot de precio
 
 **Borrar producto:**
-- Disponible si el producto no tiene pedidos asociados. Si tiene historial de pedidos, solo se puede inactivar.
-- Cambiar el precio de un producto NO modifica pedidos existentes — cada ítem de pedido conserva el `precio_unitario` snapshot del momento de creación.
+- Disponible si ninguna de sus presentaciones tiene pedidos asociados. Si tiene historial de pedidos, solo se puede inactivar.
+
+### F7.3 — Gestión de fragancias (Admin)
+- Accesible desde un botón "Gestionar fragancias" en ProductosPage (mismo patrón que "Gestionar categorías")
+- Fragancia es un catálogo global — no está ligada a un producto específico; cualquier fragancia
+  puede combinarse con cualquier producto/presentación al armar un ítem de pedido
+- Lista: nombre, badge activo/inactivo
+- Crear inline, editar nombre inline
+- Activar / desactivar (las inactivas no aparecen como opción al armar un pedido nuevo)
+- Borrar solo si no tiene pedidos asociados (guard) — si tiene, se debe desactivar en su lugar
 
 ---
 

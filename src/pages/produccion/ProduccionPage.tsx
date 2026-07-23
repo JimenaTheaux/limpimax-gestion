@@ -6,6 +6,7 @@ import { SelectorFecha }   from '@/components/common/SelectorFecha'
 import { useToast }        from '@/hooks/useToast'
 import { usePedidosProduccion, useResumenProduccion, type PedidoProduccion } from '@/services/produccion'
 import { useCambiarEstado } from '@/services/pedidos'
+import { formatearItem } from '@/types'
 
 // ─── Helpers de fecha ─────────────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ function PanelResumen({ fecha }: { fecha: string }) {
                   <tr key={i} style={{ borderBottom: '1px solid #F4F6F8' }}>
                     <td style={{ padding: '8px 4px', fontWeight: 500 }}>
                       {r.nombre_producto}
-                      {r.presentacion && <span style={{ color: '#4A5568', fontWeight: 400 }}> — {r.presentacion}{r.unidad_medida === 'litros' ? 'L' : ''}</span>}
+                      {r.presentacion && <span style={{ color: '#4A5568', fontWeight: 400 }}> — {r.presentacion}L</span>}
                     </td>
                     <td style={{ padding: '8px 4px', textAlign: 'right', fontWeight: 700, color: '#0D5C8A' }}>
                       {r.total_cantidad}
@@ -176,8 +177,7 @@ function CardProduccion({ pedido, onMarcarListo }: {
                 {item.cantidad}
               </span>
               <span style={{ fontWeight: 500 }}>
-                {item.nombre}{item.fragancia ? ` (${item.fragancia})` : ''}
-                <span style={{ color: '#4A5568', fontWeight: 400 }}> · {item.presentacion}L</span>
+                {formatearItem(item)}
               </span>
               {item.bidon_nuevo && (
                 <span style={{ fontSize: 9, fontWeight: 700, background: '#FFF3E0', color: '#F57C00', padding: '2px 6px', borderRadius: 99 }}>

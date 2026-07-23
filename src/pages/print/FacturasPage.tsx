@@ -2,17 +2,16 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Printer, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import type { EstadoPedido } from '@/types'
+import { formatearItem, type EstadoPedido } from '@/types'
 
 // ─── Tipos locales (la página fetchea directamente y mapea a camelCase) ─────────
 
 interface FacturaItem {
-  id:                   string
-  productoNombre:       string
-  productoPresentacion: string | null
-  cantidad:             string
-  precioUnitario:       string
-  bidonNuevo:           boolean
+  id:             string
+  descripcion:    string
+  cantidad:       string
+  precioUnitario: string
+  bidonNuevo:     boolean
 }
 
 interface FacturaPedido {
@@ -111,8 +110,7 @@ function Factura({ pedido, posicion }: { pedido: FacturaPedido; posicion: 0|1|2|
               return (
                 <tr key={item.id ?? i} style={{ borderBottom: '0.3px solid #E5E7EB' }}>
                   <td style={{ padding: '1px 2px', maxWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {item.productoNombre}
-                    {item.productoPresentacion && <span style={{ color: '#6B7280' }}> {item.productoPresentacion}L</span>}
+                    {item.descripcion}
                     {item.bidonNuevo && <span style={{ color: '#F57C00', fontWeight: 700 }}> 🆕</span>}
                   </td>
                   <td style={{ padding: '1px 2px', textAlign: 'center', fontWeight: 700 }}>{item.cantidad}</td>
@@ -204,7 +202,7 @@ export default function FacturasPage() {
 
       const { data: items } = await supabase
         .from('pedido_items')
-        .select('*, productos(nombre, fragancia, presentacion, precio_minorista, precio_mayorista)')
+        .select('*, producto_presentaciones(presentacion, productos(nombre)), fragancias(nombre)')
         .eq('pedido_id', id)
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -225,12 +223,11 @@ export default function FacturasPage() {
         clienteNombre:    (p as any).clientes?.nombre ?? null,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         items: (items ?? []).map((item: any): FacturaItem => ({
-          id:                   item.id,
-          productoNombre:       item.productos?.nombre ?? '',
-          productoPresentacion: item.productos?.presentacion != null ? String(item.productos.presentacion) : null,
-          cantidad:             String(item.cantidad),
-          precioUnitario:       String(item.precio_unitario),
-          bidonNuevo:           item.bidon_nuevo ?? false,
+          id:             item.id,
+          descripcion:    formatearItem(item),
+          cantidad:       String(item.cantidad),
+          precioUnitario: String(item.precio_unitario),
+          bidonNuevo:     item.bidon_nuevo ?? false,
         })),
       }
       return mapped

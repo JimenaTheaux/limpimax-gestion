@@ -8,15 +8,18 @@ import { FloatInput }  from '@/components/common/FloatInput'
 import { ButtonGroup } from '@/components/common/ButtonGroup'
 import { useClientes, useCrearCliente } from '@/services/clientes'
 import { useProductos } from '@/services/productos'
+import { useFragancias } from '@/services/fragancias'
 import { useCrearPedido, useEditarPedido, type PedidoDetalle, type ItemForm, type CrearPedidoInput } from '@/services/pedidos'
 import { useDebounce } from '@/hooks/useDebounce'
-import type { Producto, Cliente } from '@/types'
+import type { Producto, ProductoPresentacion, Fragancia, Cliente } from '@/types'
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
 const itemSchema = z.object({
-  productoId:       z.string().min(1, 'Seleccioná un producto'),
+  presentacionId:   z.string().min(1, 'Seleccioná una presentación'),
+  fraganciaId:      z.string().optional(),
   productoNombre:   z.string(),
+  fraganciaNombre:  z.string().optional(),
   presentacion:     z.string(),
   cantidad:         z.string().min(1).regex(/^\d+(\.\d+)?$/, 'Cantidad inválida'),
   precioUnitario:   z.string().min(1).regex(/^\d+(\.\d{0,2})?$/, 'Precio inválido'),
@@ -39,6 +42,7 @@ const schema = z.object({
 })
 
 type FormData = z.infer<typeof schema>
+type ItemFormData = FormData['items'][number]
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -303,12 +307,18 @@ function ItemCard({ index, watch, onEdit, onRemove }: {
   onRemove: () => void
 }) {
   const nombre         = watch(`items.${index}.productoNombre`)
+  const fragancia      = watch(`items.${index}.fraganciaNombre`)
   const presentacion   = watch(`items.${index}.presentacion`)
   const cantidad       = watch(`items.${index}.cantidad`)
   const precioUnitario = watch(`items.${index}.precioUnitario`)
   const bidonNuevo     = watch(`items.${index}.bidonNuevo`)
 
   const subtotal = (Number(cantidad) || 0) * (Number(precioUnitario) || 0)
+
+  const partes = [nombre || '—']
+  if (fragancia)    partes.push(fragancia)
+  if (presentacion) partes.push(`${presentacion}L`)
+  const titulo = partes.join(' · ')
 
   return (
     <div
@@ -320,20 +330,15 @@ function ItemCard({ index, watch, onEdit, onRemove }: {
       role="button"
       tabIndex={0}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEdit() } }}
-      aria-label={`Editar ${nombre || 'ítem'}`}
+      aria-label={`Editar ${titulo}`}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ fontWeight: 500, fontSize: 12, color: '#1A2B3C', flex: 1 }}>
-          {nombre || '—'}
+          {titulo}
         </span>
         {bidonNuevo && (
           <span style={{ fontSize: 9, fontWeight: 700, background: '#FFF3E0', color: '#E65100', padding: '1px 5px', borderRadius: 99, flexShrink: 0 }}>
             BIDÓN NUEVO
-          </span>
-        )}
-        {presentacion && (
-          <span style={{ fontSize: 9, background: '#F4F6F8', color: '#4A5568', padding: '1px 5px', borderRadius: 99, flexShrink: 0 }}>
-            {presentacion}L
           </span>
         )}
         <span style={{ fontSize: 13, fontWeight: 500, color: '#0D5C8A', flexShrink: 0 }}>
@@ -342,7 +347,7 @@ function ItemCard({ index, watch, onEdit, onRemove }: {
         <button
           type="button"
           onClick={e => { e.stopPropagation(); onRemove() }}
-          aria-label={`Eliminar ${nombre || 'ítem'}`}
+          aria-label={`Eliminar ${titulo}`}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#D1D5DB', padding: 2, flexShrink: 0, lineHeight: 0, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4 }}
           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#D32F2F' }}
           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#D1D5DB' }}
@@ -357,7 +362,7 @@ function ItemCard({ index, watch, onEdit, onRemove }: {
   )
 }
 
-// ─── Selector de producto con búsqueda ───────────────────────────────────────
+// ─── Selector de producto con búsqueda (paso 1) ───────────────────────────────
 
 function SelectorProducto({
   value, onChange, productos, error,
@@ -373,9 +378,7 @@ function SelectorProducto({
   const selected = productos.find(p => p.id === value)
 
   const filtrados = productos.filter(p => p.activo && (
-    !q ||
-    p.nombre.toLowerCase().includes(q.toLowerCase()) ||
-    (p.fragancia ?? '').toLowerCase().includes(q.toLowerCase())
+    !q || p.nombre.toLowerCase().includes(q.toLowerCase())
   ))
 
   return (
@@ -387,10 +390,7 @@ function SelectorProducto({
           border: '0.5px solid #1B9ED6', minHeight: 40,
         }}>
           <span style={{ fontSize: 13, fontWeight: 500, color: '#1A2B3C', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {selected.nombre}{selected.fragancia ? ` (${selected.fragancia})` : ''}
-            <span style={{ marginLeft: 6, fontSize: 9, background: '#D8EDFF', color: '#0D5C8A', padding: '1px 5px', borderRadius: 99 }}>
-              {selected.presentacion}L
-            </span>
+            {selected.nombre}
           </span>
           <button
             type="button"
@@ -437,10 +437,6 @@ function SelectorProducto({
                 >
                   <span style={{ fontWeight: 500, fontSize: 13, color: '#1A2B3C', flex: 1 }}>
                     {p.nombre}
-                    {p.fragancia && <span style={{ fontWeight: 400, color: '#4A5568' }}> ({p.fragancia})</span>}
-                  </span>
-                  <span style={{ fontSize: 9, background: '#F4F6F8', color: '#4A5568', padding: '1px 5px', borderRadius: 99, flexShrink: 0 }}>
-                    {p.presentacion}L
                   </span>
                 </button>
               )) : (
@@ -457,83 +453,196 @@ function SelectorProducto({
   )
 }
 
+// ─── Selector de presentación (paso 2) ─────────────────────────────────────────
+
+function SelectorPresentacion({
+  producto, value, onChange, error,
+}: {
+  producto: Producto | undefined
+  value:    string
+  onChange: (p: ProductoPresentacion) => void
+  error?:   string
+}) {
+  const presentaciones = [...(producto?.producto_presentaciones ?? [])].sort((a, b) => a.presentacion - b.presentacion)
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <select
+        value={value}
+        onChange={e => {
+          const p = presentaciones.find(pp => pp.id === e.target.value)
+          if (p) onChange(p)
+        }}
+        className="fi-input"
+        style={{
+          width: '100%', height: 40, padding: '0 28px 0 12px',
+          border: `0.5px solid ${error ? '#D32F2F' : '#D1D5DB'}`, borderRadius: 8,
+          fontFamily: 'Inter, sans-serif', background: '#fff',
+          appearance: 'none', outline: 'none', cursor: 'pointer',
+          color: '#1A2B3C', boxSizing: 'border-box', fontSize: 13,
+        }}
+      >
+        <option value="">Elegí una presentación…</option>
+        {presentaciones.map(p => (
+          <option key={p.id} value={p.id}>
+            {p.presentacion === 0.5 ? '500 ml' : `${p.presentacion} L`}
+            {' — '}${p.precio_minorista.toLocaleString('es-AR', { minimumFractionDigits: 2 })} (min.) / ${p.precio_mayorista.toLocaleString('es-AR', { minimumFractionDigits: 2 })} (may.)
+          </option>
+        ))}
+      </select>
+      <ChevronDown size={13} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#4A5568' }} />
+      {error && <span style={{ color: '#D32F2F', fontSize: 11, marginTop: 4, display: 'block' }}>{error}</span>}
+    </div>
+  )
+}
+
+// ─── Selector de fragancia (paso 3) ────────────────────────────────────────────
+
+function SelectorFragancia({
+  fragancias, value, onChange,
+}: {
+  fragancias: Fragancia[]
+  value:      string
+  onChange:   (id: string) => void
+}) {
+  if (!fragancias.length) return null
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="fi-input"
+        style={{
+          width: '100%', height: 40, padding: '0 28px 0 12px',
+          border: '0.5px solid #D1D5DB', borderRadius: 8,
+          fontFamily: 'Inter, sans-serif', background: '#fff',
+          appearance: 'none', outline: 'none', cursor: 'pointer',
+          color: '#1A2B3C', boxSizing: 'border-box', fontSize: 13,
+        }}
+      >
+        <option value="">Sin fragancia</option>
+        {fragancias.map(f => (
+          <option key={f.id} value={f.id}>{f.nombre}</option>
+        ))}
+      </select>
+      <ChevronDown size={13} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#4A5568' }} />
+    </div>
+  )
+}
+
 // ─── Formulario inline de ítem (editar o agregar) ────────────────────────────
 
 interface ItemFormInlineProps {
-  index?:    number
-  control?:  ReturnType<typeof useForm<FormData>>['control']
-  register?: ReturnType<typeof useForm<FormData>>['register']
-  watch?:    ReturnType<typeof useForm<FormData>>['watch']
-  setValue?: ReturnType<typeof useForm<FormData>>['setValue']
-  productos:  (Producto & { categoriaNombre?: string })[]
+  index?:     number
+  register?:  ReturnType<typeof useForm<FormData>>['register']
+  watch?:     ReturnType<typeof useForm<FormData>>['watch']
+  setValue?:  ReturnType<typeof useForm<FormData>>['setValue']
+  productos:  Producto[]
+  fragancias: Fragancia[]
   tipoPrecio: 'minorista' | 'mayorista'
-  onConfirm:  (item?: {
-    productoId:       string
-    productoNombre:   string
-    presentacion:     string
-    cantidad:         string
-    precioUnitario:   string
-    precioReferencia: string
-    bidonNuevo:       boolean
-  }) => void
+  onConfirm:  (item?: ItemFormData) => void
   onCancel:   () => void
   confirmLabel?: string
 }
 
+function productoDePresentacion(productos: Producto[], presentacionId: string): Producto | undefined {
+  return productos.find(p => p.producto_presentaciones?.some(pp => pp.id === presentacionId))
+}
+
 function ItemFormInline({
-  index, control, register, watch, setValue,
-  productos, tipoPrecio, onConfirm, onCancel, confirmLabel = 'Agregar ítem',
+  index, register, watch, setValue,
+  productos, fragancias, tipoPrecio, onConfirm, onCancel, confirmLabel = 'Agregar ítem',
 }: ItemFormInlineProps) {
   const isEdit = index !== undefined && index >= 0
 
-  const [lProdId,  setLProdId]  = useState('')
-  const [lCant,    setLCant]    = useState('1')
-  const [lPrecio,  setLPrecio]  = useState('')
-  const [lPrecRef, setLPrecRef] = useState('')
-  const [lBidon,   setLBidon]   = useState(false)
-  const [lErr,     setLErr]     = useState('')
+  const [lProdId,       setLProdId]        = useState('')
+  const [lPresentacion, setLPresentacionId] = useState('')
+  const [lFraganciaId,  setLFraganciaId]    = useState('')
+  const [lCant,         setLCant]           = useState('1')
+  const [lPrecio,       setLPrecio]         = useState('')
+  const [lPrecRef,      setLPrecRef]        = useState('')
+  const [lBidon,        setLBidon]          = useState(false)
+  const [lErr,          setLErr]            = useState('')
 
-  const eProducId   = isEdit ? watch?.(`items.${index!}.productoId`)       : lProdId
-  const eCant       = isEdit ? watch?.(`items.${index!}.cantidad`)          : lCant
-  const ePrecio     = isEdit ? watch?.(`items.${index!}.precioUnitario`)    : lPrecio
-  const ePrecRef    = isEdit ? watch?.(`items.${index!}.precioReferencia`)  : lPrecRef
-  const eBidon      = isEdit ? watch?.(`items.${index!}.bidonNuevo`)        : lBidon
+  // Selección transitoria de producto en modo edición — no se persiste, solo guía la UI
+  const [editProdId, setEditProdId] = useState('')
 
-  const productoSel = productos.find(p => p.id === eProducId)
+  const ePresentacionId = isEdit ? watch?.(`items.${index!}.presentacionId`)   : lPresentacion
+  const eFraganciaId    = isEdit ? watch?.(`items.${index!}.fraganciaId`)      : lFraganciaId
+  const eCant           = isEdit ? watch?.(`items.${index!}.cantidad`)         : lCant
+  const ePrecio         = isEdit ? watch?.(`items.${index!}.precioUnitario`)   : lPrecio
+  const ePrecRef        = isEdit ? watch?.(`items.${index!}.precioReferencia`) : lPrecRef
+  const eBidon          = isEdit ? watch?.(`items.${index!}.bidonNuevo`)       : lBidon
 
   useEffect(() => {
-    if (!productoSel) return
-    const precio = String(tipoPrecio === 'mayorista' ? productoSel.precio_mayorista : productoSel.precio_minorista)
+    if (!isEdit) return
+    const prod = productoDePresentacion(productos, ePresentacionId ?? '')
+    setEditProdId(prod?.id ?? '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, index])
+
+  const prodId          = isEdit ? editProdId : lProdId
+  const productoSel      = productos.find(p => p.id === prodId)
+  const presentacionSel  = productoSel?.producto_presentaciones?.find(pp => pp.id === ePresentacionId)
+
+  const handleProductoChange = (id: string) => {
     if (isEdit && setValue && index !== undefined) {
-      setValue(`items.${index}.precioUnitario`,   precio)
-      setValue(`items.${index}.precioReferencia`, precio)
-      setValue(`items.${index}.productoNombre`,   productoSel.nombre)
-      setValue(`items.${index}.presentacion`,     String(productoSel.presentacion))
+      setEditProdId(id)
+      setValue(`items.${index}.presentacionId`, '')
+      setValue(`items.${index}.productoNombre`, productos.find(p => p.id === id)?.nombre ?? '')
+      setValue(`items.${index}.presentacion`, '')
     } else {
+      setLProdId(id)
+      setLPresentacionId('')
+      setLErr('')
+    }
+  }
+
+  const handlePresentacionChange = (p: ProductoPresentacion) => {
+    const precio = String(tipoPrecio === 'mayorista' ? p.precio_mayorista : p.precio_minorista)
+    if (isEdit && setValue && index !== undefined) {
+      setValue(`items.${index}.presentacionId`, p.id)
+      setValue(`items.${index}.precioUnitario`, precio)
+      setValue(`items.${index}.precioReferencia`, precio)
+      setValue(`items.${index}.presentacion`, String(p.presentacion))
+    } else {
+      setLPresentacionId(p.id)
       setLPrecio(precio)
       setLPrecRef(precio)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eProducId, tipoPrecio])
+  }
+
+  const handleFraganciaChange = (id: string) => {
+    if (isEdit && setValue && index !== undefined) {
+      setValue(`items.${index}.fraganciaId`, id)
+      setValue(`items.${index}.fraganciaNombre`, fragancias.find(f => f.id === id)?.nombre ?? '')
+    } else {
+      setLFraganciaId(id)
+    }
+  }
 
   const subtotal = (Number(eCant) || 0) * (Number(ePrecio) || 0)
 
-  const precioActual = productoSel
-    ? (tipoPrecio === 'mayorista' ? productoSel.precio_mayorista : productoSel.precio_minorista)
+  const precioActual = presentacionSel
+    ? (tipoPrecio === 'mayorista' ? presentacionSel.precio_mayorista : presentacionSel.precio_minorista)
     : null
-  const precioDesact = productoSel && precioActual !== null && ePrecRef !== undefined &&
+  const precioDesact = presentacionSel && precioActual !== null && ePrecRef !== undefined &&
     Number(precioActual) !== Number(ePrecRef)
 
   const handleConfirm = () => {
     if (isEdit) { onConfirm(); return }
     if (!lProdId) { setLErr('Seleccioná un producto'); return }
+    if (!lPresentacion) { setLErr('Seleccioná una presentación'); return }
     if (!lCant || !/^\d+(\.\d+)?$/.test(lCant)) { setLErr('Cantidad inválida'); return }
     if (!lPrecio || !/^\d+(\.\d{0,2})?$/.test(lPrecio)) { setLErr('Precio inválido'); return }
     setLErr('')
     onConfirm({
-      productoId:       lProdId,
+      presentacionId:   lPresentacion,
+      fraganciaId:      lFraganciaId,
       productoNombre:   productoSel?.nombre ?? '',
-      presentacion:     String(productoSel?.presentacion ?? ''),
+      fraganciaNombre:  fragancias.find(f => f.id === lFraganciaId)?.nombre ?? '',
+      presentacion:     String(presentacionSel?.presentacion ?? ''),
       cantidad:         lCant,
       precioUnitario:   lPrecio,
       precioReferencia: lPrecRef,
@@ -547,53 +656,69 @@ function ItemFormInline({
       border: '0.5px solid #D1D5DB', display: 'flex', flexDirection: 'column',
       gap: 10, animation: 'fadeSlideIn 0.18s ease', marginTop: 4,
     }}>
-      {/* Selector de producto con búsqueda */}
+      {/* Paso 1 — Producto */}
       <div>
         <label style={{ fontSize: 10, fontWeight: 500, color: '#4A5568', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>
           Producto
         </label>
-        {isEdit && control && index !== undefined ? (
-          <Controller
-            name={`items.${index}.productoId`}
-            control={control}
-            render={({ field, fieldState }) => (
-              <SelectorProducto
-                value={field.value}
-                onChange={field.onChange}
-                productos={productos}
-                error={fieldState.error?.message}
-              />
-            )}
-          />
-        ) : (
-          <SelectorProducto
-            value={lProdId}
-            onChange={id => { setLProdId(id); setLErr('') }}
-            productos={productos}
-            error={lErr && !lProdId ? lErr : undefined}
-          />
-        )}
+        <SelectorProducto
+          value={prodId}
+          onChange={handleProductoChange}
+          productos={productos}
+          error={lErr && !prodId ? lErr : undefined}
+        />
       </div>
 
-      {/* Cantidad + precio */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        {isEdit && register && index !== undefined ? (
-          <>
-            <FloatInput label="Cantidad" {...register(`items.${index}.cantidad`)} inputMode="decimal" />
-            <FloatInput
-              label="Precio unit."
-              {...register(`items.${index}.precioUnitario`)}
-              inputMode="decimal"
-              hint={precioDesact ? `Actual: $${Number(precioActual).toLocaleString('es-AR', { minimumFractionDigits: 2 })}` : undefined}
-            />
-          </>
-        ) : (
-          <>
-            <FloatInput label="Cantidad"    value={lCant}   onChange={e => setLCant(e.target.value)}   inputMode="decimal" />
-            <FloatInput label="Precio unit." value={lPrecio} onChange={e => setLPrecio(e.target.value)} inputMode="decimal" />
-          </>
-        )}
-      </div>
+      {/* Paso 2 — Presentación */}
+      {productoSel && (
+        <div>
+          <label style={{ fontSize: 10, fontWeight: 500, color: '#4A5568', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>
+            Presentación
+          </label>
+          <SelectorPresentacion
+            producto={productoSel}
+            value={ePresentacionId ?? ''}
+            onChange={handlePresentacionChange}
+            error={lErr && !lPresentacion && !isEdit ? lErr : undefined}
+          />
+        </div>
+      )}
+
+      {/* Paso 3 — Fragancia (solo si hay fragancias activas) */}
+      {presentacionSel && fragancias.length > 0 && (
+        <div>
+          <label style={{ fontSize: 10, fontWeight: 500, color: '#4A5568', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>
+            Fragancia
+          </label>
+          <SelectorFragancia
+            fragancias={fragancias}
+            value={eFraganciaId ?? ''}
+            onChange={handleFraganciaChange}
+          />
+        </div>
+      )}
+
+      {/* Paso 4 — Cantidad + precio */}
+      {presentacionSel && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {isEdit && register && index !== undefined ? (
+            <>
+              <FloatInput label="Cantidad" {...register(`items.${index}.cantidad`)} inputMode="decimal" />
+              <FloatInput
+                label="Precio unit."
+                {...register(`items.${index}.precioUnitario`)}
+                inputMode="decimal"
+                hint={precioDesact ? `Actual: $${Number(precioActual).toLocaleString('es-AR', { minimumFractionDigits: 2 })}` : undefined}
+              />
+            </>
+          ) : (
+            <>
+              <FloatInput label="Cantidad"    value={lCant}   onChange={e => setLCant(e.target.value)}   inputMode="decimal" />
+              <FloatInput label="Precio unit." value={lPrecio} onChange={e => setLPrecio(e.target.value)} inputMode="decimal" />
+            </>
+          )}
+        </div>
+      )}
 
       {/* Alerta precio desactualizado */}
       {isEdit && precioDesact && setValue && index !== undefined && (
@@ -609,19 +734,23 @@ function ItemFormInline({
       )}
 
       {/* Toggle bidón nuevo */}
-      {isEdit && setValue && index !== undefined ? (
-        <ToggleSwitch label="Bidón nuevo" value={eBidon ?? false} onChange={v => setValue(`items.${index!}.bidonNuevo`, v)} />
-      ) : (
-        <ToggleSwitch label="Bidón nuevo" value={lBidon} onChange={setLBidon} />
+      {presentacionSel && (
+        isEdit && setValue && index !== undefined ? (
+          <ToggleSwitch label="Bidón nuevo" value={eBidon ?? false} onChange={v => setValue(`items.${index!}.bidonNuevo`, v)} />
+        ) : (
+          <ToggleSwitch label="Bidón nuevo" value={lBidon} onChange={setLBidon} />
+        )
       )}
 
       {/* Subtotal */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 12, color: '#4A5568' }}>Subtotal</span>
-        <span style={{ fontSize: 13, fontWeight: 500, color: '#0D5C8A' }}>
-          ${subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-        </span>
-      </div>
+      {presentacionSel && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 12, color: '#4A5568' }}>Subtotal</span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#0D5C8A' }}>
+            ${subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+          </span>
+        </div>
+      )}
 
       {lErr && <span style={{ color: '#D32F2F', fontSize: 11 }}>{lErr}</span>}
 
@@ -647,7 +776,8 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
   const editar = useEditarPedido()
   const saving = crear.isPending || editar.isPending
 
-  const { data: productos } = useProductos()
+  const { data: productos }  = useProductos()
+  const { data: fragancias } = useFragancias()
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const { register, control, handleSubmit, watch, setValue, reset, formState: { errors } } =
@@ -701,7 +831,8 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
       total_manual:             data.totalManual ?? '',
       saldo_anterior_aplicado:  data.saldoAplicado ?? '',
       items: data.items.map((item): ItemForm => ({
-        producto_id:       item.productoId,
+        presentacion_id:   item.presentacionId,
+        fragancia_id:      item.fraganciaId ?? '',
         producto_nombre:   item.productoNombre,
         presentacion:      item.presentacion,
         cantidad:          item.cantidad,
@@ -738,10 +869,7 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
     scrollToBottom()
   }
 
-  const handleItemAdded = (item: {
-    productoId: string; productoNombre: string; presentacion: string
-    cantidad: string; precioUnitario: string; precioReferencia: string; bidonNuevo: boolean
-  }) => {
+  const handleItemAdded = (item: ItemFormData) => {
     append(item)
     setAddingNew(false)
     scrollToBottom()
@@ -916,11 +1044,11 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
                   <div style={{ border: '0.5px solid #1B9ED6', borderTop: 'none', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
                     <ItemFormInline
                       index={i}
-                      control={control}
                       register={register}
                       watch={watch}
                       setValue={setValue}
                       productos={productos ?? []}
+                      fragancias={fragancias ?? []}
                       tipoPrecio={tipoPrecio}
                       confirmLabel="Actualizar ítem"
                       onConfirm={() => setExpandedIdx(null)}
@@ -942,6 +1070,7 @@ export function DrawerPedido({ open, onClose, pedido, onSaved }: Props) {
             {addingNew ? (
               <ItemFormInline
                 productos={productos ?? []}
+                fragancias={fragancias ?? []}
                 tipoPrecio={tipoPrecio}
                 confirmLabel="Agregar ítem"
                 onConfirm={item => { if (item) handleItemAdded(item) }}
@@ -1130,9 +1259,11 @@ function buildDefaults(pedido: PedidoDetalle | null): FormData {
     totalManual:      pedido?.total_manual != null ? String(pedido.total_manual) : '',
     saldoAplicado:    pedido?.saldo_anterior_aplicado != null ? String(pedido.saldo_anterior_aplicado) : '',
     items: pedido?.pedido_items?.map(i => ({
-      productoId:       i.producto_id,
-      productoNombre:   i.productos?.nombre ?? '',
-      presentacion:     String(i.productos?.presentacion ?? ''),
+      presentacionId:   i.presentacion_id,
+      fraganciaId:      i.fragancia_id ?? '',
+      productoNombre:   i.producto_presentaciones?.productos?.nombre ?? '',
+      fraganciaNombre:  i.fragancias?.nombre ?? '',
+      presentacion:     String(i.producto_presentaciones?.presentacion ?? ''),
       cantidad:         String(i.cantidad),
       precioUnitario:   String(i.precio_unitario),
       precioReferencia: String(i.precio_referencia),

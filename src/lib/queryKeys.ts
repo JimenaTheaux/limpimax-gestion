@@ -24,6 +24,10 @@ export const queryKeys = {
     list:       (q?: string, categoriaId?: string, activo?: boolean | null)     => ['productos', q, categoriaId, activo] as const,
     categorias: ()                                                              => ['categorias'] as const,
   },
+  fragancias: {
+    all:  () => ['fragancias', 'all'] as const,
+    list: () => ['fragancias', 'activas'] as const,
+  },
   egresos: {
     all:  ()                                                        => ['egresos'] as const,
     list: (mes: number, anio: number, categoriaId?: string)         => ['egresos', mes, anio, categoriaId ?? null] as const,

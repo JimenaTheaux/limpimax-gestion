@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { formatearItem } from '@/types'
 
 interface ItemDia {
-  pedidoId:      string
-  cantidad:      string
-  nombre:        string | null
-  fragancia:     string | null
-  presentacion:  string | null
+  pedidoId:       string
+  cantidad:       string
+  descripcion:    string
   precioUnitario: string
 }
 
@@ -50,8 +49,9 @@ export default function ListadoDiaPage() {
           cliente_id, direccion_entrega,
           clientes(nombre, telefono),
           pedido_items(
-            cantidad,
-            productos(nombre, fragancia, presentacion, precio_minorista)
+            cantidad, precio_unitario,
+            producto_presentaciones(presentacion, productos(nombre)),
+            fragancias(nombre)
           )
         `)
         .eq('fecha_produccion', f)
@@ -74,13 +74,11 @@ export default function ListadoDiaPage() {
         clienteTelefono:  p.clientes?.telefono ?? null,
         direccionEntrega: p.direccion_entrega,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        items: (p.pedido_items ?? []).map((item: any) => ({
-          pedidoId:      p.id,
-          cantidad:      String(item.cantidad),
-          nombre:        item.productos?.nombre        ?? null,
-          fragancia:     item.productos?.fragancia     ?? null,
-          presentacion:  item.productos?.presentacion != null ? String(item.productos.presentacion) : null,
-          precioUnitario: String(item.productos?.precio_minorista ?? '0'),
+        items: (p.pedido_items ?? []).map((item: any): ItemDia => ({
+          pedidoId:       p.id,
+          cantidad:       String(item.cantidad),
+          descripcion:    formatearItem(item),
+          precioUnitario: String(item.precio_unitario ?? '0'),
         })),
       }))
 
@@ -234,8 +232,7 @@ export default function ListadoDiaPage() {
                   display: 'inline-block', background: '#F0F0F0', color: '#333',
                   borderRadius: 4, padding: '2px 8px', margin: '2px', fontSize: 12,
                 }}>
-                  {item.nombre} {item.presentacion}L × <strong>{item.cantidad}</strong>
-                  {item.fragancia ? ` (${item.fragancia})` : ''}
+                  {item.descripcion} × <strong>{item.cantidad}</strong>
                 </span>
               ))}
             </div>

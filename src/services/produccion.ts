@@ -6,14 +6,14 @@ import type { EstadoPedido } from '@/types'
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 // snake_case — coincide con columnas de Supabase
+// Forma compatible con formatearItem() (Pick<PedidoItem, 'producto_presentaciones' | 'fragancias'>)
 export interface ItemProduccion {
-  pedido_id:    string
-  producto_id:  string
-  cantidad:     number
-  bidon_nuevo:  boolean
-  nombre:       string | null
-  fragancia:    string | null
-  presentacion: number | null
+  pedido_id:       string
+  presentacion_id: string
+  cantidad:        number
+  bidon_nuevo:     boolean
+  producto_presentaciones?: { presentacion: number; productos?: { nombre: string } | null } | null
+  fragancias?: { nombre: string } | null
 }
 
 export interface PedidoProduccion {
@@ -41,10 +41,9 @@ export interface PedidoListoHoy {
 }
 
 export interface ResumenProduccion {
-  producto_id:      string
+  presentacion_id:  string
   nombre_producto:  string | null
   presentacion:     number | null
-  unidad_medida:    string | null
   fecha_produccion: string | null
   total_cantidad:   number
   total_bidon_nuevo: number
@@ -104,8 +103,9 @@ export const usePedidosProduccion = (fecha?: string) =>
           direccion_entrega, created_at, updated_at, cliente_id,
           clientes(nombre),
           pedido_items(
-            id, pedido_id, producto_id, cantidad, bidon_nuevo,
-            productos(nombre, fragancia, presentacion)
+            id, pedido_id, presentacion_id, cantidad, bidon_nuevo,
+            producto_presentaciones(presentacion, productos(nombre)),
+            fragancias(nombre)
           )
         `)
         .eq('estado', 'en_produccion')
@@ -131,14 +131,17 @@ export const usePedidosProduccion = (fecha?: string) =>
         clientes:          row.clientes ?? null,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         pedido_items: (row.pedido_items ?? []).map((item: any): ItemProduccion => ({
-          pedido_id:    item.pedido_id,
-          producto_id:  item.producto_id,
-          cantidad:     Number(item.cantidad),
-          bidon_nuevo:  item.bidon_nuevo ?? false,
-          nombre:       item.productos?.nombre      ?? null,
-          fragancia:    item.productos?.fragancia   ?? null,
-          presentacion: item.productos?.presentacion != null
-            ? Number(item.productos.presentacion) : null,
+          pedido_id:       item.pedido_id,
+          presentacion_id: item.presentacion_id,
+          cantidad:        Number(item.cantidad),
+          bidon_nuevo:     item.bidon_nuevo ?? false,
+          producto_presentaciones: item.producto_presentaciones
+            ? {
+                presentacion: Number(item.producto_presentaciones.presentacion),
+                productos:    item.producto_presentaciones.productos ?? null,
+              }
+            : null,
+          fragancias: item.fragancias ?? null,
         })),
       }))
     },
@@ -186,8 +189,8 @@ export const useResumenProduccion = (fecha?: string) => {
         .select(`
           id, fecha_produccion,
           pedido_items(
-            cantidad, bidon_nuevo, producto_id,
-            productos(nombre, presentacion, unidad_medida)
+            cantidad, bidon_nuevo, presentacion_id,
+            producto_presentaciones(presentacion, productos(nombre))
           )
         `)
         .eq('estado', 'en_produccion')
@@ -195,29 +198,28 @@ export const useResumenProduccion = (fecha?: string) => {
 
       if (error) throw new Error(error.message)
 
-      // Agrupar por producto
+      // Agrupar por presentación
       const mapa = new Map<string, ResumenProduccion>()
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       for (const pedido of data ?? []) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         for (const item of (pedido.pedido_items ?? []) as any[]) {
-          const prodId     = item.producto_id
+          const presId     = item.presentacion_id
           const cantidad   = parseFloat(item.cantidad)
           const esBidon    = item.bidon_nuevo ?? false
-          const existing   = mapa.get(prodId)
+          const existing   = mapa.get(presId)
 
           if (existing) {
             existing.total_cantidad    += cantidad
             if (esBidon) existing.total_bidon_nuevo += cantidad
           } else {
-            mapa.set(prodId, {
-              producto_id:       prodId,
-              nombre_producto:   item.productos?.nombre          ?? null,
-              presentacion:      item.productos?.presentacion != null
-                ? Number(item.productos.presentacion) : null,
-              unidad_medida:     item.productos?.unidad_medida   ?? null,
-              fecha_produccion:  pedido.fecha_produccion         ?? null,
+            mapa.set(presId, {
+              presentacion_id:   presId,
+              nombre_producto:   item.producto_presentaciones?.productos?.nombre ?? null,
+              presentacion:      item.producto_presentaciones?.presentacion != null
+                ? Number(item.producto_presentaciones.presentacion) : null,
+              fecha_produccion:  pedido.fecha_produccion ?? null,
               total_cantidad:    cantidad,
               total_bidon_nuevo: esBidon ? cantidad : 0,
             })

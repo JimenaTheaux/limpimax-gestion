@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
 import { useAuthStore } from '@/store/authStore'
 import { totalPedido } from '@/types'
-import type { Pedido, PedidoItem, PedidoHistorial, PedidoPago, Cliente, Producto, EstadoPedido } from '@/types'
+import type { Pedido, PedidoItem, PedidoHistorial, PedidoPago, Cliente, EstadoPedido } from '@/types'
 
 export { totalPedido }
 
@@ -13,9 +13,7 @@ export type PedidoConCliente = Pedido & {
   clientes: Pick<Cliente, 'nombre' | 'direccion' | 'tipo_cliente' | 'telefono'>
 }
 
-export type ItemDetalle = PedidoItem & {
-  productos: Pick<Producto, 'nombre' | 'fragancia' | 'presentacion' | 'precio_minorista' | 'precio_mayorista'>
-}
+export type ItemDetalle = PedidoItem
 
 export type HistorialDetalle = PedidoHistorial & {
   perfiles: { nombre: string } | null
@@ -39,7 +37,8 @@ export interface PagoInput {
 // ─── Tipo para ítems del formulario (strings para inputs numéricos) ───────────
 
 export interface ItemForm {
-  producto_id:       string
+  presentacion_id:   string
+  fragancia_id:      string
   producto_nombre:   string
   presentacion:      string
   cantidad:          string
@@ -65,12 +64,12 @@ export interface CrearPedidoInput {
   accion:                   'borrador' | 'confirmar'
 }
 
-// ─── Helper: costo de producción por producto ─────────────────────────────────
+// ─── Helper: costo de producción por presentación ──────────────────────────────
 
-async function fetchCostoMap(productoIds: string[]): Promise<Record<string, number>> {
-  const ids = [...new Set(productoIds)]
+async function fetchCostoMap(presentacionIds: string[]): Promise<Record<string, number>> {
+  const ids = [...new Set(presentacionIds)]
   const { data } = await supabase
-    .from('productos')
+    .from('producto_presentaciones')
     .select('id, costo_produccion')
     .in('id', ids)
   return Object.fromEntries((data ?? []).map(p => [p.id, Number(p.costo_produccion ?? 0)]))
@@ -100,15 +99,17 @@ function parseItemDetalle(item: any): ItemDetalle {
     precio_unitario:   Number(item.precio_unitario),
     precio_referencia: Number(item.precio_referencia),
     bidon_nuevo:       item.bidon_nuevo ?? false,
-    productos: item.productos
+    producto_presentaciones: item.producto_presentaciones
       ? {
-          nombre:           item.productos.nombre,
-          fragancia:        item.productos.fragancia   ?? null,
-          presentacion:     Number(item.productos.presentacion),
-          precio_minorista: Number(item.productos.precio_minorista),
-          precio_mayorista: Number(item.productos.precio_mayorista),
+          ...item.producto_presentaciones,
+          presentacion:     Number(item.producto_presentaciones.presentacion),
+          precio_minorista: Number(item.producto_presentaciones.precio_minorista),
+          precio_mayorista: Number(item.producto_presentaciones.precio_mayorista),
+          costo_produccion: Number(item.producto_presentaciones.costo_produccion ?? 0),
+          productos:        item.producto_presentaciones.productos ?? null,
         }
       : null,
+    fragancias: item.fragancias ?? null,
   } as ItemDetalle
 }
 
@@ -194,7 +195,7 @@ export const usePedidoDetalle = (id: string | null) =>
           .maybeSingle(),
         supabase
           .from('pedido_items')
-          .select('*, productos(nombre, fragancia, presentacion, precio_minorista, precio_mayorista)')
+          .select('*, producto_presentaciones(*, productos(nombre)), fragancias(id, nombre, activo)')
           .eq('pedido_id', id!),
         supabase
           .from('pedido_historial')
@@ -245,7 +246,7 @@ export async function fetchPedidoDetalle(id: string): Promise<PedidoDetalle> {
       .maybeSingle(),
     supabase
       .from('pedido_items')
-      .select('*, productos(nombre, fragancia, presentacion, precio_minorista, precio_mayorista)')
+      .select('*, producto_presentaciones(*, productos(nombre)), fragancias(id, nombre, activo)')
       .eq('pedido_id', id),
     supabase
       .from('pedido_historial')
@@ -314,18 +315,19 @@ export const useCrearPedido = () => {
 
       if (e1) throw new Error(e1.message)
 
-      const costoMap = await fetchCostoMap(data.items.map(i => i.producto_id))
+      const costoMap = await fetchCostoMap(data.items.map(i => i.presentacion_id))
 
       await Promise.all([
         supabase.from('pedido_items').insert(
           data.items.map(item => ({
             pedido_id:         pedido.id,
-            producto_id:       item.producto_id,
+            presentacion_id:   item.presentacion_id,
+            fragancia_id:      item.fragancia_id || null,
             cantidad:          parseFloat(item.cantidad),
             precio_unitario:   parseFloat(item.precio_unitario),
             precio_referencia: parseFloat(item.precio_referencia),
             bidon_nuevo:       item.bidon_nuevo,
-            costo_snapshot:    costoMap[item.producto_id] ?? 0,
+            costo_snapshot:    costoMap[item.presentacion_id] ?? 0,
           }))
         ),
         supabase.from('pedido_historial').insert({
@@ -376,7 +378,7 @@ export const useEditarPedido = () => {
       if (updateErr) throw new Error(updateErr.message)
 
       if (items && items.length > 0) {
-        const costoMap = await fetchCostoMap(items.map(i => i.producto_id))
+        const costoMap = await fetchCostoMap(items.map(i => i.presentacion_id))
 
         const { error: delErr } = await supabase.from('pedido_items').delete().eq('pedido_id', id)
         if (delErr) throw new Error(delErr.message)
@@ -384,12 +386,13 @@ export const useEditarPedido = () => {
         const { error: insErr } = await supabase.from('pedido_items').insert(
           items.map(item => ({
             pedido_id:         id,
-            producto_id:       item.producto_id,
+            presentacion_id:   item.presentacion_id,
+            fragancia_id:      item.fragancia_id || null,
             cantidad:          parseFloat(item.cantidad),
             precio_unitario:   parseFloat(item.precio_unitario),
             precio_referencia: parseFloat(item.precio_referencia),
             bidon_nuevo:       item.bidon_nuevo,
-            costo_snapshot:    costoMap[item.producto_id] ?? 0,
+            costo_snapshot:    costoMap[item.presentacion_id] ?? 0,
           }))
         )
         if (insErr) throw new Error(insErr.message)

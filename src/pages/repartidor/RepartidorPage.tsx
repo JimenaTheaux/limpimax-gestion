@@ -10,7 +10,7 @@ import {
   usePedidos, usePedidoDetalle, useCambiarEstado, useCerrarPedido, totalPedido,
   type PedidoListItem, type PagoInput,
 } from '@/services/pedidos'
-import { ESTADO_CONFIG } from '@/types'
+import { ESTADO_CONFIG, formatearItem } from '@/types'
 import type { AddActionInput } from '@/hooks/useOffline'
 
 // ─── Date helper ──────────────────────────────────────────────────────────────
@@ -42,13 +42,10 @@ function ExpandedItems({ pedidoId }: { pedidoId: string }) {
   return (
     <div style={{ padding: '8px 14px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
       {items.map((item, i) => {
-        const prod = item.productos as typeof item.productos | null
         return (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12, color: '#4A5568' }}>
-              {prod?.nombre ?? '—'}
-              {prod?.presentacion ? ` · ${prod.presentacion}L` : ''}
-              {' · '}{item.cantidad}
+              {formatearItem(item)} · {item.cantidad}
             </span>
             {item.bidon_nuevo && (
               <span style={{

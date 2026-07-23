@@ -94,17 +94,14 @@ CREATE TABLE categorias_producto (
 
 ### `productos`
 
+Un producto ya no lleva precio, presentación ni fragancia propios — esos datos viven en
+`producto_presentaciones` (N por producto) y `fragancias` (catálogo global, no ligado a un producto).
+
 ```sql
 CREATE TABLE productos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  codigo TEXT UNIQUE,
   nombre TEXT NOT NULL,
-  fragancia TEXT,
   categoria_id UUID REFERENCES categorias_producto(id),
-  unidad_medida TEXT DEFAULT 'litros',
-  presentacion NUMERIC(5,1) NOT NULL,
-  precio_minorista NUMERIC(10,2) NOT NULL DEFAULT 0,
-  precio_mayorista NUMERIC(10,2) NOT NULL DEFAULT 0,
   activo BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -115,21 +112,79 @@ Tipo TypeScript:
 ```typescript
 export type Producto = {
   id: string
-  codigo: string | null
   nombre: string
-  fragancia: string | null
   categoria_id: string | null
-  unidad_medida: string
-  presentacion: number
+  activo: boolean
+  created_at: string
+  updated_at: string
+  // Joins opcionales
+  categorias_producto?: { nombre: string }
+  producto_presentaciones?: ProductoPresentacion[]
+}
+```
+
+---
+
+### `producto_presentaciones`
+
+Cada producto puede tener varias presentaciones (litros), cada una con su propio precio y costo.
+
+```sql
+CREATE TABLE producto_presentaciones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  producto_id UUID NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+  presentacion NUMERIC(5,1) NOT NULL,
+  precio_minorista NUMERIC(10,2) NOT NULL DEFAULT 0,
+  precio_mayorista NUMERIC(10,2) NOT NULL DEFAULT 0,
+  costo_produccion NUMERIC(10,2) NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (producto_id, presentacion)
+);
+```
+
+Tipo TypeScript:
+```typescript
+export type ProductoPresentacion = {
+  id: string
+  producto_id: string
+  presentacion: number   // litros: 0.5, 1, 3, 5, 10, 20
   precio_minorista: number
   precio_mayorista: number
-  activo: boolean
+  costo_produccion: number
   created_at: string
   updated_at: string
 }
 ```
 
-Presentaciones válidas: `[0.5, 3, 5, 10, 20]` litros.
+Presentaciones válidas: `[0.5, 1, 3, 5, 10, 20]` litros.
+
+Al editar un producto, el ABM reemplaza todas las presentaciones (delete + insert) en vez de diffear —
+es más simple y los pedidos existentes conservan su `precio_unitario` como snapshot, sin verse afectados.
+
+---
+
+### `fragancias`
+
+Catálogo global de fragancias, independiente del producto — cualquier fragancia puede combinarse con
+cualquier producto/presentación al armar un ítem de pedido.
+
+```sql
+CREATE TABLE fragancias (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre TEXT NOT NULL UNIQUE,
+  activo BOOLEAN DEFAULT TRUE
+);
+```
+
+Tipo TypeScript:
+```typescript
+export type Fragancia = {
+  id: string
+  nombre: string
+  activo: boolean
+}
+```
 
 ---
 
@@ -230,15 +285,20 @@ export type Pedido = {
 
 ### `pedido_items`
 
+`producto_id` fue reemplazado por `presentacion_id` (apunta a `producto_presentaciones`) +
+`fragancia_id` (apunta a `fragancias`, nullable — sin fragancia es un ítem válido).
+
 ```sql
 CREATE TABLE pedido_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   pedido_id UUID NOT NULL REFERENCES pedidos(id) ON DELETE CASCADE,
-  producto_id UUID NOT NULL REFERENCES productos(id),
+  presentacion_id UUID NOT NULL REFERENCES producto_presentaciones(id),
+  fragancia_id UUID REFERENCES fragancias(id),
   cantidad NUMERIC(10,3) NOT NULL,
   precio_unitario NUMERIC(10,2) NOT NULL,
   precio_referencia NUMERIC(10,2) NOT NULL,
-  bidon_nuevo BOOLEAN DEFAULT FALSE
+  bidon_nuevo BOOLEAN DEFAULT FALSE,
+  costo_snapshot NUMERIC(10,2) DEFAULT 0
 );
 ```
 
@@ -247,17 +307,23 @@ Tipo TypeScript:
 export type PedidoItem = {
   id: string
   pedido_id: string
-  producto_id: string
+  presentacion_id: string
+  fragancia_id: string | null
   cantidad: number
   precio_unitario: number
   precio_referencia: number
   bidon_nuevo: boolean
-  // Join opcional
-  productos?: Producto
-  // Calculado en el cliente:
-  // subtotal = cantidad * precio_unitario
+  // Joins opcionales
+  producto_presentaciones?: ProductoPresentacion & { productos?: { nombre: string } }
+  fragancias?: Fragancia | null
+  // Computed en cliente
+  subtotal?: number
 }
 ```
+
+**Formateo del ítem:** `formatearItem(item)` (en `src/types/index.ts`) es la única función que arma el
+string mostrado por ítem — `"Producto · Fragancia · PresentaciónL"`, omitiendo la fragancia si es `null`.
+Ningún componente debe concatenar nombre + presentación de forma manual; siempre se llama a esta función.
 
 ---
 
@@ -312,8 +378,9 @@ const { data } = await supabase
     id, numero, estado, fecha_produccion, notas_produccion, created_at,
     clientes (nombre),
     pedido_items (
-      id, cantidad, bidon_nuevo,
-      productos (nombre, presentacion)
+      id, presentacion_id, cantidad, bidon_nuevo,
+      producto_presentaciones (presentacion, productos (nombre)),
+      fragancias (nombre)
     )
   `)
   .eq('estado', 'en_produccion')
@@ -340,8 +407,9 @@ const { data } = await supabase
     forma_cobro, monto_cobrado,
     clientes (nombre, direccion, telefono),
     pedido_items (
-      id, cantidad, bidon_nuevo,
-      productos (nombre, presentacion)
+      id, presentacion_id, cantidad, bidon_nuevo,
+      producto_presentaciones (presentacion, productos (nombre)),
+      fragancias (nombre)
     )
   `)
   .in('estado', ['en_produccion', 'listo_reparto', 'en_reparto'])
@@ -358,7 +426,8 @@ const { data } = await supabase
     clientes (*),
     pedido_items (
       *,
-      productos (*)
+      producto_presentaciones (*, productos (nombre)),
+      fragancias (*)
     ),
     pedido_historial (
       *,
@@ -494,6 +563,8 @@ ALTER TABLE pedido_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pedido_historial ENABLE ROW LEVEL SECURITY;
 ALTER TABLE clientes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE productos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE producto_presentaciones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fragancias ENABLE ROW LEVEL SECURITY;
 ALTER TABLE perfiles ENABLE ROW LEVEL SECURITY;
 
 -- Perfiles: cada usuario lee su propio perfil
@@ -526,6 +597,12 @@ CREATE POLICY "auth_clientes" ON clientes
   FOR ALL USING (auth.uid() IS NOT NULL);
 
 CREATE POLICY "auth_productos" ON productos
+  FOR ALL USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "auth_producto_presentaciones" ON producto_presentaciones
+  FOR ALL USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "auth_fragancias" ON fragancias
   FOR ALL USING (auth.uid() IS NOT NULL);
 ```
 

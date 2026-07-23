@@ -1,18 +1,33 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
-import type { Producto, CategoriaProducto } from '@/types'
+import type { Producto, ProductoPresentacion, CategoriaProducto } from '@/types'
+
+export interface PresentacionInput {
+  presentacion:      number
+  precio_minorista:  number
+  precio_mayorista:  number
+  costo_produccion:  number
+}
 
 // Supabase devuelve NUMERIC como string — parseamos a number para coincidir con el tipo
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function parseProducto(row: any): Producto {
+function parsePresentacion(row: any): ProductoPresentacion {
   return {
     ...row,
     presentacion:      Number(row.presentacion),
     precio_minorista:  Number(row.precio_minorista),
     precio_mayorista:  Number(row.precio_mayorista),
     costo_produccion:  Number(row.costo_produccion ?? 0),
-    categorias_producto: row.categorias_producto ?? null,
+  } as ProductoPresentacion
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseProducto(row: any): Producto {
+  return {
+    ...row,
+    categorias_producto:     row.categorias_producto ?? null,
+    producto_presentaciones: (row.producto_presentaciones ?? []).map(parsePresentacion),
   } as Producto
 }
 
@@ -26,7 +41,7 @@ export const useProductos = (q?: string, categoriaId?: string, activo: boolean |
     queryFn: async () => {
       let query = supabase
         .from('productos')
-        .select('*, categorias_producto(id, nombre)')
+        .select('*, categorias_producto(id, nombre), producto_presentaciones(*)')
         .order('nombre', { ascending: true })
 
       if (activo !== null) query = query.eq('activo', activo)
@@ -57,24 +72,40 @@ export const useCategorias = () =>
 export const useCrearProducto = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (payload: Omit<Producto, 'id' | 'created_at' | 'updated_at' | 'categorias_producto'>) => {
-      const { data, error } = await supabase
+    mutationFn: async ({ presentaciones, ...datos }: {
+      nombre:         string
+      categoria_id:   string | null
+      activo?:        boolean
+      presentaciones: PresentacionInput[]
+    }) => {
+      const { data: producto, error: e1 } = await supabase
         .from('productos')
         .insert({
-          nombre:            payload.nombre,
-          fragancia:         payload.fragancia     || null,
-          categoria_id:      payload.categoria_id  || null,
-          unidad_medida:     payload.unidad_medida  ?? 'litros',
-          presentacion:      payload.presentacion,
-          precio_minorista:  payload.precio_minorista,
-          precio_mayorista:  payload.precio_mayorista,
-          costo_produccion:  payload.costo_produccion ?? 0,
-          activo:            payload.activo ?? true,
-          codigo:            payload.codigo || null,
+          nombre:       datos.nombre,
+          categoria_id: datos.categoria_id || null,
+          activo:       datos.activo ?? true,
         })
-        .select('*, categorias_producto(id, nombre)')
+        .select('id')
         .single()
 
+      if (e1) throw new Error(e1.message)
+
+      const { error: e2 } = await supabase.from('producto_presentaciones').insert(
+        presentaciones.map(p => ({
+          producto_id:       producto.id,
+          presentacion:      p.presentacion,
+          precio_minorista:  p.precio_minorista,
+          precio_mayorista:  p.precio_mayorista,
+          costo_produccion:  p.costo_produccion,
+        }))
+      )
+      if (e2) throw new Error(e2.message)
+
+      const { data, error } = await supabase
+        .from('productos')
+        .select('*, categorias_producto(id, nombre), producto_presentaciones(*)')
+        .eq('id', producto.id)
+        .single()
       if (error) throw new Error(error.message)
       return parseProducto(data)
     },
@@ -85,26 +116,44 @@ export const useCrearProducto = () => {
 export const useEditarProducto = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, ...payload }: Partial<Producto> & { id: string }) => {
+    mutationFn: async ({ id, presentaciones, ...datos }: {
+      id:             string
+      nombre?:        string
+      categoria_id?:  string | null
+      activo?:        boolean
+      presentaciones?: PresentacionInput[]
+    }) => {
       const patch: Record<string, unknown> = {}
-      if (payload.nombre           !== undefined) patch.nombre           = payload.nombre
-      if (payload.fragancia        !== undefined) patch.fragancia        = payload.fragancia    || null
-      if (payload.categoria_id     !== undefined) patch.categoria_id     = payload.categoria_id || null
-      if (payload.unidad_medida    !== undefined) patch.unidad_medida    = payload.unidad_medida
-      if (payload.presentacion     !== undefined) patch.presentacion     = payload.presentacion
-      if (payload.precio_minorista !== undefined) patch.precio_minorista = payload.precio_minorista
-      if (payload.precio_mayorista !== undefined) patch.precio_mayorista = payload.precio_mayorista
-      if (payload.costo_produccion !== undefined) patch.costo_produccion = payload.costo_produccion
-      if (payload.activo           !== undefined) patch.activo           = payload.activo
-      if (payload.codigo           !== undefined) patch.codigo           = payload.codigo || null
+      if (datos.nombre       !== undefined) patch.nombre       = datos.nombre
+      if (datos.categoria_id !== undefined) patch.categoria_id = datos.categoria_id || null
+      if (datos.activo       !== undefined) patch.activo       = datos.activo
+
+      if (Object.keys(patch).length > 0) {
+        const { error } = await supabase.from('productos').update(patch).eq('id', id)
+        if (error) throw new Error(error.message)
+      }
+
+      if (presentaciones) {
+        const { error: delErr } = await supabase.from('producto_presentaciones').delete().eq('producto_id', id)
+        if (delErr) throw new Error(delErr.message)
+
+        const { error: insErr } = await supabase.from('producto_presentaciones').insert(
+          presentaciones.map(p => ({
+            producto_id:       id,
+            presentacion:      p.presentacion,
+            precio_minorista:  p.precio_minorista,
+            precio_mayorista:  p.precio_mayorista,
+            costo_produccion:  p.costo_produccion,
+          }))
+        )
+        if (insErr) throw new Error(insErr.message)
+      }
 
       const { data, error } = await supabase
         .from('productos')
-        .update(patch)
+        .select('*, categorias_producto(id, nombre), producto_presentaciones(*)')
         .eq('id', id)
-        .select('*, categorias_producto(id, nombre)')
         .single()
-
       if (error) throw new Error(error.message)
       return parseProducto(data)
     },
@@ -181,13 +230,22 @@ export const useBorrarProducto = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
-      const { count, error: countErr } = await supabase
-        .from('pedido_items')
-        .select('id', { count: 'exact', head: true })
+      const { data: presentaciones, error: presErr } = await supabase
+        .from('producto_presentaciones')
+        .select('id')
         .eq('producto_id', id)
+      if (presErr) throw new Error(presErr.message)
 
-      if (countErr) throw new Error(countErr.message)
-      if (count && count > 0) throw new Error('HAS_ORDERS')
+      const presentacionIds = (presentaciones ?? []).map(p => p.id)
+      if (presentacionIds.length > 0) {
+        const { count, error: countErr } = await supabase
+          .from('pedido_items')
+          .select('id', { count: 'exact', head: true })
+          .in('presentacion_id', presentacionIds)
+
+        if (countErr) throw new Error(countErr.message)
+        if (count && count > 0) throw new Error('HAS_ORDERS')
+      }
 
       const { error } = await supabase.from('productos').delete().eq('id', id)
       if (error) throw new Error(error.message)

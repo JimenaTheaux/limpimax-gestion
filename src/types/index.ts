@@ -59,34 +59,47 @@ export interface CategoriaProducto {
   nombre: string
 }
 
+export interface ProductoPresentacion {
+  id:               string
+  producto_id:      string
+  presentacion:     number   // litros: 0.5, 1, 3, 5, 10, 20
+  precio_minorista: number
+  precio_mayorista: number
+  costo_produccion: number
+  created_at:       string
+  updated_at:       string
+}
+
 export interface Producto {
-  id:                string
-  codigo:            string | null
-  nombre:            string
-  fragancia:         string | null
-  categoria_id:      string | null
-  unidad_medida:     string
-  presentacion:      number
-  precio_minorista:  number
-  precio_mayorista:  number
-  costo_produccion:  number
-  activo:            boolean
-  created_at:        string
-  updated_at:        string
-  // Join opcional
-  categorias_producto?: CategoriaProducto | null
+  id:           string
+  nombre:       string
+  categoria_id: string | null
+  activo:       boolean
+  created_at:   string
+  updated_at:   string
+  // Joins opcionales
+  categorias_producto?:     CategoriaProducto | null
+  producto_presentaciones?: ProductoPresentacion[]
+}
+
+export interface Fragancia {
+  id:     string
+  nombre: string
+  activo: boolean
 }
 
 export interface PedidoItem {
   id:                string
   pedido_id:         string
-  producto_id:       string
+  presentacion_id:   string
+  fragancia_id:      string | null
   cantidad:          number
   precio_unitario:   number
   precio_referencia: number
   bidon_nuevo:       boolean
-  // Join opcional
-  productos?: Pick<Producto, 'nombre' | 'fragancia' | 'presentacion' | 'precio_minorista' | 'precio_mayorista'> | null
+  // Joins opcionales
+  producto_presentaciones?: (ProductoPresentacion & { productos?: Pick<Producto, 'nombre'> | null }) | null
+  fragancias?: Fragancia | null
 }
 
 export interface PedidoHistorial {
@@ -175,3 +188,22 @@ export const formatNumero = (n: number): string => `P-${String(n).padStart(5, '0
 export const totalPedido = (
   pedido: Pick<Pedido, 'total_manual' | 'total_calculado'>
 ): number => pedido.total_manual ?? pedido.total_calculado
+
+/** Forma mínima que necesita formatearItem — permite reusarla con joins de distinta forma (PedidoItem, resúmenes, etc.) */
+export type ItemFormateable = {
+  producto_presentaciones?: { presentacion: number; productos?: { nombre: string } | null } | null
+  fragancias?: { nombre: string } | null
+}
+
+/** Única función que arma el string de un ítem de pedido — nunca concatenar inline */
+export function formatearItem(item: ItemFormateable): string {
+  const nombre       = item.producto_presentaciones?.productos?.nombre ?? '—'
+  const fragancia    = item.fragancias?.nombre
+  const presentacion = item.producto_presentaciones?.presentacion
+
+  const partes = [nombre]
+  if (fragancia)    partes.push(fragancia)
+  if (presentacion) partes.push(`${presentacion}L`)
+
+  return partes.join(' · ')
+}

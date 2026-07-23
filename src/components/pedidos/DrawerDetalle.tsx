@@ -9,7 +9,7 @@ import {
   usePedidoDetalle, useCambiarEstado, useAnularPedido, useEditarCobro, useCerrarPedido,
   totalPedido, type PedidoDetalle, type PagoInput,
 } from '@/services/pedidos'
-import { ESTADO_CONFIG, formatNumero, type EstadoPedido } from '@/types'
+import { ESTADO_CONFIG, formatNumero, formatearItem, type EstadoPedido } from '@/types'
 import { useAuthStore }      from '@/store/authStore'
 import { useCompartirFactura } from '@/hooks/useCompartirFactura'
 
@@ -270,7 +270,7 @@ export function DrawerDetalle({ pedidoId, open, onClose, onEditar, onSaved }: Pr
                       <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: 10, marginBottom: 10, borderBottom: '1px solid #F4F6F8' }}>
                         <div>
                           <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>
-                            {item.productos?.nombre}
+                            {formatearItem(item)}
                             {item.bidon_nuevo && (
                               <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, background: '#FFF3E0', color: '#F57C00', padding: '2px 6px', borderRadius: 99 }}>BIDÓN NUEVO</span>
                             )}

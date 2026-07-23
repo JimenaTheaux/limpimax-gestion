@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Search, Edit2, Package, MoreHorizontal, Eye, EyeOff, Trash2, Pencil, ChevronDown } from 'lucide-react'
+import { Plus, Search, Edit2, Package, MoreHorizontal, Eye, EyeOff, Trash2, Pencil, ChevronDown, X, Droplet } from 'lucide-react'
 import { Skeleton }       from '@/components/ui/skeleton'
 import { Drawer }         from '@/components/common/Drawer'
 import { FloatInput }     from '@/components/common/FloatInput'
@@ -14,20 +14,42 @@ import {
   useCrearProducto, useEditarProducto, useCrearCategoria,
   useEditarCategoria, useBorrarCategoria, useBorrarProducto,
 } from '@/services/productos'
+import {
+  useAllFragancias, useCrearFragancia, useEditarFragancia,
+  useToggleFragancia, useBorrarFragancia,
+} from '@/services/fragancias'
 import { useDebounce } from '@/hooks/useDebounce'
 import type { Producto } from '@/types'
 
+// ─── Constantes ───────────────────────────────────────────────────────────────
+
+const PRESENTACIONES_VALIDAS = ['0.5', '1', '3', '5', '10', '20'] as const
+
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
+const presentacionSchema = z.object({
+  presentacion:     z.enum(PRESENTACIONES_VALIDAS, { message: 'Seleccioná una presentación' }),
+  precio_minorista: z.string().min(1, 'Requerido').regex(/^\d+(\.\d{0,2})?$/, 'Precio inválido'),
+  precio_mayorista: z.string().min(1, 'Requerido').regex(/^\d+(\.\d{0,2})?$/, 'Precio inválido'),
+  costo_produccion: z.string().optional(),
+})
+
 const schema = z.object({
-  nombre:           z.string().min(1, 'El nombre es obligatorio'),
-  fragancia:        z.string().optional(),
-  categoriaId:      z.string().optional(),
-  presentacion:     z.enum(['0.5', '3', '5', '10', '20'], { message: 'Seleccioná una presentación' }),
-  precioMinorista:  z.string().min(1, 'Requerido').regex(/^\d+(\.\d{0,2})?$/, 'Precio inválido'),
-  precioMayorista:  z.string().min(1, 'Requerido').regex(/^\d+(\.\d{0,2})?$/, 'Precio inválido'),
-  costoProduccion:  z.string().optional(),
-  codigo:           z.string().optional(),
+  nombre:         z.string().min(1, 'El nombre es obligatorio'),
+  categoriaId:    z.string().optional(),
+  presentaciones: z.array(presentacionSchema).min(1, 'Agregá al menos una presentación'),
+}).superRefine((data, ctx) => {
+  const vistos = new Set<string>()
+  data.presentaciones.forEach((p, i) => {
+    if (vistos.has(p.presentacion)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Presentación repetida',
+        path: ['presentaciones', i, 'presentacion'],
+      })
+    }
+    vistos.add(p.presentacion)
+  })
 })
 
 type FormData = z.infer<typeof schema>
@@ -47,6 +69,18 @@ const LABEL_S: React.CSSProperties = {
   display: 'block', marginBottom: 5,
 }
 
+function presentacionDefaults(producto: Producto | null): FormData['presentaciones'] {
+  if (producto?.producto_presentaciones?.length) {
+    return producto.producto_presentaciones.map(p => ({
+      presentacion:     String(p.presentacion) as FormData['presentaciones'][number]['presentacion'],
+      precio_minorista: String(p.precio_minorista),
+      precio_mayorista: String(p.precio_mayorista),
+      costo_produccion: String(p.costo_produccion ?? 0),
+    }))
+  }
+  return [{ presentacion: '5', precio_minorista: '', precio_mayorista: '', costo_produccion: '' }]
+}
+
 function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
   const crear    = useCrearProducto()
   const editar   = useEditarProducto()
@@ -58,54 +92,42 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
   const [activo,  setActivo]  = useState(producto?.activo ?? true)
   const saving = crear.isPending || editar.isPending
 
-  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, reset, watch, setValue, control, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      nombre:           producto?.nombre                                                    ?? '',
-      fragancia:        producto?.fragancia                                                 ?? '',
-      categoriaId:      producto?.categoria_id                                              ?? '',
-      presentacion:     (producto?.presentacion != null ? String(producto.presentacion) : '5') as FormData['presentacion'],
-      precioMinorista:  producto?.precio_minorista != null ? String(producto.precio_minorista) : '',
-      precioMayorista:  producto?.precio_mayorista != null ? String(producto.precio_mayorista) : '',
-      costoProduccion:  producto?.costo_produccion != null ? String(producto.costo_produccion) : '',
-      codigo:           producto?.codigo                                                    ?? '',
+      nombre:         producto?.nombre       ?? '',
+      categoriaId:    producto?.categoria_id ?? '',
+      presentaciones: presentacionDefaults(producto),
     },
   })
+
+  const { fields, append, remove } = useFieldArray({ control, name: 'presentaciones' })
 
   const categoriaVal = watch('categoriaId')
 
   const onSubmit = async (data: FormData) => {
-    const presentacionNum  = parseFloat(data.presentacion)
-    const minorista        = parseFloat(data.precioMinorista)
-    const mayorista        = parseFloat(data.precioMayorista)
-    const costoProduccion  = parseFloat(data.costoProduccion || '0') || 0
+    const presentaciones = data.presentaciones.map(p => ({
+      presentacion:     parseFloat(p.presentacion),
+      precio_minorista: parseFloat(p.precio_minorista),
+      precio_mayorista: parseFloat(p.precio_mayorista),
+      costo_produccion: parseFloat(p.costo_produccion || '0') || 0,
+    }))
     try {
       if (producto) {
         await editar.mutateAsync({
-          id:               producto.id,
-          nombre:           data.nombre,
-          fragancia:        data.fragancia   || null,
-          categoria_id:     data.categoriaId || null,
-          presentacion:     presentacionNum,
-          precio_minorista: minorista,
-          precio_mayorista: mayorista,
-          costo_produccion: costoProduccion,
-          codigo:           data.codigo      || null,
+          id:           producto.id,
+          nombre:       data.nombre,
+          categoria_id: data.categoriaId || null,
           activo,
+          presentaciones,
         })
         onSaved('Producto actualizado correctamente')
       } else {
         await crear.mutateAsync({
-          nombre:           data.nombre,
-          fragancia:        data.fragancia   || null,
-          categoria_id:     data.categoriaId || null,
-          unidad_medida:    'litros',
-          presentacion:     presentacionNum,
-          precio_minorista: minorista,
-          precio_mayorista: mayorista,
-          costo_produccion: costoProduccion,
+          nombre:       data.nombre,
+          categoria_id: data.categoriaId || null,
           activo,
-          codigo:           data.codigo      || null,
+          presentaciones,
         })
         onSaved('Producto creado correctamente')
         reset()
@@ -121,14 +143,9 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
   useEffect(() => {
     if (!open) return
     reset({
-      nombre:           producto?.nombre                                                    ?? '',
-      fragancia:        producto?.fragancia                                                 ?? '',
-      categoriaId:      producto?.categoria_id                                              ?? '',
-      presentacion:     (producto?.presentacion != null ? String(producto.presentacion) : '5') as FormData['presentacion'],
-      precioMinorista:  producto?.precio_minorista != null ? String(producto.precio_minorista) : '',
-      precioMayorista:  producto?.precio_mayorista != null ? String(producto.precio_mayorista) : '',
-      costoProduccion:  producto?.costo_produccion != null ? String(producto.costo_produccion) : '',
-      codigo:           producto?.codigo                                                    ?? '',
+      nombre:         producto?.nombre       ?? '',
+      categoriaId:    producto?.categoria_id ?? '',
+      presentaciones: presentacionDefaults(producto),
     })
     setActivo(producto?.activo ?? true)
   }, [open, producto])
@@ -213,7 +230,7 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
         onSubmit={handleSubmit(onSubmit)}
         style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
       >
-        {/* Grid 1: Nombre + Categoría */}
+        {/* Nombre + Categoría */}
         <div className="form-grid-2">
           <FloatInput label="Nombre *" error={errors.nombre?.message} {...register('nombre')} />
 
@@ -287,47 +304,113 @@ function ProductoDrawer({ open, onClose, producto, onSaved }: DrawerProps) {
           </div>
         </div>
 
-        {/* Grid 2: Fragancia + Presentación */}
-        <div className="form-grid-2">
-          <FloatInput label="Fragancia" {...register('fragancia')} />
-
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={LABEL_S}>Presentación *</span>
-            <div style={{ position: 'relative' }}>
-              <select
-                {...register('presentacion')}
-                className="fi-input"
-                style={{ ...selectStyle, borderColor: errors.presentacion ? '#D32F2F' : '#D1D5DB' }}
-              >
-                <option value="0.5">500 ml</option>
-                <option value="3">3 L</option>
-                <option value="5">5 L</option>
-                <option value="10">10 L</option>
-                <option value="20">20 L</option>
-              </select>
-              <ChevronDown size={13} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#4A5568' }} />
-            </div>
-            {errors.presentacion && <span style={{ color: '#D32F2F', fontSize: 11, marginTop: 4 }}>{errors.presentacion.message}</span>}
+        {/* Presentaciones */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={LABEL_S}>Presentaciones *</span>
+            {errors.presentaciones?.message && (
+              <span style={{ color: '#D32F2F', fontSize: 11 }}>{errors.presentaciones.message}</span>
+            )}
           </div>
-        </div>
 
-        {/* Grid 3: Precio min + Precio may */}
-        <div className="form-grid-2">
-          <FloatInput label="Precio minorista *" error={errors.precioMinorista?.message} {...register('precioMinorista')} inputMode="decimal" />
-          <FloatInput label="Precio mayorista *" error={errors.precioMayorista?.message} {...register('precioMayorista')} inputMode="decimal" />
-        </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {fields.map((field, i) => {
+              const rowErr = errors.presentaciones?.[i]
+              return (
+                <div key={field.id} style={{
+                  display: 'grid', gridTemplateColumns: '76px 1fr 1fr 1fr 28px', gap: 6, alignItems: 'start',
+                  background: '#F9FAFB', border: '0.5px solid #D1D5DB', borderRadius: 8, padding: 8,
+                }}>
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      {...register(`presentaciones.${i}.presentacion`)}
+                      className="fi-input"
+                      style={{ ...selectStyle, height: 34, fontSize: 12, borderColor: rowErr?.presentacion ? '#D32F2F' : '#D1D5DB' }}
+                    >
+                      {PRESENTACIONES_VALIDAS.map(p => (
+                        <option key={p} value={p}>{p === '0.5' ? '500 ml' : `${p} L`}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={11} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#4A5568' }} />
+                  </div>
 
-        <div style={{ borderLeft: '3px solid #F57C00', paddingLeft: 10, borderRadius: '0 8px 8px 0', background: '#FFF9F0', padding: '10px 10px 10px 12px' }}>
-          <FloatInput
-            label="Costo de producción"
-            hint="Solo uso interno — no se muestra al cliente"
-            {...register('costoProduccion')}
-            inputMode="decimal"
-            style={{ background: '#FFF9F0' }}
-          />
-        </div>
+                  <input
+                    {...register(`presentaciones.${i}.precio_minorista`)}
+                    placeholder="Precio min."
+                    inputMode="decimal"
+                    className="fi-input"
+                    style={{
+                      height: 34, padding: '0 8px', fontSize: 12,
+                      border: `0.5px solid ${rowErr?.precio_minorista ? '#D32F2F' : '#D1D5DB'}`,
+                      borderRadius: 6, outline: 0, background: '#fff', color: '#1A2B3C',
+                      fontFamily: 'Inter, sans-serif', boxSizing: 'border-box', width: '100%',
+                    }}
+                  />
 
-        <FloatInput label="Código (opcional)" {...register('codigo')} />
+                  <input
+                    {...register(`presentaciones.${i}.precio_mayorista`)}
+                    placeholder="Precio may."
+                    inputMode="decimal"
+                    className="fi-input"
+                    style={{
+                      height: 34, padding: '0 8px', fontSize: 12,
+                      border: `0.5px solid ${rowErr?.precio_mayorista ? '#D32F2F' : '#D1D5DB'}`,
+                      borderRadius: 6, outline: 0, background: '#fff', color: '#1A2B3C',
+                      fontFamily: 'Inter, sans-serif', boxSizing: 'border-box', width: '100%',
+                    }}
+                  />
+
+                  <input
+                    {...register(`presentaciones.${i}.costo_produccion`)}
+                    placeholder="Costo prod."
+                    inputMode="decimal"
+                    className="fi-input"
+                    style={{
+                      height: 34, padding: '0 8px', fontSize: 12,
+                      border: '0.5px solid #D1D5DB',
+                      borderRadius: 6, outline: 0, background: '#FFF9F0', color: '#1A2B3C',
+                      fontFamily: 'Inter, sans-serif', boxSizing: 'border-box', width: '100%',
+                    }}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => fields.length > 1 && remove(i)}
+                    disabled={fields.length <= 1}
+                    aria-label="Quitar presentación"
+                    style={{
+                      width: 28, height: 34, background: 'transparent', border: 'none',
+                      cursor: fields.length <= 1 ? 'not-allowed' : 'pointer',
+                      color: fields.length <= 1 ? '#D1D5DB' : '#D32F2F',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
+
+                  {(rowErr?.presentacion || rowErr?.precio_minorista || rowErr?.precio_mayorista) && (
+                    <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#D32F2F' }}>
+                      {rowErr.presentacion?.message || rowErr.precio_minorista?.message || rowErr.precio_mayorista?.message}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => append({ presentacion: '5', precio_minorista: '', precio_mayorista: '', costo_produccion: '' })}
+            style={{
+              marginTop: 8, width: '100%', height: 34, background: 'transparent',
+              border: '0.5px dashed #1B9ED6', borderRadius: 8, color: '#1B9ED6',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}
+          >
+            <Plus size={13} /> Agregar presentación
+          </button>
+        </div>
 
         {/* Toggle activo/inactivo */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: '#F9FAFB', borderRadius: 8, border: '0.5px solid #D1D5DB' }}>
@@ -371,12 +454,29 @@ function BadgeActivo({ activo }: { activo: boolean }) {
   )
 }
 
+function BadgesPresentaciones({ producto }: { producto: Producto }) {
+  const presentaciones = producto.producto_presentaciones ?? []
+  if (!presentaciones.length) return <span style={{ color: '#D1D5DB', fontSize: 12 }}>—</span>
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+      {[...presentaciones].sort((a, b) => a.presentacion - b.presentacion).map(p => (
+        <span key={p.id} style={{
+          fontSize: 10, fontWeight: 500, color: '#0D5C8A', background: '#E8F4FF',
+          padding: '1px 7px', borderRadius: 99, whiteSpace: 'nowrap',
+        }}>
+          {presentacionLabel(p.presentacion)}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 // ─── Shimmer ──────────────────────────────────────────────────────────────────
 
 function ShimmerRow() {
   return (
     <tr>
-      {[160, 90, 55, 90, 90, 55, 28].map((w, i) => (
+      {[160, 90, 120, 55, 28].map((w, i) => (
         <td key={i} style={{ padding: '10px 14px', borderBottom: '0.5px solid #F4F6F8' }}>
           <Skeleton style={{ height: 13, width: w, borderRadius: 6 }} />
         </td>
@@ -644,6 +744,252 @@ function CategoriasDrawer({ open, onClose, onMsg }: CatDrawerProps) {
   )
 }
 
+// ─── Gestión de fragancias ─────────────────────────────────────────────────────
+
+interface FraganciasDrawerProps {
+  open:    boolean
+  onClose: () => void
+  onMsg:   (msg: string) => void
+}
+
+function FraganciasDrawer({ open, onClose, onMsg }: FraganciasDrawerProps) {
+  const { data: fragancias, isLoading } = useAllFragancias()
+  const crear  = useCrearFragancia()
+  const editar = useEditarFragancia()
+  const toggle = useToggleFragancia()
+  const borrar = useBorrarFragancia()
+
+  const [editId,     setEditId]     = useState<string | null>(null)
+  const [editNombre, setEditNombre] = useState('')
+  const [deleteId,   setDeleteId]   = useState<string | null>(null)
+  const [newNombre,  setNewNombre]  = useState('')
+  const [showNew,    setShowNew]    = useState(false)
+
+  const resetAll = () => { setEditId(null); setDeleteId(null); setShowNew(false); setNewNombre('') }
+
+  useEffect(() => { if (!open) resetAll() }, [open])
+
+  const handleSaveEdit = async () => {
+    if (!editId || !editNombre.trim()) return
+    try {
+      await editar.mutateAsync({ id: editId, nombre: editNombre.trim() })
+      setEditId(null)
+      onMsg('Fragancia actualizada')
+    } catch {
+      onMsg('Error al actualizar la fragancia|error')
+    }
+  }
+
+  const handleToggle = async (id: string, activo: boolean) => {
+    try {
+      await toggle.mutateAsync({ id, activo: !activo })
+    } catch {
+      onMsg('Error al actualizar la fragancia|error')
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await borrar.mutateAsync(id)
+      setDeleteId(null)
+      onMsg('Fragancia eliminada')
+    } catch (e) {
+      setDeleteId(null)
+      if (e instanceof Error && e.message === 'HAS_ORDERS')
+        onMsg('No se puede borrar. Tiene pedidos asociados. Podés desactivarla en su lugar.|error')
+      else
+        onMsg('Error al borrar la fragancia|error')
+    }
+  }
+
+  const handleCrear = async () => {
+    if (!newNombre.trim()) return
+    try {
+      await crear.mutateAsync(newNombre.trim())
+      setNewNombre(''); setShowNew(false)
+      onMsg('Fragancia creada')
+    } catch {
+      onMsg('Error al crear la fragancia|error')
+    }
+  }
+
+  const footer = (
+    <button
+      type="button"
+      onClick={onClose}
+      className="btn-press drawer-btn-primary"
+      style={{ background: 'transparent', color: '#4A5568', border: 'none', fontSize: 14, cursor: 'pointer' }}
+    >
+      Cerrar
+    </button>
+  )
+
+  const inputStyle: CSSProperties = {
+    flex: 1, height: 32, padding: '0 10px',
+    border: '1.5px solid #1B9ED6', borderRadius: 6,
+    fontSize: 13, outline: 0, fontFamily: 'Inter, sans-serif', boxSizing: 'border-box',
+  }
+  const btnIconStyle: CSSProperties = {
+    width: 32, height: 32, background: 'transparent', border: 'none',
+    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6,
+  }
+
+  return (
+    <Drawer open={open} onClose={onClose} title="Gestionar fragancias" footer={footer}>
+      {showNew ? (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+          <input
+            autoFocus
+            value={newNombre}
+            onChange={e => setNewNombre(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleCrear()
+              if (e.key === 'Escape') { setShowNew(false); setNewNombre('') }
+            }}
+            placeholder="Nombre de fragancia"
+            style={{ ...inputStyle, height: 36 }}
+          />
+          <button
+            onClick={handleCrear}
+            disabled={crear.isPending || !newNombre.trim()}
+            style={{
+              height: 36, padding: '0 14px', background: '#0D5C8A', color: '#fff',
+              border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
+              cursor: crear.isPending ? 'not-allowed' : 'pointer', flexShrink: 0,
+            }}
+          >
+            {crear.isPending ? '…' : 'Crear'}
+          </button>
+          <button
+            onClick={() => { setShowNew(false); setNewNombre('') }}
+            style={{ ...btnIconStyle, border: '0.5px solid #D1D5DB', width: 36, height: 36, flexShrink: 0 }}
+          >
+            ✗
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setShowNew(true)}
+          className="btn-press"
+          style={{
+            width: '100%', height: 40, background: '#F4F6F8',
+            border: '0.5px dashed #1B9ED6', borderRadius: 10,
+            color: '#1B9ED6', fontSize: 13, fontWeight: 600,
+            cursor: 'pointer', marginBottom: 12,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}
+        >
+          <Plus size={14} /> Nueva fragancia
+        </button>
+      )}
+
+      {isLoading ? (
+        <div style={{ padding: 24, textAlign: 'center', color: '#4A5568', fontSize: 13 }}>Cargando…</div>
+      ) : !fragancias?.length ? (
+        <div style={{ padding: 24, textAlign: 'center', color: '#4A5568', fontSize: 13 }}>No hay fragancias aún</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {fragancias.map(frag => (
+            <div key={frag.id} style={{ background: '#fff', borderRadius: 10, border: '0.5px solid #D1D5DB', overflow: 'hidden' }}>
+              {editId === frag.id ? (
+                <div style={{ display: 'flex', gap: 8, padding: '8px 12px', alignItems: 'center' }}>
+                  <input
+                    autoFocus
+                    value={editNombre}
+                    onChange={e => setEditNombre(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleSaveEdit()
+                      if (e.key === 'Escape') setEditId(null)
+                    }}
+                    style={inputStyle}
+                  />
+                  <button
+                    onClick={handleSaveEdit}
+                    disabled={editar.isPending || !editNombre.trim()}
+                    style={{
+                      height: 32, padding: '0 10px', background: '#0D5C8A', color: '#fff',
+                      border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                      cursor: editar.isPending ? 'not-allowed' : 'pointer', flexShrink: 0,
+                    }}
+                  >
+                    ✓
+                  </button>
+                  <button
+                    onClick={() => setEditId(null)}
+                    style={{ ...btnIconStyle, border: '0.5px solid #D1D5DB', flexShrink: 0 }}
+                  >
+                    ✗
+                  </button>
+                </div>
+              ) : deleteId === frag.id ? (
+                <div style={{ padding: '10px 14px' }}>
+                  <p style={{ margin: '0 0 10px', fontSize: 13, color: '#1A2B3C' }}>
+                    ¿Borrar <strong>{frag.nombre}</strong>?
+                  </p>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={() => handleDelete(frag.id)}
+                      disabled={borrar.isPending}
+                      style={{
+                        flex: 1, height: 36, background: '#D32F2F', color: '#fff',
+                        border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                        cursor: borrar.isPending ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {borrar.isPending ? 'Borrando…' : 'Sí, borrar'}
+                    </button>
+                    <button
+                      onClick={() => setDeleteId(null)}
+                      style={{
+                        flex: 1, height: 36, background: 'transparent', color: '#4A5568',
+                        border: '0.5px solid #D1D5DB', borderRadius: 8, fontSize: 13, cursor: 'pointer',
+                      }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', padding: '0 8px 0 14px', height: 48 }}>
+                  <span style={{ flex: 1, fontSize: 13, color: frag.activo ? '#1A2B3C' : '#9A9A9A' }}>{frag.nombre}</span>
+                  <BadgeActivo activo={frag.activo} />
+                  <button
+                    onClick={() => handleToggle(frag.id, frag.activo)}
+                    aria-label={frag.activo ? `Desactivar ${frag.nombre}` : `Activar ${frag.nombre}`}
+                    style={{ ...btnIconStyle, color: '#4A5568', marginLeft: 4 }}
+                    onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = '#F4F6F8')}
+                    onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
+                  >
+                    {frag.activo ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                  <button
+                    onClick={() => { setEditId(frag.id); setEditNombre(frag.nombre); setDeleteId(null) }}
+                    aria-label={`Editar ${frag.nombre}`}
+                    style={{ ...btnIconStyle, color: '#4A5568' }}
+                    onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = '#F4F6F8')}
+                    onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    onClick={() => { setDeleteId(frag.id); setEditId(null) }}
+                    aria-label={`Borrar ${frag.nombre}`}
+                    style={{ ...btnIconStyle, color: '#9A9A9A' }}
+                    onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = '#FDECEA')}
+                    onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Drawer>
+  )
+}
+
 // ─── Action sheet — acciones rápidas sobre producto ───────────────────────────
 
 type ActionStep = 'menu' | 'confirm-toggle' | 'confirm-delete'
@@ -693,7 +1039,6 @@ function ProductActionSheet({ product, step, onClose, onStep, onToggle, onDelete
           <>
             <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 600, color: '#1A2B3C' }}>
               {product.nombre}
-              {product.fragancia && <span style={{ fontWeight: 400, color: '#4A5568' }}> — {product.fragancia}</span>}
             </p>
             {sheetBtn(
               () => onStep('confirm-toggle'), false,
@@ -780,6 +1125,7 @@ export default function ProductosPage() {
   const [drawerOpen, setDrawer]   = useState(false)
   const [selected, setSelected]   = useState<Producto | null>(null)
   const [catDrawer, setCatDrawer] = useState(false)
+  const [fragDrawer, setFragDrawer] = useState(false)
   const [actionProduct, setActionProduct] = useState<Producto | null>(null)
   const [actionStep, setActionStep]       = useState<ActionStep>('menu')
   const { toasts, show, dismiss } = useToast()
@@ -917,6 +1263,19 @@ export default function ProductosPage() {
           </button>
         </div>
 
+        <button
+          onClick={() => setFragDrawer(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            height: 36, padding: '0 12px',
+            background: '#fff', border: '0.5px solid #D1D5DB', borderRadius: 8,
+            color: '#4A5568', fontSize: 12, fontWeight: 500,
+            cursor: 'pointer', whiteSpace: 'nowrap',
+          }}
+        >
+          <Droplet size={13} /> Gestionar fragancias
+        </button>
+
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
           {(['todos', 'activo', 'inactivo'] as ActivoFiltro[]).map(v => {
             const isActive = activoFiltro === v
@@ -947,7 +1306,7 @@ export default function ProductosPage() {
           <table className="prd-table" aria-label="Listado de productos">
             <thead>
               <tr style={{ background: '#F4F6F8', borderBottom: '0.5px solid #D1D5DB' }}>
-                {['Producto', 'Categoría', 'Presentación', 'Precio min.', 'Precio may.', 'Estado', 'Acciones'].map((h, i) => (
+                {['Producto', 'Categoría', 'Presentaciones', 'Estado', 'Acciones'].map((h, i) => (
                   <th
                     key={h}
                     scope="col"
@@ -955,7 +1314,7 @@ export default function ProductosPage() {
                       padding: '8px 14px',
                       fontSize: 10, fontWeight: 500, textTransform: 'uppercase',
                       letterSpacing: '0.06em', color: '#4A5568',
-                      textAlign: i === 6 ? 'right' : 'left',
+                      textAlign: i === 4 ? 'right' : 'left',
                       whiteSpace: 'nowrap',
                     }}
                   >
@@ -969,7 +1328,7 @@ export default function ProductosPage() {
                 Array.from({ length: 4 }).map((_, i) => <ShimmerRow key={i} />)
               ) : !productos?.length ? (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={5}>
                     <div style={{ padding: '48px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                       <Package size={40} strokeWidth={1.2} color="#D1D5DB" />
                       <p style={{ fontSize: 14, fontWeight: 500, color: '#1A2B3C', margin: 0 }}>Sin productos</p>
@@ -1001,27 +1360,12 @@ export default function ProductosPage() {
                       }}
                     >
                       {p.nombre}
-                      {p.fragancia && (
-                        <span style={{ fontWeight: 400, color: '#4A5568', fontSize: 12 }}> — {p.fragancia}</span>
-                      )}
                     </th>
                     <td style={{ padding: '0 14px', height: 48, fontSize: 12, color: p.categorias_producto?.nombre ? '#4A5568' : '#D1D5DB', borderBottom: '0.5px solid #F4F6F8', whiteSpace: 'nowrap' }}>
                       {p.categorias_producto?.nombre ?? '—'}
                     </td>
-                    <td style={{ padding: '0 14px', height: 48, fontSize: 12, color: '#1A2B3C', borderBottom: '0.5px solid #F4F6F8', whiteSpace: 'nowrap' }}>
-                      {presentacionLabel(p.presentacion)}
-                    </td>
-                    <td style={{ padding: '0 14px', height: 48, borderBottom: '0.5px solid #F4F6F8', whiteSpace: 'nowrap' }}>
-                      <span style={{ fontSize: 9, color: '#4A5568', marginRight: 3 }}>Min</span>
-                      <span style={{ fontSize: 12, fontWeight: 500, color: '#4A5568' }}>
-                        ${Number(p.precio_minorista).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                      </span>
-                    </td>
-                    <td style={{ padding: '0 14px', height: 48, borderBottom: '0.5px solid #F4F6F8', whiteSpace: 'nowrap' }}>
-                      <span style={{ fontSize: 9, color: '#4A5568', marginRight: 3 }}>May</span>
-                      <span style={{ fontSize: 12, fontWeight: 500, color: '#0D5C8A' }}>
-                        ${Number(p.precio_mayorista).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                      </span>
+                    <td style={{ padding: '8px 14px', borderBottom: '0.5px solid #F4F6F8' }}>
+                      <BadgesPresentaciones producto={p} />
                     </td>
                     <td style={{ padding: '0 14px', height: 48, borderBottom: '0.5px solid #F4F6F8', whiteSpace: 'nowrap' }}>
                       <BadgeActivo activo={p.activo ?? true} />
@@ -1121,25 +1465,20 @@ export default function ProductosPage() {
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   {/* Línea 1 */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <span style={{ fontWeight: 500, fontSize: 13, color: '#1A2B3C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, marginRight: 8 }}>
                       {p.nombre}
                     </span>
                     <BadgeActivo activo={p.activo ?? true} />
                   </div>
                   {/* Línea 2 */}
-                  <p style={{ fontSize: 12, color: '#4A5568', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {presentacionLabel(p.presentacion)}
-                    {p.categorias_producto?.nombre ? ` · ${p.categorias_producto.nombre}` : ''}
-                  </p>
-                  {/* Línea 3 */}
-                  <p style={{ fontSize: 11, color: '#4A5568', margin: 0 }}>
-                    Min ${Number(p.precio_minorista).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                    {' · '}
-                    <span style={{ color: '#0D5C8A' }}>
-                      May ${Number(p.precio_mayorista).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </p>
+                  {p.categorias_producto?.nombre && (
+                    <p style={{ fontSize: 12, color: '#4A5568', margin: '0 0 5px' }}>
+                      {p.categorias_producto.nombre}
+                    </p>
+                  )}
+                  {/* Línea 3 — badges de presentaciones */}
+                  <BadgesPresentaciones producto={p} />
                 </div>
                 <button
                   onClick={e => { e.stopPropagation(); handleOpenAction(p) }}
@@ -1165,6 +1504,7 @@ export default function ProductosPage() {
 
       <ProductoDrawer key={selected?.id ?? 'new'} open={drawerOpen} onClose={handleClose} producto={selected} onSaved={handleSaved} />
       <CategoriasDrawer open={catDrawer} onClose={() => setCatDrawer(false)} onMsg={handleSaved} />
+      <FraganciasDrawer open={fragDrawer} onClose={() => setFragDrawer(false)} onMsg={handleSaved} />
       <ProductActionSheet
         product={actionProduct}
         step={actionStep}

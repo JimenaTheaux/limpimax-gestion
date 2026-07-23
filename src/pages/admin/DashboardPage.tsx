@@ -17,16 +17,16 @@ Chart.register(...registerables)
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface PedidoItemRow {
-  cantidad:    number
-  producto_id: string
-  productos?:  {
-    nombre:               string
-    presentacion:         number
-    fragancia:            string | null
-    categorias_produto?: { nombre: string } | null
-    categorias_produto2?: { nombre: string } | null
-    categorias_producto?: { nombre: string } | null
+  cantidad:         number
+  presentacion_id:  string
+  producto_presentaciones?: {
+    presentacion: number
+    productos?: {
+      nombre: string
+      categorias_producto?: { nombre: string } | null
+    } | null
   } | null
+  fragancias?: { nombre: string } | null
 }
 
 interface PedidoRow {
@@ -96,7 +96,7 @@ function usePedidosPeriodo(inicio: string, fin: string) {
     queryFn:  async () => {
       const { data, error } = await supabase
         .from('pedidos')
-        .select('id, estado, fecha_produccion, pedido_items(cantidad, producto_id, productos(nombre, presentacion, fragancia, categorias_producto(nombre)))')
+        .select('id, estado, fecha_produccion, pedido_items(cantidad, presentacion_id, producto_presentaciones(presentacion, productos(nombre, categorias_producto(nombre))), fragancias(nombre))')
         .gte('created_at', inicio)
         .lte('created_at', fin + 'T23:59:59')
       if (error) throw new Error(error.message)
@@ -288,11 +288,11 @@ function calcTopProductos(pedidos: PedidoRow[]) {
   for (const p of pedidos) {
     if (p.estado !== 'cerrado') continue
     for (const item of p.pedido_items ?? []) {
-      const key = item.producto_id
+      const key = item.presentacion_id
       if (!acc[key]) acc[key] = {
-        nombre:       item.productos?.nombre       ?? '—',
-        presentacion: item.productos?.presentacion ?? 0,
-        fragancia:    item.productos?.fragancia    ?? null,
+        nombre:       item.producto_presentaciones?.productos?.nombre ?? '—',
+        presentacion: item.producto_presentaciones?.presentacion      ?? 0,
+        fragancia:    item.fragancias?.nombre ?? null,
         total:        0,
       }
       acc[key].total += Number(item.cantidad)
@@ -306,7 +306,7 @@ function calcTopCategorias(pedidos: PedidoRow[]): { nombre: string; total: numbe
   for (const p of pedidos) {
     if (p.estado !== 'cerrado') continue
     for (const item of p.pedido_items ?? []) {
-      const cat = item.productos?.categorias_producto?.nombre ?? 'Sin categoría'
+      const cat = item.producto_presentaciones?.productos?.categorias_producto?.nombre ?? 'Sin categoría'
       acc[cat] = (acc[cat] ?? 0) + Number(item.cantidad)
     }
   }

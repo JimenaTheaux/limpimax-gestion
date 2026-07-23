@@ -1,6 +1,6 @@
 import { Fragment } from 'react'
 import type { PedidoDetalle } from '@/services/pedidos'
-import { totalPedido } from '@/types'
+import { totalPedido, formatearItem } from '@/types'
 
 function fmtFecha(iso: string | null): string {
   if (!iso) return '—'
@@ -133,8 +133,7 @@ export function FacturaCanvas({ pedido }: { pedido: PedidoDetalle }) {
               <tr>
                 <td style={{ padding: '8px 6px 2px 6px', verticalAlign: 'top' }}>
                   <div style={{ fontSize: 12, fontWeight: 500, color: '#1A2B3C', lineHeight: 1.3 }}>
-                    {item.productos?.nombre ?? '—'}
-                    {item.productos?.presentacion ? ` — ${item.productos.presentacion}L` : ''}
+                    {formatearItem(item)}
                   </div>
                 </td>
                 <td style={{ textAlign: 'center', padding: '8px 6px 2px', fontSize: 12, verticalAlign: 'top' }}>

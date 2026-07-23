@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Printer, X } from 'lucide-react'
 import { usePedidoDetalle, totalPedido } from '@/services/pedidos'
-import { ESTADO_CONFIG } from '@/types'
+import { ESTADO_CONFIG, formatearItem } from '@/types'
 
 export default function PrintPedidoPage() {
   const { id }     = useParams<{ id: string }>()
@@ -151,9 +151,7 @@ export default function PrintPedidoPage() {
               return (
                 <tr key={i} style={{ borderBottom: '1px solid #F4F6F8' }}>
                   <td style={{ padding: '10px 4px', fontSize: 13 }}>
-                    {item.productos?.nombre}
-                    {item.productos?.fragancia ? ` (${item.productos.fragancia})` : ''}
-                    {item.productos?.presentacion ? ` — ${item.productos.presentacion}L` : ''}
+                    {formatearItem(item)}
                     {item.bidon_nuevo && (
                       <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, background: '#FFF3E0', color: '#F57C00', padding: '1px 5px', borderRadius: 99 }}>
                         BIDÓN NUEVO
