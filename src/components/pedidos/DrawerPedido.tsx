@@ -730,20 +730,18 @@ function ItemFormInline({
       border: '0.5px solid #D1D5DB', display: 'flex', flexDirection: 'column',
       gap: 10, animation: 'fadeSlideIn 0.18s ease', marginTop: 4,
     }}>
-      {/* Paso 1 — Producto (una vez elegida la presentación, se resume en la fila combinada de abajo) */}
-      {!presentacionSel && (
-        <div>
-          <label style={{ fontSize: 10, fontWeight: 500, color: '#4A5568', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>
-            Producto
-          </label>
-          <SelectorProducto
-            value={prodId}
-            onChange={handleProductoChange}
-            productos={productos}
-            error={lErr && !prodId ? lErr : undefined}
-          />
-        </div>
-      )}
+      {/* Paso 1 — Producto (colapsa a chip compacto una vez elegido) */}
+      <div>
+        <label style={{ fontSize: 10, fontWeight: 500, color: '#4A5568', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>
+          Producto
+        </label>
+        <SelectorProducto
+          value={prodId}
+          onChange={handleProductoChange}
+          productos={productos}
+          error={lErr && !prodId ? lErr : undefined}
+        />
+      </div>
 
       {/* Paso 2 — Presentación (se omite si el producto tiene una sola) */}
       {productoSel && presentacionesProducto.length > 1 && (
@@ -760,20 +758,9 @@ function ItemFormInline({
         </div>
       )}
 
-      {/* Paso 3 — Producto (resumen) + Cantidad + Precio + Quitar, combinados en una fila en desktop */}
+      {/* Paso 3 — Cantidad + Precio + Quitar, combinados en una fila en desktop */}
       {presentacionSel && (
         <div className="ped-item-row">
-          <div>
-            <label style={{ fontSize: 10, fontWeight: 500, color: '#4A5568', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>
-              Producto
-            </label>
-            <SelectorProducto
-              value={prodId}
-              onChange={handleProductoChange}
-              productos={productos}
-              error={lErr && !prodId ? lErr : undefined}
-            />
-          </div>
           {isEdit && register && index !== undefined ? (
             <>
               <FloatInput label="Cantidad" {...register(`items.${index}.cantidad`)} inputMode="decimal" />

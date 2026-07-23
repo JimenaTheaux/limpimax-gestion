@@ -247,7 +247,7 @@
   @media (min-width: 1024px) {
     .ped-item-row {
       display: grid;
-      grid-template-columns: 45% 20% 25% 10%;
+      grid-template-columns: 1fr 1fr 56px;
       gap: 10px;
       align-items: start;
     }
